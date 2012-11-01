@@ -1,9 +1,10 @@
-import mdp
-
-from matplotlib.pyplot import *
 import math
 import numpy as np
 import random
+
+from matplotlib import pyplot
+
+import mdp
 
 
 class WorldModelTree(object):
@@ -193,7 +194,7 @@ class WorldModelTree(object):
         """
         Adds a matrix x of new observations to the node. The data is
         interpreted as one observation following the previous one. This is
-        important to calculate the transition probabilites.
+        important to calculate the transition probabilities.
         If there has been data before, the new data is appended.
         """
 
@@ -216,11 +217,11 @@ class WorldModelTree(object):
             self.labels = labels
         else:
             first_data = self.data.shape[0]
-            first_source = first_i - 1
+            first_source = first_data - 1
             self.data = np.vstack([self.data, x])
             self.labels = np.vstack([self.labels, labels])
 
-        # add references to data in all leafes
+        # add references to data in all leaves
         all_leaves = self.leaves()
         N = self.data.shape[0]
         for i in range(first_data, N):
@@ -298,13 +299,13 @@ class WorldModelTree(object):
                 data_list.append(data)
 
         # plot
-        colormap = cm.prism
-        gca().set_color_cycle([colormap(i) for i in np.linspace(0, 0.98, 7)])
+        colormap = pyplot.cm.prism
+        pyplot.gca().set_color_cycle([colormap(i) for i in np.linspace(0, 0.98, 7)])
         for i, data in enumerate(data_list):
-            plot(data[:,0], data[:,1], self.symbols[i%len(self.symbols)])
+            pyplot.plot(data[:,0], data[:,1], self.symbols[i%len(self.symbols)])
             
         if show_plot:
-            show()
+            pyplot.show()
         return
 
 
@@ -804,13 +805,13 @@ if __name__ == "__main__":
             else:
                 break
 
-        sum = np.sum(tree._transition_matrix())
+        n_trans = np.sum(tree._transition_matrix())
         print 'final transitions:\n', tree._transition_matrix()
-        print 'sum:', sum
+        print 'sum:', n_trans
         print 'final entropy:', tree.entropy()
-        assert(sum == n-1)
+        assert(n_trans == n-1)
 
-        subplot(2, 2, p+1)
+        pyplot.subplot(2, 2, p+1)
         tree.plot_tree_data(show_plot=False)
 
-    show()
+    pyplot.show()
