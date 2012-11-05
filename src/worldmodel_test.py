@@ -39,7 +39,7 @@ class TrivialTransitionsTest(unittest.TestCase):
         data = worldmodel.problemChain(n=1000, seed=0)
         tree = worldmodel.WorldModelTree(normalized_entropy=True, global_entropy='weighted')
         tree.add_data(data)
-        trans = tree._transition_matrix()
+        trans = tree.transitions
         self.assertEqual(trans.shape, (1,1))
         self.assertEqual(trans[0,0], data.shape[0]-1) # n of transitions
 
@@ -63,7 +63,7 @@ class TrivialEntropyTests(unittest.TestCase):
             for global_entropy in ['sum', 'avg', 'weighted']:
                 tree = worldmodel.WorldModelTree(normalized_entropy=normalized_entropy, global_entropy=global_entropy)
                 tree.add_data(self.data)
-                trans = tree._transition_matrix()
+                trans = tree.transitions
                 entropy = tree._transition_entropy(trans_matrix=trans)
                 self.assertEqual(entropy, 1.0)
 
@@ -85,7 +85,7 @@ class VectorEntropyTests(unittest.TestCase):
                 tree = worldmodel.WorldModelTree(normalized_entropy=normalized_entropy, global_entropy=global_entropy)
                 for i in range(10):
                     zeros = np.zeros(i)
-                    entropy = tree._entropy(trans=zeros, warning=False)
+                    entropy = tree._entropy(trans=zeros, ignore_empty_classes=True)
                     self.assertEqual(entropy, 1.0)
 
     def testOneEntropy(self):
