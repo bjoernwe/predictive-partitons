@@ -89,7 +89,7 @@ class WorldModelTree(object):
             new_trans = self._splitted_transition_matrix(new_labels)
 
             # remember best split
-            new_entropy = self._transition_entropy(trans_matrix=new_trans, normalized_entropy=root._normalized_entropy, global_entropy=root._global_entropy)
+            new_entropy = self._transition_entropy(trans=new_trans, normalized_entropy=root._normalized_entropy, global_entropy=root._global_entropy)
 
             # correct by entropy of the split itself
             if self._split_entropy:
@@ -456,8 +456,7 @@ class WorldModelTree(object):
 
     def entropy(self):
         """
-        Calculates the (weighted) entropy of the target distribution for a node,
-        e.g., the root node.
+        Calculates the (weighted) entropy for the root node.
         """
         if self._is_splitted():
 
@@ -488,16 +487,16 @@ class WorldModelTree(object):
 
 
     @classmethod
-    def _transition_entropy(cls, trans_matrix, normalized_entropy, global_entropy):
+    def _transition_entropy(cls, trans, normalized_entropy, global_entropy):
         """
-        Calculates the entropy for the transition matrix.
+        Calculates the entropy for a given transition matrix.
         """
-        K = trans_matrix.shape[0]
+        K = trans.shape[0]
         row_entropies = np.zeros(K)
 
         # entropies for every row of matrix
         for i in range(K):
-            row = trans_matrix[i]
+            row = trans[i]
             row_entropies[i] = cls._entropy(trans=row, normalized_entropy=normalized_entropy)
 
         # (weighted) average
@@ -506,7 +505,7 @@ class WorldModelTree(object):
         elif global_entropy == 'avg':
             entropy = np.average(row_entropies)
         elif global_entropy == 'weighted':
-            weights = np.sum(trans_matrix, axis=1)
+            weights = np.sum(trans, axis=1)
             weights /= np.sum(weights)
             entropy = np.sum(weights * row_entropies)
         else:
@@ -515,21 +514,6 @@ class WorldModelTree(object):
         return entropy
 
 
-    def _state_entropy(self, trans=None, normalized_entropy=True):
-        """
-        Calculates the entropy of state space partitioning itself. It will be
-        maximal if all states are equally large. Optionally, a transition matrix
-        can be given.
-        """
-
-        if trans is None:
-            trans = self._transition_matrix()
-
-        class_sizes = np.sum(trans, axis=1)
-        entropy = self._entropy(trans=class_sizes, normalized_entropy=normalized_entropy)
-        return entropy
-
-    
     def _class_index(self):
         """
         Returns the class index/label of the node. Returns None if node is not
