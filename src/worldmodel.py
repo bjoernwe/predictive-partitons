@@ -11,7 +11,7 @@ class WorldModelTree(object):
 
     symbols = ['o', '^', 'd', 's', '*']
 
-    def __init__(self, normalized_entropy, global_entropy, parent=None):
+    def __init__(self, normalized_entropy, global_entropy, split_entropy, parent=None):
         self.parent = parent
         self.children = []
         self.data = None     # global data storage in root node
@@ -19,6 +19,7 @@ class WorldModelTree(object):
         self.transitions = None
         self._normalized_entropy = normalized_entropy
         self._global_entropy = global_entropy
+        self._split_entropy = split_entropy
         self._min_class_size = 10
 
 
@@ -90,10 +91,11 @@ class WorldModelTree(object):
             new_entropy = self._transition_entropy(trans_matrix = new_trans)
 
             # correct by entropy of the split itself
-            split_sizes = np.zeros(2)
-            split_sizes[0] = len(new_dat_ref[0])
-            split_sizes[1] = len(new_dat_ref[1])
-            new_entropy /= self._entropy(split_sizes)
+            if self._split_entropy:
+                split_sizes = np.zeros(2)
+                split_sizes[0] = len(new_dat_ref[0])
+                split_sizes[1] = len(new_dat_ref[1])
+                new_entropy /= self._entropy(split_sizes)
 
             if new_entropy < best_entropy:
                 best_entropy = new_entropy
@@ -113,8 +115,14 @@ class WorldModelTree(object):
         root.transitions = best_trans
 
         # create new leaves
-        child0 = self.__class__(normalized_entropy=self._normalized_entropy, global_entropy=self._global_entropy, parent=self)
-        child1 = self.__class__(normalized_entropy=self._normalized_entropy, global_entropy=self._global_entropy, parent=self)
+        child0 = self.__class__(normalized_entropy = self._normalized_entropy, 
+                                global_entropy = self._global_entropy,
+                                split_entropy = self._split_entropy,
+                                parent = self)
+        child1 = self.__class__(normalized_entropy = self._normalized_entropy, 
+                                global_entropy = self._global_entropy,
+                                split_entropy = self._split_entropy,
+                                parent = self)
         child0.dat_ref = best_refs[0]
         child1.dat_ref = best_refs[1]
 
@@ -581,8 +589,11 @@ class PCAWorldModelTree(WorldModelTree):
 
 class RandomWorldModelTree(WorldModelTree):
 
-    def __init__(self, normalized_entropy, global_entropy, parent=None, **kwargs):
-        super(RandomWorldModelTree, self).__init__(normalized_entropy, global_entropy, parent, **kwargs)
+    def __init__(self, normalized_entropy, global_entropy, split_entropy, parent = None):
+        super(RandomWorldModelTree, self).__init__(normalized_entropy = normalized_entropy, 
+                                                   global_entropy = global_entropy, 
+                                                   split_entropy = split_entropy, 
+                                                   parent = parent)
 
 
     def _init_test(self):
@@ -727,7 +738,7 @@ if __name__ == "__main__":
         n = 1000
         data = problem(n=n, seed=1)
 
-        tree = RandomWorldModelTree(normalized_entropy=True, global_entropy='weighted')
+        tree = RandomWorldModelTree(normalized_entropy=True, global_entropy='weighted', split_entropy=True)
         tree.add_data(data)
         
         while True:
