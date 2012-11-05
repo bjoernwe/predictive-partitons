@@ -19,6 +19,7 @@ class WorldModelTree(object):
         self.transitions = None
         self._normalized_entropy = normalized_entropy
         self._global_entropy = global_entropy
+        self._min_class_size = 10
 
 
     def classify(self, x):
@@ -65,7 +66,7 @@ class WorldModelTree(object):
 
         # check wether there's enough data
         # TODO parameterize
-        if len(self.dat_ref) < 10:
+        if len(self.dat_ref) < 2 * self._min_class_size:
             return 0
 
         # find best split ...
@@ -78,7 +79,8 @@ class WorldModelTree(object):
 
             # calculate labels and data for initialized split
             new_labels, new_dat_ref = self._relabel_data()
-            if len(new_dat_ref[0]) < 10 or len(new_dat_ref[1]) < 10:
+            if (len(new_dat_ref[0]) < self._min_class_size or 
+                len(new_dat_ref[1]) < self._min_class_size):
                 continue
             
             # calculate transitions matrix for new labels
@@ -290,18 +292,19 @@ class WorldModelTree(object):
         return self.root().leaves().index(self)
 
 
-    def plot_tree_data(self, show_plot=True):
+    def plot_tree_data(self, data_list=None, show_plot=True):
         """
         Plots all the data that is stored in the tree.
         """
 
-        # list of data for the different classes
-        data_list = []
-        all_leaves = self.leaves()
-        for leaf in all_leaves:
-            data = leaf.get_data()
-            if data is not None:
-                data_list.append(data)
+        if data_list is None:
+            # list of data for the different classes
+            data_list = []
+            all_leaves = self.leaves()
+            for leaf in all_leaves:
+                data = leaf.get_data()
+                if data is not None:
+                    data_list.append(data)
 
         # plot
         colormap = pyplot.cm.prism
@@ -679,17 +682,50 @@ def problemHoneycomb(n=1000, seed=None):
     return data
 
 
+def problemVoronoi(n=1000, k=3, seed=None):
+    
+    if seed is not None:
+        np.random.seed(seed)
+
+    # k class means
+    means = np.random.random((k, 2))
+    
+    # transition probabilities between classes
+    probs = np.random.random((k, k))
+    probs = probs / np.sum(probs, axis=1)[:,np.newaxis]
+    
+    data_list = []
+    current_class = 0
+    for _ in range(n):
+    
+        # weighted sample of next class
+        # from: http://stackoverflow.com/questions/6432499/how-to-do-weighted-random-sample-of-categories-in-python
+        next_class = np.array(probs[current_class]).cumsum().searchsorted(np.random.sample(1))
+        
+        right_class = False
+        while not right_class:
+            x = np.random.random(2)
+            distances = map(lambda m: np.linalg.norm(x-m), means)
+            c = np.argmin(distances)
+            right_class = (c==next_class)
+            
+        data_list.append(x)
+        current_class = next_class
+
+    return np.vstack(data_list)
+
+
 
 if __name__ == "__main__":
 
     problems = [problemChain, problemDiamond, problemHoneycomb]
-    #problems = [problemChain]
+    #problems = [problemVoronoi]
 
     for p, problem in enumerate(problems):
 
         # create data
         n = 1000
-        data = problem(n=n)
+        data = problem(n=n, seed=1)
 
         tree = RandomWorldModelTree(normalized_entropy=True, global_entropy='weighted')
         tree.add_data(data)
@@ -709,7 +745,7 @@ if __name__ == "__main__":
         print 'final entropy:', tree.entropy()
         assert(n_trans == n-1)
 
-        pyplot.subplot(2, 2, p+1)
+        pyplot.subplot(1, len(problems), p+1)
         tree.plot_tree_data(show_plot=False)
 
     pyplot.show()
