@@ -71,6 +71,7 @@ class WorldModelTree(object):
             return 0
 
         # find best split ...
+        root = self.root()
         best_entropy = float('Inf')
         for _ in range(100):
 
@@ -95,7 +96,7 @@ class WorldModelTree(object):
                 split_sizes = np.zeros(2)
                 split_sizes[0] = len(new_dat_ref[0])
                 split_sizes[1] = len(new_dat_ref[1])
-                new_entropy /= self._entropy(split_sizes)
+                new_entropy /= self._entropy(trans=split_sizes, normalized_entropy=root._normalized_entropy)
 
             if new_entropy < best_entropy:
                 best_entropy = new_entropy
@@ -105,7 +106,6 @@ class WorldModelTree(object):
                 best_test = self._get_test_parameters()
 
         # was there a good test at all?
-        root = self.root()
         if best_entropy >= root.entropy():
             return 0
 
@@ -414,17 +414,12 @@ class WorldModelTree(object):
     #    return trans
 
 
-    def _entropy(self, trans=None, ignore_empty_classes=False):
+    @classmethod
+    def _entropy(cls, trans, normalized_entropy, ignore_empty_classes=False):
         """
         Calculates the (normalized) entropy over the target state distribution
         for a leaf or a given list of transitions.
         """
-        # which transitions to use?
-        if trans is None:
-            root = self.root()
-            current_state = self.class_label()
-            assert current_state != None
-            trans = root.transitions[current_state]
 
         # negative values?
         assert True not in list(trans < -0.)
@@ -452,7 +447,7 @@ class WorldModelTree(object):
 
         # normalization?
         assert(entropy <= np.log2(K))
-        if self._normalized_entropy:
+        if normalized_entropy:
             entropy /= np.log2(K)
 
         assert(entropy >= 0)
@@ -467,8 +462,8 @@ class WorldModelTree(object):
         if self._is_splitted():
 
             # entropy of all leaves ...
-            leaves = self.leaves()
-            leaf_entropies = map(lambda leaf: leaf._entropy(), leaves)
+            root = self.root()
+            leaf_entropies = map(lambda t: WorldModelTree._entropy(trans=t, normalized_entropy=root._normalized_entropy), root.transitions)
 
             # (weighted) average
             if self._global_entropy == 'sum':
@@ -484,8 +479,10 @@ class WorldModelTree(object):
 
         else:
             # return entropy of leaf node
-            entropy = self._entropy()
-            #entropy /= self._state_entropy(normalized_entropy=normalized_entropy)
+            root = self.root()
+            current_state = self.class_label()
+            trans = root.transitions[current_state]
+            entropy = self._entropy(trans=trans, normalized_entropy=root._normalized_entropy)
 
         return entropy
 
@@ -494,13 +491,14 @@ class WorldModelTree(object):
         """
         Calculates the entropy for the transition matrix.
         """
+        root = self.root()
         K = trans_matrix.shape[0]
         row_entropies = np.zeros(K)
 
         # entropies for every row of matrix
         for i in range(K):
             row = trans_matrix[i]
-            row_entropies[i] = self._entropy(trans=row)
+            row_entropies[i] = self._entropy(trans=row, normalized_entropy=root._normalized_entropy)
 
         # (weighted) average
         if self._global_entropy == 'sum':

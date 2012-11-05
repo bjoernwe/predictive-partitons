@@ -75,7 +75,7 @@ class TrivialEntropyTests(unittest.TestCase):
                 for split_entropy in [False, True]:
                     tree = worldmodel.WorldModelTree(normalized_entropy=normalized_entropy, global_entropy=global_entropy, split_entropy=split_entropy)
                     tree.add_data(self.data)
-                    entropy = tree._entropy()
+                    entropy = tree.entropy()
                     self.assertEqual(entropy, 1.0)
 
 
@@ -84,71 +84,55 @@ class VectorEntropyTests(unittest.TestCase):
 
     def testZeroEntropy(self):
         for normalized_entropy in [False, True]:
-            for global_entropy in ['sum', 'avg', 'weighted']:
-                for split_entropy in [False, True]:
-                    tree = worldmodel.WorldModelTree(normalized_entropy=normalized_entropy, global_entropy=global_entropy, split_entropy=split_entropy)
-                    for i in range(10):
-                        zeros = np.zeros(i)
-                        entropy = tree._entropy(trans=zeros, ignore_empty_classes=True)
-                        self.assertEqual(entropy, 1.0)
+            for i in range(10):
+                zeros = np.zeros(i)
+                entropy = worldmodel.WorldModelTree._entropy(trans=zeros, normalized_entropy=normalized_entropy, ignore_empty_classes=True)
+                self.assertEqual(entropy, 1.0)
 
     def testOneEntropy(self):
-        for global_entropy in ['sum', 'avg', 'weighted']:
-            for split_entropy in [False, True]:
-                tree = worldmodel.WorldModelTree(normalized_entropy=True, global_entropy=global_entropy, split_entropy=split_entropy)
-                for i in range(2,10):
-                    ones = np.ones(i)
-                    entropy = tree._entropy(trans=ones)
-                    self.assertEqual(entropy, 1.0)
-            for split_entropy in [False, True]:
-                tree = worldmodel.WorldModelTree(normalized_entropy=False, global_entropy=global_entropy, split_entropy=split_entropy)
-                for i in range(2,10):
-                    ones = np.ones(i)
-                    entropy = tree._entropy(trans=ones)
-                    self.assertEqual(entropy, np.log2(i))
+        for i in range(2,10):
+            ones = np.ones(i)
+            entropy = worldmodel.WorldModelTree._entropy(trans=ones, normalized_entropy=True)
+            self.assertEqual(entropy, 1.0)
+        for i in range(2,10):
+            ones = np.ones(i)
+            entropy = worldmodel.WorldModelTree._entropy(trans=ones, normalized_entropy=False)
+            self.assertEqual(entropy, np.log2(i))
 
     def testCustomEntropy(self):
 
-        for global_entropy in ['sum', 'avg', 'weighted']:
+        # normalized
+        entropy = worldmodel.WorldModelTree._entropy(trans=np.array(range(2)), normalized_entropy=True)
+        self.assertEqual(entropy, 0.0)
+        entropy = worldmodel.WorldModelTree._entropy(trans=np.array(range(3)), normalized_entropy=True)
+        self.assertEqual(entropy, 0.5793801642856950)
+        entropy = worldmodel.WorldModelTree._entropy(trans=np.array(range(4)), normalized_entropy=True)
+        self.assertEqual(entropy, 0.72957395851362239)
 
-            for split_entropy in [False, True]:
-                
-                # normalized
-                tree = worldmodel.WorldModelTree(normalized_entropy=True, global_entropy=global_entropy, split_entropy=split_entropy)
-                entropy = tree._entropy(trans=np.array(range(2)))
-                self.assertEqual(entropy, 0.0)
-                entropy = tree._entropy(trans=np.array(range(3)))
-                self.assertEqual(entropy, 0.5793801642856950)
-                entropy = tree._entropy(trans=np.array(range(4)))
-                self.assertEqual(entropy, 0.72957395851362239)
-    
-                # not normalized
-                tree = worldmodel.WorldModelTree(normalized_entropy=False, global_entropy=global_entropy, split_entropy=split_entropy)
-                entropy = tree._entropy(trans=np.array(range(2)))
-                self.assertEqual(entropy, 0.0)
-                entropy = tree._entropy(trans=np.array(range(3)))
-                self.assertEqual(entropy, 0.91829583405448956)
-                entropy = tree._entropy(trans=np.array(range(4)))
-                self.assertEqual(entropy, 1.4591479170272448)
+        # not normalized
+        entropy = worldmodel.WorldModelTree._entropy(trans=np.array(range(2)), normalized_entropy=False)
+        self.assertEqual(entropy, 0.0)
+        entropy = worldmodel.WorldModelTree._entropy(trans=np.array(range(3)), normalized_entropy=False)
+        self.assertEqual(entropy, 0.91829583405448956)
+        entropy = worldmodel.WorldModelTree._entropy(trans=np.array(range(4)), normalized_entropy=False)
+        self.assertEqual(entropy, 1.4591479170272448)
 
     def testRandomEntropy(self):
         """
         Checks wether entropy of random vectors stays between 0 and 1.
         """
         np.random.seed(0)
-        tree = worldmodel.WorldModelTree(normalized_entropy=True, global_entropy='weighted', split_entropy=True)
         for l in range(10):
             for _ in range(1000):
                 p = l * np.random.random(l)
-                e = tree._entropy(trans=p)
+                e = worldmodel.WorldModelTree._entropy(trans=p, normalized_entropy=True)
                 self.assertGreaterEqual(e, 0.)
                 self.assertLessEqual(e, 1.)
 
-        tree = worldmodel.WorldModelTree(normalized_entropy=False, global_entropy='weighted', split_entropy=True)
         for l in range(2, 10):
             for _ in range(1000):
                 p = l * np.random.random(l)
-                e = tree._entropy(trans=p)
+                e = worldmodel.WorldModelTree._entropy(trans=p, normalized_entropy=True)
                 self.assertGreaterEqual(e, 0.)
                 self.assertLessEqual(e, np.log2(l))
 
