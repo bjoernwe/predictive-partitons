@@ -66,7 +66,7 @@ class TrivialEntropyTests(unittest.TestCase):
                     tree = worldmodel.WorldModelTree(normalized_entropy=normalized_entropy, global_entropy=global_entropy, split_entropy=split_entropy)
                     tree.add_data(self.data)
                     trans = tree.transitions
-                    entropy = tree._transition_entropy(trans_matrix=trans)
+                    entropy = worldmodel.WorldModelTree._transition_entropy(trans_matrix=trans, normalized_entropy=normalized_entropy, global_entropy=global_entropy)
                     self.assertEqual(entropy, 1.0)
 
     def testTrivialLeafEntropy(self):

@@ -89,7 +89,7 @@ class WorldModelTree(object):
             new_trans = self._splitted_transition_matrix(new_labels)
 
             # remember best split
-            new_entropy = self._transition_entropy(trans_matrix = new_trans)
+            new_entropy = self._transition_entropy(trans_matrix=new_trans, normalized_entropy=root._normalized_entropy, global_entropy=root._global_entropy)
 
             # correct by entropy of the split itself
             if self._split_entropy:
@@ -487,32 +487,31 @@ class WorldModelTree(object):
         return entropy
 
 
-    def _transition_entropy(self, trans_matrix):
+    @classmethod
+    def _transition_entropy(cls, trans_matrix, normalized_entropy, global_entropy):
         """
         Calculates the entropy for the transition matrix.
         """
-        root = self.root()
         K = trans_matrix.shape[0]
         row_entropies = np.zeros(K)
 
         # entropies for every row of matrix
         for i in range(K):
             row = trans_matrix[i]
-            row_entropies[i] = self._entropy(trans=row, normalized_entropy=root._normalized_entropy)
+            row_entropies[i] = cls._entropy(trans=row, normalized_entropy=normalized_entropy)
 
         # (weighted) average
-        if self._global_entropy == 'sum':
+        if global_entropy == 'sum':
             entropy = np.sum(row_entropies)
-        elif self._global_entropy == 'avg':
+        elif global_entropy == 'avg':
             entropy = np.average(row_entropies)
-        elif self._global_entropy == 'weighted':
+        elif global_entropy == 'weighted':
             weights = np.sum(trans_matrix, axis=1)
             weights /= np.sum(weights)
             entropy = np.sum(weights * row_entropies)
         else:
             raise RuntimeError("Valid options for global_entropy are 'sum', 'avg' and 'weighted'.")
 
-        #entropy /= self._state_entropy(normalized_entropy=normalized_entropy)
         return entropy
 
 
