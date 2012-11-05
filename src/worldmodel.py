@@ -142,8 +142,7 @@ class WorldModelTree(object):
 
         # make of copy of all labels
         # increase labels above current state by one to make space for the split
-        new_labels = list(root.labels)
-        new_labels = map(lambda l: l+1 if l > current_state else l, new_labels)
+        new_labels = map(lambda l: l+1 if l > current_state else l, root.labels)
         new_dat_ref = [[], []]
 
         # every entry belonging to this node has to be re-classified
@@ -574,116 +573,6 @@ class PCAWorldModelTree(WorldModelTree):
     def _set_test_parameters(self, params):
         self.pca = params
 
-
-
-
-class ClusterWorldModelTree(WorldModelTree):
-
-    def __init__(self, parent=None, **kwargs):
-        super(ClusterWorldModelTree, self).__init__(parent, **kwargs)
-
-
-    def _pca(self, data):
-        pca = mdp.nodes.PCANode(output_dim=1)
-        pca.train(data)
-        pca.stop_training()
-        w = pca.v[:,0]
-        theta = w.dot(pca.avg[0])
-        return w, theta
-
-
-    def _init_test(self):
-
-        data = self.get_data()
-        self._boundary_w, self._boundary_theta = self._pca(data)
-
-        new_labels, new_dat_ref = self._relabel_data()
-
-        means = []
-        covs = []
-        weights = []
-
-        for child_index in [0,1]:
-
-            # calculate mean and covariance of each target state
-            root = self.root()
-            all_leaves = root.leaves()
-            K = len(all_leaves)
-            for target_state in range(K+1):
-                dat = self._get_data_for_target(new_dat_ref[child_index], target_state=target_state, labels=new_labels)
-                if dat is None or dat.shape[0] <= 1:
-                    continue
-                covariance_matrix = mdp.utils.CovarianceMatrix()
-                covariance_matrix.update(dat)
-                C, M, N = covariance_matrix.fix()
-                means.append(M)
-                covs.append(C)
-                weights.append(N)
-
-        # at least two target states from here?
-        if len(means) <= 1:
-            return False
-
-        # cluster data until only two clusters remain
-        while len(means) > 2:
-            # find smallest mahalanobis distance between class means
-            min_dif = float('Inf')
-            min_i = None
-            min_j = None
-            K = len(means)  # number of clusters
-            for i in range(K):
-                for j in range(i+1, K):
-                    dif_m = means[i] - means[j]
-                    S = ( weights[i]*covs[i] + weights[j]*covs[j] ) / (weights[i] + weights[j])
-                    Sinv = np.linalg.inv(S)
-                    dif = np.sqrt(dif_m.T.dot(Sinv.dot(dif_m))) # mahalanobis distance
-                    if dif < min_dif:
-                        min_i = i
-                        min_j = j
-            # merge the two nearest states
-            means[min_i] = (weights[min_i]*means[min_i] + weights[min_j]*means[min_j]) / (weights[min_i] + weights[min_j])
-            covs[min_i] = (weights[min_i]*covs[min_i] + weights[min_j]*covs[min_j]) / (weights[min_i] + weights[min_j])
-            means.pop(min_j)
-            covs.pop(min_j)
-            weights.pop(min_j)
-
-        # calculate Fisher LDA for the two remaining clusters
-        dif_m = means[1] - means[0]
-        S = ( covs[0] + covs[1] )# / 2
-        Sinv = np.linalg.inv(S)
-        w = Sinv.dot(dif_m)
-        w = w / np.linalg.norm(w)
-        self._boundary_w = w
-
-        # set threshold at intersect between the two gaussians
-        mu0 = w.dot(means[0])
-        mu1 = w.dot(means[1])
-        sigma0 = w.dot(covs[0]).dot(w)
-        sigma1 = w.dot(covs[1]).dot(w)
-
-        # solve quadratic equation for intersect point
-        a = sigma1**2 - sigma0**2
-        b = 2*(mu1*sigma0**2 - mu0*sigma1**2)
-        c = mu0**2 * sigma1**2 - mu1**2 * sigma0**2 - 2 * sigma0**2 * sigma1**2 * np.log(sigma1/sigma0)
-        x0 = ( -b + np.sqrt( b**2 - 4*a*c ) ) / ( 2*a )
-        x1 = ( -b - np.sqrt( b**2 - 4*a*c ) ) / ( 2*a )
-
-        # chose solution between means
-        m0 = min(mu0, mu1)
-        m1 = max(mu0, mu1)
-        if x0 >= m0 and mu0 <= m1:
-            self._boundary_theta = x0
-        else:
-            self._boundary_theta = x1
-
-        return True
-
-
-    def _test(self, x):
-        y = self._boundary_w.dot(x)
-        y = np.sign(y - self._boundary_theta) + 1
-        y = y // 2
-        return int(y)
 
 
 
