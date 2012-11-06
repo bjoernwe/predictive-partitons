@@ -65,7 +65,7 @@ class VoronoiData(object):
         return closest_class
     
     
-    def plot(self):
+    def plot(self, show_plot=True):
 
         # each class into one list        
         data_list = [[] for _ in range(self.k)]
@@ -79,8 +79,9 @@ class VoronoiData(object):
         pyplot.gca().set_color_cycle([colormap(i) for i in np.linspace(0, 0.98, 7)])
         for i, data in enumerate(data_list):
             pyplot.plot(data[:,0], data[:,1], self.symbols[i%len(self.symbols)])
-            
-        pyplot.show()
+
+        if show_plot:            
+            pyplot.show()
         return
     
     
@@ -90,6 +91,18 @@ class VoronoiData(object):
 
 if __name__ == '__main__':
     
-    voronoi = VoronoiData(k=10, power=4)
+    voronoi = VoronoiData(n=1000, k=4, power=4)
     print voronoi.entropy(normalized_entropy=True, global_entropy='weighted')
-    voronoi.plot() 
+    model = worldmodel.RandomWorldModelTree(normalized_entropy=True, global_entropy='weighted', split_entropy=True)
+    model.add_data(voronoi.data)
+    model.split_complete()
+    print len(model.leaves())
+    print model.entropy()
+    
+    # plot
+    pyplot.subplot(1,2,1)
+    voronoi.plot(show_plot=False) 
+    pyplot.subplot(1,2,2)
+    model.plot_tree_data(show_plot=False)
+    pyplot.show()
+    

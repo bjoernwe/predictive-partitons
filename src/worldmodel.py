@@ -20,7 +20,7 @@ class WorldModelTree(object):
         self._normalized_entropy = normalized_entropy
         self._global_entropy = global_entropy
         self._split_entropy = split_entropy
-        self._min_class_size = 10
+        self._min_class_size = 1
 
 
     def classify(self, x):
@@ -48,22 +48,15 @@ class WorldModelTree(object):
                 return class_label
 
 
-    def split(self):
+    def _prepare_all_splits(self):
         """
-        Splits the data along the first principal component. If the node is
-        splitted, all subnodes are splitted.
-        Returns the number of performed splits.
         """
 
         # recursion: step down to the leafes
         if self._is_splitted():
-            n_splits = 0
-            children = list(self.children)
-            # TODO shuffle
-            #random.shuffle(children)
-            for child in children:
-                n_splits += child.split()
-            return n_splits
+            for child in self.children:
+                child._prepare_all_splits()
+            return
 
         # check wether there's enough data
         # TODO parameterize
@@ -72,7 +65,7 @@ class WorldModelTree(object):
 
         # find best split ...
         root = self.root()
-        best_entropy = float('Inf')
+        best_rating = float('Inf')
         for _ in range(100):
 
             # initialize decision boundary of _test() method
@@ -92,49 +85,74 @@ class WorldModelTree(object):
             new_entropy = self._transition_entropy(trans=new_trans, normalized_entropy=root._normalized_entropy, global_entropy=root._global_entropy)
 
             # correct by entropy of the split itself
+            new_rating = new_entropy
             if self._split_entropy:
                 split_sizes = np.zeros(2)
                 split_sizes[0] = len(new_dat_ref[0])
                 split_sizes[1] = len(new_dat_ref[1])
-                new_entropy /= self._entropy(trans=split_sizes, normalized_entropy=root._normalized_entropy)
+                new_rating = new_entropy / self._entropy(trans=split_sizes, normalized_entropy=root._normalized_entropy)
 
-            if new_entropy < best_entropy:
+            if new_rating < best_rating:
+                best_rating = new_rating
                 best_entropy = new_entropy
                 best_labels = new_labels
                 best_refs = new_dat_ref
                 best_trans = new_trans
                 best_test = self._get_test_parameters()
-
-        # was there a good test at all?
-        if best_entropy >= root.entropy():
-            return 0
-
-        # remember the split
-        self._set_test_parameters(best_test)
-        root.labels = best_labels
-        root.transitions = best_trans
+                
+        self._split_rating  = best_rating
+        self._split_entropy = best_entropy
+        self._split_labels  = best_labels
+        self._split_refs    = best_refs
+        self._split_trans   = best_trans
+        self._split_test    = best_test
+        return
+        
+        
+    def split(self):
+        
+        root = self.root()
+        root._prepare_all_splits()
+        entropy = root.entropy()
+        all_leaves = root.leaves()
+        gains = map(lambda leaf: entropy - leaf._split_entropy, all_leaves)
+        print 'gains:', gains
+        best_gain_index = np.argmax(gains)
+        print 'best index:', best_gain_index
+        
+        if gains[best_gain_index] <= 0:
+            return
+        
+        # split!
+        best_leaf = all_leaves[best_gain_index] 
+        best_leaf._set_test_parameters(best_leaf._split_test)
+        root.labels = best_leaf._split_labels
+        root.transitions = best_leaf._split_trans
 
         # create new leaves
         child0 = self.__class__(normalized_entropy = self._normalized_entropy, 
                                 global_entropy = self._global_entropy,
                                 split_entropy = self._split_entropy,
-                                parent = self)
+                                parent = best_leaf)
         child1 = self.__class__(normalized_entropy = self._normalized_entropy, 
                                 global_entropy = self._global_entropy,
                                 split_entropy = self._split_entropy,
-                                parent = self)
-        child0.dat_ref = best_refs[0]
-        child1.dat_ref = best_refs[1]
+                                parent = best_leaf)
+        child0.dat_ref = best_leaf._split_refs[0]
+        child1.dat_ref = best_leaf._split_refs[1]
 
         # create list of children
         # (makes split official!)
-        self.children = []
-        self.children.append(child0)
-        self.children.append(child1)
-
-        #assert(best_entropy == root.entropy())
-        return 1
-
+        best_leaf.children = []
+        best_leaf.children.append(child0)
+        best_leaf.children.append(child1)
+        
+        # reset calculated splits
+        for leaf in all_leaves:
+            leaf._split_rating = None
+        
+        return
+                
 
     def _relabel_data(self):
         """
@@ -287,7 +305,7 @@ class WorldModelTree(object):
 
     def _test(self, x):
         """
-        Tests to which child the data point x belons
+        Tests to which child the data point x belongs
         """
         raise NotImplementedError('_test() has to be implemented by sub-class.')
     
@@ -524,6 +542,17 @@ class WorldModelTree(object):
             return leaves.index(self)
         else:
             return None
+        
+        
+    def split_complete(self):
+        """
+        Splits the tree until convergence.
+        """
+        while True:
+            n_splits = self.split()
+            if n_splits == 0:
+                break
+        return
 
 
 
@@ -676,8 +705,8 @@ def problemHoneycomb(n=1000, seed=None):
 
 if __name__ == "__main__":
 
-    problems = [problemChain, problemDiamond, problemHoneycomb]
-    #problems = [problemVoronoi]
+    #problems = [problemChain, problemDiamond, problemHoneycomb]
+    problems = [problemHoneycomb]
 
     for p, problem in enumerate(problems):
 
@@ -688,7 +717,34 @@ if __name__ == "__main__":
         tree = RandomWorldModelTree(normalized_entropy=True, global_entropy='weighted', split_entropy=True)
         tree.add_data(data)
         
-        while True:
+        tree.split()
+        
+        print 'round', 1
+        print tree.transitions
+        print map(lambda row: tree._entropy(trans=row, normalized_entropy=False), tree.transitions)
+        print tree.entropy()
+        pyplot.subplot(1,3,1)
+        tree.plot_tree_data(show_plot=False)
+        
+        tree.children[0].split()
+
+        print 'round', 2
+        print tree.transitions
+        print map(lambda row: tree._entropy(trans=row, normalized_entropy=False), tree.transitions)
+        print tree.entropy()
+        pyplot.subplot(1,3,2)
+        tree.plot_tree_data(show_plot=False)
+        
+        tree.children[1].split()
+
+        print 'round', 3
+        print tree.transitions
+        print map(lambda row: tree._entropy(trans=row, normalized_entropy=False), tree.transitions)
+        print tree.entropy()
+        pyplot.subplot(1,3,3)
+        tree.plot_tree_data(show_plot=False)
+        
+        while False:
             n_splits = tree.split()
             if n_splits:
                 print 'performed {0} splits.'.format(n_splits)
@@ -703,7 +759,7 @@ if __name__ == "__main__":
         print 'final entropy:', tree.entropy()
         assert(n_trans == n-1)
 
-        pyplot.subplot(1, len(problems), p+1)
-        tree.plot_tree_data(show_plot=False)
+        #pyplot.subplot(1, len(problems), p+1)
+        #tree.plot_tree_data(show_plot=False)
 
     pyplot.show()
