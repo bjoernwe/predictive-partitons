@@ -20,7 +20,10 @@ class WorldModelTree(object):
         self._normalized_entropy = normalized_entropy
         self._global_entropy = global_entropy
         self._split_entropy = split_entropy
-        self._min_class_size = 1
+        self._min_class_size = 10
+        self._min_n_states = 1
+        self._tmp_entropy = float('inf')
+        self._tmp_rating = float('-inf')
 
 
     def classify(self, x):
@@ -99,35 +102,40 @@ class WorldModelTree(object):
                 best_refs = new_dat_ref
                 best_trans = new_trans
                 best_test = self._get_test_parameters()
-                
-        self._split_rating  = best_rating
-        self._split_entropy = best_entropy
-        self._split_labels  = best_labels
-        self._split_refs    = best_refs
-        self._split_trans   = best_trans
-        self._split_test    = best_test
+            
+        if best_rating == float('inf'):
+            return
+        self._tmp_rating  = best_rating
+        self._tmp_entropy = best_entropy
+        self._tmp_labels  = best_labels
+        self._tmp_refs    = best_refs
+        self._tmp_trans   = best_trans
+        self._tmp_test    = best_test
         return
         
         
-    def split(self):
+    def split(self, force=False):
         
         root = self.root()
         root._prepare_all_splits()
         entropy = root.entropy()
         all_leaves = root.leaves()
-        gains = map(lambda leaf: entropy - leaf._split_entropy, all_leaves)
+        gains = map(lambda leaf: entropy - leaf._tmp_entropy, all_leaves)
+        #gains = map(lambda leaf: entropy - leaf._tmp_rating, all_leaves)
         print 'gains:', gains
         best_gain_index = np.argmax(gains)
         print 'best index:', best_gain_index
         
-        if gains[best_gain_index] <= 0:
-            return
+        if len(all_leaves) >= self._min_n_states:
+            if (gains[best_gain_index] <= 0 or
+                gains[best_gain_index] == float('inf')):
+                return False
         
         # split!
-        best_leaf = all_leaves[best_gain_index] 
-        best_leaf._set_test_parameters(best_leaf._split_test)
-        root.labels = best_leaf._split_labels
-        root.transitions = best_leaf._split_trans
+        best_leaf = all_leaves[best_gain_index]
+        best_leaf._set_test_parameters(best_leaf._tmp_test)
+        root.labels = best_leaf._tmp_labels
+        root.transitions = best_leaf._tmp_trans
 
         # create new leaves
         child0 = self.__class__(normalized_entropy = self._normalized_entropy, 
@@ -138,8 +146,8 @@ class WorldModelTree(object):
                                 global_entropy = self._global_entropy,
                                 split_entropy = self._split_entropy,
                                 parent = best_leaf)
-        child0.dat_ref = best_leaf._split_refs[0]
-        child1.dat_ref = best_leaf._split_refs[1]
+        child0.dat_ref = best_leaf._tmp_refs[0]
+        child1.dat_ref = best_leaf._tmp_refs[1]
 
         # create list of children
         # (makes split official!)
@@ -149,9 +157,9 @@ class WorldModelTree(object):
         
         # reset calculated splits
         for leaf in all_leaves:
-            leaf._split_rating = None
+            leaf._tmp_rating = float('-inf')
         
-        return
+        return True
                 
 
     def _relabel_data(self):
@@ -455,7 +463,10 @@ class WorldModelTree(object):
         if trans_sum == 0:
             if not ignore_empty_classes:
                 assert trans_sum != 0
-            return 1.0
+            if normalized_entropy:
+                return 1.0
+            else:
+                return np.log2(K)
 
         # the actual calculation
         probs = np.array(trans, dtype=np.float64) / trans_sum
@@ -508,9 +519,11 @@ class WorldModelTree(object):
     def _transition_entropy(cls, trans, normalized_entropy, global_entropy):
         """
         Calculates the entropy for a given transition matrix.
-        """
+        """        
         K = trans.shape[0]
         row_entropies = np.zeros(K)
+        
+        trans = np.array(trans) + 0*np.ones((K,K))
 
         # entropies for every row of matrix
         for i in range(K):
@@ -549,8 +562,7 @@ class WorldModelTree(object):
         Splits the tree until convergence.
         """
         while True:
-            n_splits = self.split()
-            if n_splits == 0:
+            if not self.split():
                 break
         return
 
@@ -562,8 +574,11 @@ class PCAWorldModelTree(WorldModelTree):
     its first principal component.
     """
 
-    def __init__(self, parent=None, **kwargs):
-        super(PCAWorldModelTree, self).__init__(parent, **kwargs)
+    def __init__(self, normalized_entropy, global_entropy, split_entropy, parent=None):
+        super(PCAWorldModelTree, self).__init__(normalized_entropy = normalized_entropy, 
+                                                global_entropy = global_entropy, 
+                                                split_entropy = split_entropy, 
+                                                parent = parent)
 
 
     def _init_test(self):
@@ -599,7 +614,7 @@ class PCAWorldModelTree(WorldModelTree):
 
 class RandomWorldModelTree(WorldModelTree):
 
-    def __init__(self, normalized_entropy, global_entropy, split_entropy, parent = None):
+    def __init__(self, normalized_entropy, global_entropy, split_entropy, parent=None):
         super(RandomWorldModelTree, self).__init__(normalized_entropy = normalized_entropy, 
                                                    global_entropy = global_entropy, 
                                                    split_entropy = split_entropy, 
@@ -714,40 +729,24 @@ if __name__ == "__main__":
         n = 1000
         data = problem(n=n, seed=1)
 
-        tree = RandomWorldModelTree(normalized_entropy=True, global_entropy='weighted', split_entropy=True)
+        tree = PCAWorldModelTree(normalized_entropy=True, global_entropy='weighted', split_entropy=False)
         tree.add_data(data)
-        
-        tree.split()
-        
-        print 'round', 1
-        print tree.transitions
-        print map(lambda row: tree._entropy(trans=row, normalized_entropy=False), tree.transitions)
-        print tree.entropy()
-        pyplot.subplot(1,3,1)
-        tree.plot_tree_data(show_plot=False)
-        
-        tree.children[0].split()
 
-        print 'round', 2
-        print tree.transitions
-        print map(lambda row: tree._entropy(trans=row, normalized_entropy=False), tree.transitions)
-        print tree.entropy()
-        pyplot.subplot(1,3,2)
-        tree.plot_tree_data(show_plot=False)
+        for i in range(0):        
+            print 'round', i
+            tree.split()
+            print tree.transitions
+            print map(lambda row: tree._entropy(trans=row, normalized_entropy=False), tree.transitions)
+            print tree.entropy()
+            pyplot.subplot(3,3,i+1)
+            tree.plot_tree_data(show_plot=False)
         
-        tree.children[1].split()
-
-        print 'round', 3
-        print tree.transitions
-        print map(lambda row: tree._entropy(trans=row, normalized_entropy=False), tree.transitions)
-        print tree.entropy()
-        pyplot.subplot(1,3,3)
-        tree.plot_tree_data(show_plot=False)
-        
-        while False:
-            n_splits = tree.split()
-            if n_splits:
-                print 'performed {0} splits.'.format(n_splits)
+        tree.split(force=True)
+        tree.split(force=True)
+        tree.split(force=True)
+        tree.split(force=True)
+        while True:
+            if tree.split():
                 print tree.transitions
                 print 'new entropy: {0}'.format(tree.entropy())
             else:
@@ -757,9 +756,9 @@ if __name__ == "__main__":
         print 'final transitions:\n', tree.transitions
         print 'sum:', n_trans
         print 'final entropy:', tree.entropy()
-        assert(n_trans == n-1)
+        #assert(n_trans == n-1)
 
-        #pyplot.subplot(1, len(problems), p+1)
-        #tree.plot_tree_data(show_plot=False)
+        pyplot.subplot(1, len(problems), p+1)
+        tree.plot_tree_data(show_plot=False)
 
     pyplot.show()

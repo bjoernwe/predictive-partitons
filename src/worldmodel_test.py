@@ -83,11 +83,14 @@ class TrivialEntropyTests(unittest.TestCase):
 class VectorEntropyTests(unittest.TestCase):
 
     def testZeroEntropy(self):
-        for normalized_entropy in [False, True]:
-            for i in range(10):
-                zeros = np.zeros(i)
-                entropy = worldmodel.WorldModelTree._entropy(trans=zeros, normalized_entropy=normalized_entropy, ignore_empty_classes=True)
-                self.assertEqual(entropy, 1.0)
+        for i in range(10):
+            zeros = np.zeros(i)
+            entropy = worldmodel.WorldModelTree._entropy(trans=zeros, normalized_entropy=True, ignore_empty_classes=True)
+            self.assertEqual(entropy, 1.0)
+        for i in range(2,10):
+            zeros = np.zeros(i)
+            entropy = worldmodel.WorldModelTree._entropy(trans=zeros, normalized_entropy=False, ignore_empty_classes=True)
+            self.assertEqual(entropy, np.log2(i))
 
     def testOneEntropy(self):
         for i in range(2,10):
