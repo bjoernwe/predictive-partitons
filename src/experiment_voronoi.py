@@ -91,12 +91,12 @@ class VoronoiData(object):
 
 if __name__ == '__main__':
     
-    voronoi = VoronoiData(n=10000, k=10, power=5)
+    voronoi = VoronoiData(n=10000, k=5, power=5)
     print voronoi.transitions
     print voronoi.entropy(normalized_entropy=True, global_entropy='weighted')
-    model = worldmodel.RandomWorldModelTree(normalized_entropy=False, global_entropy='weighted', split_entropy=False)
+    model = worldmodel.WorldModelTree(normalized_entropy=True, global_entropy='weighted')
     model.add_data(voronoi.data)
-    model.split_complete()
+    model.sleep(depth=6)
     print len(model.leaves())
     print model.entropy()
     
