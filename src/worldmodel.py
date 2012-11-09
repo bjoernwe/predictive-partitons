@@ -122,9 +122,7 @@ class WorldModelTree(object):
         all_leaves = root.leaves()
         gains = map(lambda leaf: entropy - leaf._tmp_entropy, all_leaves)
         #gains = map(lambda leaf: entropy - leaf._tmp_rating, all_leaves)
-        print 'gains:', gains
         best_gain_index = np.argmax(gains)
-        print 'best index:', best_gain_index
         
         if len(all_leaves) >= self._min_n_states:
             if (gains[best_gain_index] <= 0 or
