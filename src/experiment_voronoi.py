@@ -1,4 +1,5 @@
 import numpy as np
+import random
 
 from matplotlib import pyplot
 
@@ -25,6 +26,11 @@ class VoronoiData(object):
         self.means = np.random.random((k, 2))
         
         # transition probabilities between classes
+        #probs = np.zeros((k,k))
+        #for i in range(k):
+        #    indices = random.sample(range(k), 2)
+        #    probs[i,indices[0]] = 1
+        #    probs[i,indices[1]] = 1
         probs = np.random.random((k, k))**power
         probs = probs / np.sum(probs, axis=1)[:,np.newaxis]
         self.probs = probs
@@ -91,12 +97,12 @@ class VoronoiData(object):
 
 if __name__ == '__main__':
     
-    voronoi = VoronoiData(n=10000, k=5, power=5)
+    voronoi = VoronoiData(n=10000, k=5, power=3)
     print voronoi.transitions
     print voronoi.entropy(normalized_entropy=True, global_entropy='weighted')
     model = worldmodel.WorldModelTree(normalized_entropy=True, global_entropy='weighted')
     model.add_data(voronoi.data)
-    model.sleep(depth=6)
+    model.sleep(depth=5)
     print len(model.leaves())
     print model.entropy()
     

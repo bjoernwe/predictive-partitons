@@ -37,7 +37,7 @@ class TrivialTransitionsTest(unittest.TestCase):
 
     def testTrivialTransMatrix(self):
         data = worldmodel.problemChain(n=1000, seed=0)
-        tree = worldmodel.WorldModelTree(normalized_entropy=True, global_entropy='weighted', split_entropy=True)
+        tree = worldmodel.WorldModelTree(normalized_entropy=True, global_entropy='weighted')
         tree.add_data(data)
         trans = tree.transitions
         self.assertEqual(trans.shape, (1,1))
@@ -54,7 +54,7 @@ class TrivialEntropyTests(unittest.TestCase):
         for normalized_entropy in [False, True]:
             for global_entropy in ['sum', 'avg', 'weighted']:
                 for split_entropy in [False, True]:
-                    tree = worldmodel.WorldModelTree(normalized_entropy=normalized_entropy, global_entropy=global_entropy, split_entropy=split_entropy)
+                    tree = worldmodel.WorldModelTree(normalized_entropy=normalized_entropy, global_entropy=global_entropy)
                     tree.add_data(self.data)
                     entropy = tree.entropy()
                     self.assertEqual(entropy, 1.0)
@@ -63,7 +63,7 @@ class TrivialEntropyTests(unittest.TestCase):
         for normalized_entropy in [False, True]:
             for global_entropy in ['sum', 'avg', 'weighted']:
                 for split_entropy in [False, True]:
-                    tree = worldmodel.WorldModelTree(normalized_entropy=normalized_entropy, global_entropy=global_entropy, split_entropy=split_entropy)
+                    tree = worldmodel.WorldModelTree(normalized_entropy=normalized_entropy, global_entropy=global_entropy)
                     tree.add_data(self.data)
                     trans = tree.transitions
                     entropy = worldmodel.WorldModelTree._transition_entropy(trans=trans, normalized_entropy=normalized_entropy, global_entropy=global_entropy)
@@ -73,7 +73,7 @@ class TrivialEntropyTests(unittest.TestCase):
         for normalized_entropy in [False, True]:
             for global_entropy in ['sum', 'avg', 'weighted']:
                 for split_entropy in [False, True]:
-                    tree = worldmodel.WorldModelTree(normalized_entropy=normalized_entropy, global_entropy=global_entropy, split_entropy=split_entropy)
+                    tree = worldmodel.WorldModelTree(normalized_entropy=normalized_entropy, global_entropy=global_entropy)
                     tree.add_data(self.data)
                     entropy = tree.entropy()
                     self.assertEqual(entropy, 1.0)

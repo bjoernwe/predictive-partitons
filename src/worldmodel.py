@@ -28,7 +28,7 @@ class WorldModelTree(object):
         self.dat_ref = []    # indices of data belonging to this node
 
         #self._split_entropy = split_entropy
-        #self._min_class_size = 10
+        self._min_class_size = 10
         #self._min_n_states = 1
         #self._tmp_entropy = float('inf')
         #self._tmp_rating = float('-inf')
@@ -516,11 +516,14 @@ class WorldModelTree(object):
         K = trans.shape[0]
         row_entropies = np.zeros(K)
         
-        #trans = np.array(trans) + 1*np.ones((K,K))
+        #trans = np.array(trans)
+        #np.fill_diagonal(trans, 0)
+        #trans = trans + 1 * np.ones((K,K))
 
         # entropies for every row of matrix
         for i in range(K):
             row = trans[i]
+            #row = row[row>0]
             row_entropies[i] = cls._entropy(trans=row, normalized_entropy=normalized_entropy)
 
         # (weighted) average
@@ -548,6 +551,9 @@ class WorldModelTree(object):
         
         # split this leaf node
         assert self.status == 'leaf'
+        if len(self.dat_ref) < self._min_class_size:
+            return
+        
         root = self.root()
         self._init_test()
         new_labels, new_dat_ref = self._relabel_data()
@@ -587,7 +593,7 @@ class WorldModelTree(object):
             # chose two random states for merging    
             root = self.root()
             K = root.transitions.shape[0]
-            if K < 2:
+            if K < 4:
                 break
             s1, s2 = random.sample(range(K), 2)
             if s1 > s2:
@@ -630,6 +636,8 @@ class WorldModelTree(object):
                 parent1.status = 'merged'
                 parent2.status = 'merged'
                 print 'merged'
+                print root.transitions
+                print np.sum(root.transitions)
         
         
         return
@@ -833,7 +841,7 @@ if __name__ == "__main__":
         n = 10000
         data = problem(n=n, seed=1)
 
-        tree = WorldModelTree(normalized_entropy=False, global_entropy='weighted')
+        tree = WorldModelTree(normalized_entropy=True, global_entropy='weighted')
         tree.add_data(data)
 
 
