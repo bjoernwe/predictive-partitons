@@ -25,13 +25,22 @@ class VoronoiData(object):
         # k class means
         self.means = np.random.random((k, 2))
         
-        # transition probabilities between classes
+        ### init transition probabilities ###
+        
+        ### deterministic transitions
         #probs = np.zeros((k,k))
         #for i in range(k):
-        #    indices = random.sample(range(k), 2)
-        #    probs[i,indices[0]] = 1
-        #    probs[i,indices[1]] = 1
-        probs = np.random.random((k, k))**power
+        #    probs[i,(i+1)%k] = 1
+            
+        ### fifty, fifty
+        probs = np.eye(k)
+        for i in range(k):
+            probs[i,(i+1)%k] = 1
+        
+        # transition probabilities between classes
+        #probs = np.random.random((k, k))**power
+        
+        # normalize probabilities
         probs = probs / np.sum(probs, axis=1)[:,np.newaxis]
         self.probs = probs
         
@@ -40,6 +49,9 @@ class VoronoiData(object):
         self.labels = np.zeros(n, dtype=int)
         current_class = 0
         for i in range(n):
+            
+            if not i%1000:
+                print i
         
             # weighted sample of class means
             # from: http://stackoverflow.com/questions/6432499/how-to-do-weighted-random-sample-of-categories-in-python
@@ -97,19 +109,39 @@ class VoronoiData(object):
 
 if __name__ == '__main__':
     
-    voronoi = VoronoiData(n=10000, k=5, power=3)
+    k = 7
+    voronoi = VoronoiData(n=10000, k=k, power=5)
+    entropy = voronoi.entropy(normalized_entropy=True, global_entropy='weighted') 
     print voronoi.transitions
-    print voronoi.entropy(normalized_entropy=True, global_entropy='weighted')
+    print entropy
     model = worldmodel.WorldModelTree(normalized_entropy=True, global_entropy='weighted')
     model.add_data(voronoi.data)
     model.sleep(depth=5)
+    #model.sleep(depth=2)
+    
     print len(model.leaves())
     print model.entropy()
     
-    # plot
-    pyplot.subplot(1,2,1)
-    voronoi.plot(show_plot=False) 
-    pyplot.subplot(1,2,2)
+    # plot target
+    pyplot.subplot(2,3,1)
+    voronoi.plot(show_plot=False)
+     
+    # plot result
+    pyplot.subplot(2,3,3)
     model.plot_tree_data(show_plot=False)
+    
+    # plot stats
+    pyplot.subplot(2,1,2)
+    pyplot.plot(-model.stats_entropy_global[:,0], model.stats_entropy_global[:,1])
+    pyplot.plot(-model.stats_entropy_out[:,0], model.stats_entropy_out[:,1])
+    pyplot.plot(-model.stats_entropy_out_strict[:,0], model.stats_entropy_out_strict[:,1])
+    pyplot.plot(-model.stats_min_entropy[:,0], model.stats_min_entropy[:,1])
+    pyplot.plot(-model.stats_min_entropy_out[:,0], model.stats_min_entropy_out[:,1])
+    pyplot.plot(-model.stats_min_entropy_in[:,0], model.stats_min_entropy_in[:,1])
+    pyplot.plot([-30, -2], [entropy, entropy], '--', c='gray')
+    pyplot.plot([-7, -7], [.1, 1], '--', c='gray')
+    pyplot.legend(['global', 'out', 'out (strict)', 'min-entropy', 'min-entropy (out)', 'min-entropy (in)', 'true entropy', 'true #classes'], loc=3)
+    print 'true entropy:', voronoi.entropy(normalized_entropy=True, global_entropy='weighted')
+
     pyplot.show()
     
