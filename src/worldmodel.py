@@ -8,7 +8,15 @@ from matplotlib import pyplot
 import mdp
 
 
-Stats = collections.namedtuple('Stats', ['entropy'])
+Stats = collections.namedtuple('Stats', ['n_states', 
+                                         'norm', 
+                                         'entropy', 
+                                         'entropy_normalized', 
+                                         'entropy_per_norm', 
+                                         'mutual_information', 
+                                         'normalized_mutual_information', 
+                                         'kl_divergence_rate'
+                                         ])
 
 class WorldModelTree(object):
 
@@ -402,28 +410,26 @@ class WorldModelTree(object):
 
 
     @classmethod
-    def _transition_entropy(cls, trans, normalized_entropy, global_entropy, only_out=False):
+    def _matrix_entropy(cls, transitions, normalized_entropy, global_entropy, only_out=False):
         """
         Calculates the entropy for a given transition matrix.
         """        
-        K = trans.shape[0]
+        K = transitions.shape[0]
         row_entropies = np.zeros(K)
-        
-        trans = np.array(trans)
-        if only_out:
-            trans = np.array(trans)
-            #np.fill_diagonal(trans, 0)
-            #trans = trans + 1 * np.ones((K,K))
 
-        # entropies for every row of matrix
-        for i in range(K):
-            row = trans[i]
-            if only_out:
-                row = np.delete(row, i)
-            if only_out == 'strict':
-                row = row[row>0]
-            #row += 1
-            row_entropies[i] = cls._entropy(trans=row, normalized_entropy=normalized_entropy)
+        if only_out:
+            weights = np.sum(transitions, axis=1)
+            probs = np.array(transitions, dtype=np.float) / weights[:,np.newaxis]
+            np.fill_diagonal(probs, 0)
+            log_probs = np.zeros_like(probs)
+            log_probs[probs > 0.] = np.log2( probs[probs > 0.] )
+            row_entropies = -np.sum(probs * log_probs, axis=1)
+            if normalized_entropy:
+                row_entropies /= np.log2(K)
+        else:
+            for i in range(K):
+                row = transitions[i]
+                row_entropies[i] = cls._entropy(trans=row, normalized_entropy=normalized_entropy)
 
         # (weighted) average
         if global_entropy == 'sum':
@@ -431,7 +437,7 @@ class WorldModelTree(object):
         elif global_entropy == 'avg':
             entropy = np.average(row_entropies)
         elif global_entropy == 'weighted':
-            weights = np.sum(trans, axis=1)
+            weights = np.sum(transitions, axis=1)
             weights /= np.sum(weights)
             entropy = np.sum(weights * row_entropies)
         else:
@@ -541,142 +547,144 @@ class WorldModelTree(object):
         return
     
     
+    def _entropy_of_merged_states(self, matrix, s1, s2):
+        
+        merged_matrix = np.array(matrix)
+        
+        merged_row = (matrix[s1,:] + matrix[s2,:]) / 2.
+        merged_matrix[s1] = merged_row
+        merged_matrix[s2] = merged_row
+
+        merged_col = (matrix[:,s1] + matrix[:,s2]) / 2.
+        merged_matrix[:,s1] = merged_col
+        merged_matrix[:,s2] = merged_col
+        
+        return self._matrix_entropy(transitions=merged_matrix, normalized_entropy=False, global_entropy='weighted', only_out=False)
+    
+    
     def sleep(self, depth=1):
         """
         Create little splits and re-assemble them with less entropy.
         """
-        # neural thunderstorm
+        # split severat times ("neural thunderstorm")
+        root = self.root()
         for _ in range(depth):
             self.split()
-            print self.root().transitions
-            print np.sum(self.root().transitions)
+            print root.transitions
+            #print np.sum(root.transitions)
             
-        # collect some statistics
-        stats_entropy_global = []
-        stats_entropy_out = []
-        stats_entropy_out_strict= []
-        stats_min_entropy = []
-        stats_min_entropy_out = []
-        stats_min_entropy_in = []
-        
+        root.stats.append(self._calc_stats(transitions_large=root.transitions, transitions_small=root.transitions))
         plotted_yet = False
-
-        for r in range(2500):
+            
+        # merge again ...
+        for r in range(150):
         
-            # chose two random states for merging    
+            # useful variables    
             root = self.root()
             K = root.transitions.shape[0]
             if K < 2:
                 break
             
-            #while True:
-            #    s1, s2 = root.random.sample(range(K), 2)
-            #    if (root.transitions[s1,s2] > 0 or
-            #        root.transitions[s2,s1] > 0):
-            #        break
-            s1, s2 = root.random.sample(range(K), 2)
-            if s1 > s2:
-                s1, s2 = [s2, s1]
+            # find best merge ...
+            #best_entropy = float('inf')
+            best_s1 = None
+            best_s2 = None
+            best_trans = None
+            best_labels = None
+            best_stats = root.stats[-1]
+            best_diff = float("inf")
             
-            # merge rows and columns
-            merged_trans = np.array(root.transitions)
-            merged_trans[s1,:] += merged_trans[s2,:]
-            merged_trans = np.delete(merged_trans, s2, 0)  
-            merged_trans[:,s1] += merged_trans[:,s2]
-            merged_trans = np.delete(merged_trans, s2, 1)  
-            
-            new_entropy = self._transition_entropy(trans=merged_trans,     normalized_entropy=self._normalized_entropy, global_entropy=self._global_entropy, only_out=False)
-            old_entropy = self._transition_entropy(trans=root.transitions, normalized_entropy=self._normalized_entropy, global_entropy=self._global_entropy, only_out=False)
-
-            new_entropy_out = self._transition_entropy(trans=merged_trans,     normalized_entropy=self._normalized_entropy, global_entropy=self._global_entropy, only_out=True)
-            old_entropy_out = self._transition_entropy(trans=root.transitions, normalized_entropy=self._normalized_entropy, global_entropy=self._global_entropy, only_out=True)
-            
-            new_entropy_out_strict = self._transition_entropy(trans=merged_trans,     normalized_entropy=self._normalized_entropy, global_entropy=self._global_entropy, only_out='strict')
-            old_entropy_out_strict = self._transition_entropy(trans=root.transitions, normalized_entropy=self._normalized_entropy, global_entropy=self._global_entropy, only_out='strict')
-            
-            new_min_entropy = self._transition_min_entropy(trans=merged_trans,     normalized_entropy=self._normalized_entropy, global_entropy=self._global_entropy, only_out=False)
-            old_min_entropy = self._transition_min_entropy(trans=root.transitions, normalized_entropy=self._normalized_entropy, global_entropy=self._global_entropy, only_out=False)
-            
-            new_min_entropy_out = self._transition_min_entropy(trans=merged_trans,     normalized_entropy=self._normalized_entropy, global_entropy=self._global_entropy, only_out=True)
-            old_min_entropy_out = self._transition_min_entropy(trans=root.transitions, normalized_entropy=self._normalized_entropy, global_entropy=self._global_entropy, only_out=True)
-
-            new_min_entropy_in = self._transition_min_entropy_auto(trans=merged_trans,     global_entropy=self._global_entropy)
-            old_min_entropy_in = self._transition_min_entropy_auto(trans=root.transitions, global_entropy=self._global_entropy)
-            
-            # good for low resolutions
-            new_objective = new_entropy_out / new_entropy
-            old_objective = old_entropy_out / old_entropy
-            
-            # naja...
-            #new_objective = new_entropy_out_strict / new_entropy
-            #old_objective = old_entropy_out_strict / old_entropy
-
-            # a bit too rough
-            #new_objective = new_min_entropy_out / new_min_entropy
-            #old_objective = old_min_entropy_out / old_min_entropy
-
             if r%100 == 0:    
                 print 'r:', r
-            if (True and
-                new_objective   <= old_objective and
-                new_entropy     <= old_entropy and
-                #new_entropy_out <= old_entropy_out and
-#                new_entropy_out_strict <= 0.995*old_entropy_out_strict and
-                #new_entropy_dif <= old_entropy_dif and
-                #new_min_entropy <= old_min_entropy and
-#                new_min_entropy_out <= 0.98*old_min_entropy_out and
-                #new_min_entropy_in  >= old_min_entropy_in and
-                True):
-    
-                # plot intermediate result
-                if not plotted_yet:
-                    #if new_entropy_out_strict >= 1.0 * old_entropy_out_strict:
-                    if old_entropy <= 0.355923808026:
-                        pyplot.subplot(2,3,2)
-                        self.plot_tree_data(show_plot=False)
-                        plotted_yet = True
                 
-                # merge labels again
-                for i in range(len(root.labels)):
-                    if root.labels[i] == s2:
-                        root.labels[i] = s1
-                    if root.labels[i] > s2:
-                        root.labels[i] -= 1
-        
-                # merge transitions again
-                root.transitions = merged_trans
+            best_norm = 0
                 
-                # merge data references
-                leaves = root.leaves()
-                parent1 = leaves[s1]            
-                parent2 = leaves[s2]            
-                child = self.__class__(normalized_entropy = self._normalized_entropy, 
-                                       global_entropy = self._global_entropy,
-                                       parents = [parent1, parent2])
-                child.dat_ref = parent1.dat_ref + parent2.dat_ref
-                parent1.dat_ref = []
-                parent2.dat_ref = []
-                parent1.children = [child]
-                parent2.children = [child]
-                parent1.status = 'merged'
-                parent2.status = 'merged'
-                print 'merged'
-                print root.transitions
-                print np.sum(root.transitions)
+            for _ in range(250):
+
+                # pick random pair of states for merging            
+                s1, s2 = root.random.sample(range(K), 2)
+                if s1 > s2:
+                    s1, s2 = [s2, s1]
                 
-                stats_entropy_global.append((K-1, new_entropy))
-                stats_entropy_out.append((K-1, new_entropy_out))
-                stats_entropy_out_strict.append((K-1, new_entropy_out_strict))
-                stats_min_entropy.append((K-1, new_min_entropy))
-                stats_min_entropy_out.append((K-1, new_min_entropy_out))
-                stats_min_entropy_in.append((K-1, new_min_entropy_in))
-                                                
-                root.stats_entropy_global = np.vstack(stats_entropy_global)
-                root.stats_entropy_out = np.vstack(stats_entropy_out)
-                root.stats_entropy_out_strict = np.vstack(stats_entropy_out_strict)
-                root.stats_min_entropy = np.vstack(stats_min_entropy)
-                root.stats_min_entropy_out = np.vstack(stats_min_entropy_out)
-                root.stats_min_entropy_in = np.vstack(stats_min_entropy_in)
+                # merge rows and columns
+                merged_trans = np.array(root.transitions)
+                merged_trans[s1,:] += merged_trans[s2,:]
+                merged_trans = np.delete(merged_trans, s2, 0)  
+                merged_trans[:,s1] += merged_trans[:,s2]
+                merged_trans = np.delete(merged_trans, s2, 1)
+                
+                new_stats = self._calc_stats(transitions_large=root.transitions, transitions_small=merged_trans)
+                
+                #diff = abs(root.stats[-1].norm - new_stats.norm)
+                #diff = abs(root.stats[-1].entropy - new_stats.entropy)
+                diff = abs(root.stats[-1].mutual_information - new_stats.mutual_information)
+                
+                if (True and
+                    #new_stats.entropy_out_quot > best_quotient and
+                    #new_stats.entropy < root.stats[-1].entropy and
+                    diff < best_diff and
+                    #new_stats.entropy_per_norm < best_stats.entropy_per_norm and
+                    #new_stats.normalized_entropy_per_norm < best_stats.normalized_entropy_per_norm and
+                    #new_stats.mutual_information > best_stats.mutual_information and
+                    #new_stats.norm > best_norm and
+                    True):
+                    
+                    #print 'best entropy:', new_stats.entropy
+                    print 'best diff:', diff
+                    
+                    # merge labels again
+                    new_labels = list(root.labels)
+                    for i in range(len(new_labels)):
+                        if new_labels[i] == s2:
+                            new_labels[i] = s1
+                        if new_labels[i] > s2:
+                            new_labels[i] -= 1
+
+                    #best_entropy = new_stats.entropy
+                    best_s1 = s1
+                    best_s2 = s2
+                    best_trans = merged_trans#np.array(merged_trans)
+                    best_labels = new_labels#list(new_labels)
+                    best_stats = new_stats#Stats(*new_stats)
+                    best_norm = new_stats.norm
+                    best_diff = diff
+                    
+                    merged_trans = None
+                    new_labels = None
+                    new_stats = None
+
+            if best_s1 is None:
+                continue
+            print '***'
+            
+            if not plotted_yet:
+                if best_stats.normalized_mutual_information < root.stats[-1].normalized_mutual_information:
+                    pyplot.subplot(2,3,2)
+                    self.plot_tree_data(show_plot=False)
+                    plotted_yet = True
+            
+            # merge transitions again
+            root.transitions = best_trans
+            root.labels = best_labels
+            root.stats.append(best_stats)
+            
+            # merge data references
+            leaves = root.leaves()
+            parent1 = leaves[best_s1]            
+            parent2 = leaves[best_s2]            
+            child = self.__class__(normalized_entropy = self._normalized_entropy, 
+                                   global_entropy = self._global_entropy,
+                                   parents = [parent1, parent2])
+            child.dat_ref = parent1.dat_ref + parent2.dat_ref
+            parent1.dat_ref = []
+            parent2.dat_ref = []
+            parent1.children = [child]
+            parent2.children = [child]
+            parent1.status = 'merged'
+            parent2.status = 'merged'
+            print 'merged'
+            print root.transitions
+            print np.sum(root.transitions)
                 
         return
         
@@ -705,14 +713,49 @@ class WorldModelTree(object):
         return int(index)
     
     
-    def _calc_stats(self, trans):
+    def _calc_stats(self, transitions_large, transitions_small):
         """
         Calculates statistics for a given transition matrix.
         """
         
-        entropy = self._transition_entropy(trans=trans, normalized_entropy=self._normalized_entropy, global_entropy=self._global_entropy, only_out=False)
+        P = transitions_large
+        Q = transitions_small
         
-        stats = Stats(entropy=entropy)
+        q_entropy = self._matrix_entropy(transitions=Q, normalized_entropy=False, global_entropy=self._global_entropy, only_out=False)
+        q_entropy_normalized = self._matrix_entropy(transitions=Q, normalized_entropy=True, global_entropy=self._global_entropy, only_out=False)
+        
+        # norm of Q
+        q_weights = np.sum(Q, axis=1)
+        q_probs = Q / q_weights[:,np.newaxis]
+        q_mu = q_weights / np.sum(q_weights)
+        q_K = Q.shape[0]
+        q_norm = np.sum( ( q_probs**2 * q_mu[:,np.newaxis] ) / q_mu[np.newaxis,:] )
+        
+        q_entropy_per_norm = q_entropy / q_norm
+        
+        # mutual information
+        q_entropy_mu = self._entropy(trans=q_mu, normalized_entropy=False)
+        q_mutual_information = q_entropy_mu - q_entropy
+        q_normalized_mutual_information = q_mutual_information / np.log2(q_K)
+
+        p_entropy = self._matrix_entropy(transitions=P, normalized_entropy=False, global_entropy=self._global_entropy, only_out=False)
+        p_weights = np.sum(P, axis=1)
+        p_mu = p_weights / np.sum(p_weights)
+        p_entropy_mu = self._entropy(trans=p_mu, normalized_entropy=False)
+        p_mutual_information = p_entropy_mu - p_entropy
+        
+        kl_divergence_rate = p_mutual_information - q_mutual_information
+        
+        
+        stats = Stats(n_states = q_K, 
+                      entropy = q_entropy, 
+                      entropy_normalized = q_entropy_normalized, 
+                      norm = q_norm, 
+                      entropy_per_norm = q_entropy_per_norm,
+                      mutual_information = q_mutual_information,
+                      normalized_mutual_information = q_normalized_mutual_information,
+                      kl_divergence_rate = kl_divergence_rate
+                      )
         return stats
 
 
@@ -798,7 +841,7 @@ if __name__ == "__main__":
 
 
         print tree.transitions
-        tree.sleep(depth=5)
+        tree.sleep(depth=6)
         
 
 
@@ -807,19 +850,14 @@ if __name__ == "__main__":
         print 'final transitions:\n', tree.transitions
         print 'sum:', n_trans
         print 'final entropy:', entropy
-        #assert(n_trans == n-1)
+        assert(n_trans == n-1)
 
         pyplot.subplot(2, 3, 3)
         tree.plot_tree_data(show_plot=False)
 
     pyplot.subplot(2, 1, 2)
-    pyplot.plot(-tree.stats_entropy_global[:,0], tree.stats_entropy_global[:,1])
-    pyplot.plot(-tree.stats_entropy_out[:,0], tree.stats_entropy_out[:,1])
-    pyplot.plot(-tree.stats_entropy_out_strict[:,0], tree.stats_entropy_out_strict[:,1])
-    pyplot.plot(-tree.stats_min_entropy[:,0], tree.stats_min_entropy[:,1])
-    pyplot.plot(-tree.stats_min_entropy_out[:,0], tree.stats_min_entropy_out[:,1])
-    pyplot.plot(-tree.stats_min_entropy_in[:,0], tree.stats_min_entropy_in[:,1])
-    pyplot.plot([-30, -2], [entropy, entropy], '--', c='gray')
-    pyplot.plot([-7, -7], [.1, 1], '--', c='gray')
-    pyplot.legend(['global', 'out', 'out (strict)', 'min-entropy', 'min-entropy (out)', 'min-entropy (in)', 'true entropy', 'true #classes'])
+    pyplot.plot(np.vstack(tree.stats)[:,1:])
+    #pyplot.plot([-30, -2], [entropy, entropy], '--', c='gray')
+    #pyplot.plot([-7, -7], [.1, 1], '--', c='gray')
+    pyplot.legend(list(tree.stats[0]._fields)[1:], loc=3)# + ['true entropy', 'true #classes'])
     pyplot.show()

@@ -62,21 +62,18 @@ class TrivialEntropyTests(unittest.TestCase):
     def testTrivialTransEntropy(self):
         for normalized_entropy in [False, True]:
             for global_entropy in ['sum', 'avg', 'weighted']:
-                for split_entropy in [False, True]:
-                    tree = worldmodel.WorldModelTree(normalized_entropy=normalized_entropy, global_entropy=global_entropy)
-                    tree.add_data(self.data)
-                    trans = tree.transitions
-                    entropy = worldmodel.WorldModelTree._transition_entropy(trans=trans, normalized_entropy=normalized_entropy, global_entropy=global_entropy)
-                    self.assertEqual(entropy, 1.0)
+                tree = worldmodel.WorldModelTree(normalized_entropy=normalized_entropy, global_entropy=global_entropy)
+                tree.add_data(self.data)
+                entropy = worldmodel.WorldModelTree._matrix_entropy(transitions=tree.transitions, normalized_entropy=normalized_entropy, global_entropy=global_entropy)
+                self.assertEqual(entropy, 1.0)
 
     def testTrivialLeafEntropy(self):
         for normalized_entropy in [False, True]:
             for global_entropy in ['sum', 'avg', 'weighted']:
-                for split_entropy in [False, True]:
-                    tree = worldmodel.WorldModelTree(normalized_entropy=normalized_entropy, global_entropy=global_entropy)
-                    tree.add_data(self.data)
-                    entropy = tree.entropy()
-                    self.assertEqual(entropy, 1.0)
+                tree = worldmodel.WorldModelTree(normalized_entropy=normalized_entropy, global_entropy=global_entropy)
+                tree.add_data(self.data)
+                entropy = tree.entropy()
+                self.assertEqual(entropy, 1.0)
 
 
 
