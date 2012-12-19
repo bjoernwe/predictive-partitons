@@ -127,8 +127,10 @@ if __name__ == '__main__':
     
     model = worldmodel.WorldModelTree(normalized_entropy=True, global_entropy='weighted')
     model.add_data(voronoi.data)
-    model.sleep(depth=6)
+    model.sleep(min_gain=0.03, max_costs=0.05)
     #model.sleep(depth=2)
+    #for _ in range(20):
+    #    model.single_splitting_step()
     
     print len(model.leaves())
     print model.entropy()
@@ -142,13 +144,14 @@ if __name__ == '__main__':
     model.plot_tree_data(show_plot=False)
     
     # plot stats
-    stats = np.vstack(model.stats)
+    #stats = np.vstack(model.stats)
     pyplot.subplot(2,1,2)
-    pyplot.plot(stats[:,1:])
+    #pyplot.plot(stats[:,1:])
     #pyplot.plot([-30, -2], [entropy, entropy], '--', c='gray')
     #pyplot.plot([-7, -7], [.1, 1], '--', c='gray')
-    pyplot.legend(list(model.stats[0]._fields)[1:], loc=3)# + ['true entropy', 'true #classes'], loc=3)
+    #pyplot.legend(list(model.stats[0]._fields)[1:], loc=3)# + ['true entropy', 'true #classes'], loc=3)
     print 'true entropy:', voronoi.entropy(normalized_entropy=True, global_entropy='weighted')
+    print 'final number of nodes:', len(model.nodes())
 
     pyplot.title('opt: mutual information / stop: kl_divergence_rate >= 0.06 / data: deterministic')
     pyplot.show()
