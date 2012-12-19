@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import random
 
-def sierpinsky_square(N, iterations=200000):
+def sierpinsky_square(N, iterations=200000, normalize=True):
     """
     Generates a Sierpinski square.
     http://eldar.mathstat.uoguelph.ca/dashlock/Outreach/Articles/GSF.html
@@ -28,14 +28,19 @@ def sierpinsky_square(N, iterations=200000):
         A[x, y] = current_color
         
     # normalize
-    #weights = np.sum(A, axis=1)
-    #A = A / weights[:,np.newaxis]
+    if normalize:
+        weights = np.sum(A, axis=1)
+        A = A / weights[:,np.newaxis]
+        
     return A
     
 
 if __name__ == '__main__':
     
-    A = sierpinsky_square(N=16)    
+    A = sierpinsky_square(N=8)
+    E, U = np.linalg.eig(A)
+    print np.abs(E)
+    print np.sign(U)    
     plt.imshow(A)
     plt.show()
     

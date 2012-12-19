@@ -35,10 +35,10 @@ class VoronoiData(object):
         #    probs[i,(i+1)%k] = 1
             
         ### fifty, fifty
-        #probs = np.zeros((k,k))
-        #for i in range(k):
+        probs = np.zeros((k,k))
+        for i in range(k):
             #probs[i,i] = 1
-            #probs[i,(i+1)%k] = .5
+            probs[i,(i+1)%k] = .5
             #probs[i,(i+2)%k] = .25
             #probs[i,(i+3)%k] = .125
             #probs[i,(i+4)%k] = .0625
@@ -47,7 +47,7 @@ class VoronoiData(object):
         #probs = np.random.random((k, k))**power
         
         # sierpinsky
-        probs = sierpinsky.sierpinsky_square(N=k)
+        #probs = sierpinsky.sierpinsky_square(N=k)
         
         # normalize probabilities
         probs = probs / np.sum(probs, axis=1)[:,np.newaxis]
@@ -118,11 +118,13 @@ class VoronoiData(object):
 
 if __name__ == '__main__':
     
-    k = 32
+    k = 8
     voronoi = VoronoiData(n=10000, k=k, power=5)
     entropy = voronoi.entropy(normalized_entropy=True, global_entropy='weighted') 
     print voronoi.transitions
     print entropy
+    print 'eigenvalues:\n', np.abs(np.linalg.eig(voronoi.transitions)[0])
+    
     model = worldmodel.WorldModelTree(normalized_entropy=True, global_entropy='weighted')
     model.add_data(voronoi.data)
     model.sleep(depth=6)
@@ -148,6 +150,6 @@ if __name__ == '__main__':
     pyplot.legend(list(model.stats[0]._fields)[1:], loc=3)# + ['true entropy', 'true #classes'], loc=3)
     print 'true entropy:', voronoi.entropy(normalized_entropy=True, global_entropy='weighted')
 
-    pyplot.title('opt: max norm / stop: entropy per norm')
+    pyplot.title('opt: mutual information / stop: kl_divergence_rate >= 0.06 / data: deterministic')
     pyplot.show()
     

@@ -573,6 +573,9 @@ class WorldModelTree(object):
             print root.transitions
             #print np.sum(root.transitions)
             
+        print 'eigenvalues:\n', np.abs(np.linalg.eig(root.transitions)[0])
+        
+        P0 = np.array(root.transitions)
         root.stats.append(self._calc_stats(transitions_large=root.transitions, transitions_small=root.transitions))
         plotted_yet = False
             
@@ -597,8 +600,6 @@ class WorldModelTree(object):
             if r%100 == 0:    
                 print 'r:', r
                 
-            best_norm = 0
-                
             for _ in range(250):
 
                 # pick random pair of states for merging            
@@ -613,6 +614,7 @@ class WorldModelTree(object):
                 merged_trans[:,s1] += merged_trans[:,s2]
                 merged_trans = np.delete(merged_trans, s2, 1)
                 
+                #new_stats = self._calc_stats(transitions_large=P0, transitions_small=merged_trans)
                 new_stats = self._calc_stats(transitions_large=root.transitions, transitions_small=merged_trans)
                 
                 #diff = abs(root.stats[-1].norm - new_stats.norm)
@@ -658,7 +660,8 @@ class WorldModelTree(object):
             print '***'
             
             if not plotted_yet:
-                if best_stats.normalized_mutual_information < root.stats[-1].normalized_mutual_information:
+                #if best_stats.normalized_mutual_information < root.stats[-1].normalized_mutual_information:
+                if best_stats.kl_divergence_rate >= 0.06:
                     pyplot.subplot(2,3,2)
                     self.plot_tree_data(show_plot=False)
                     plotted_yet = True
