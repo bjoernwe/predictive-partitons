@@ -26,8 +26,10 @@ class WorldModelTree(object):
         
         # family relations of node
         self.status = 'leaf'
-        self.parents = parents 
         self.children = []
+        self.parents = []
+        if parents is not None:
+            self.parents = parents 
         
         # attributes of root node
         self.data = None     # global data storage in root node
@@ -78,6 +80,7 @@ class WorldModelTree(object):
         method of a leaf node. So, _test() has to be initialized before but the
         node not finally split yet.
         """
+        assert self.status == 'leaf'
 
         # some useful variables
         root = self.root()
@@ -100,8 +103,9 @@ class WorldModelTree(object):
         return new_labels, new_dat_ref
 
 
-    def _splitted_transition_matrix(self, new_labels):
+    def _splitted_transition_matrix(self, new_labels, index1, index2=None):
         """
+        TODO: class method
         Calculates a new transition matrix with the current state (self) split.
         """
         if not self.status == 'leaf':
@@ -109,24 +113,26 @@ class WorldModelTree(object):
 
         # helpful variable
         root = self.root()
-        current_state = self.class_label()
-        assert current_state is not None
+        index1
+        if index2 is None:
+            index2 = index1
+        assert index1 is not None
         N = len(new_labels)
 
         # new transition matrix
         new_trans = np.array(root.transitions)
         # split current row and set to zero
-        new_trans[current_state,:] = 0
-        new_trans = np.insert(new_trans, current_state, 0, axis=0)  # new row
+        new_trans[index1,:] = 0
+        new_trans = np.insert(new_trans, index2, 0, axis=0)  # new row
         # split current column and set to zero
-        new_trans[:,current_state] = 0
-        new_trans = np.insert(new_trans, current_state, 0, axis=1)  # new column
+        new_trans[:,index1] = 0
+        new_trans = np.insert(new_trans, index2, 0, axis=1)  # new column
 
         # update all transitions from or to current state
         for i in range(N-1):
             source = root.labels[i]
             target = root.labels[i+1]
-            if source == current_state or target == current_state:
+            if source == index1 or target == index1:
                 new_source = new_labels[i]
                 new_target = new_labels[i+1]
                 new_trans[new_source, new_target] += 1
@@ -220,7 +226,7 @@ class WorldModelTree(object):
         """
         Returns the root node of the whole tree.
         """
-        if self.parents is None:
+        if len(self.parents) == 0:
             return self
         else:
             return self.parents[0].root()
@@ -437,28 +443,76 @@ class WorldModelTree(object):
                 leaf.split()
             return
         
-        # split this leaf node
+        # test for minimum number of data points
         assert self.status == 'leaf'
         if len(self.dat_ref) < self._min_class_size:
             return
         
         root = self.root()
-        self._init_test()
-        new_labels, new_dat_ref = self._relabel_data()
-        root.transitions = self._splitted_transition_matrix(new_labels)
-        root.labels = new_labels
-        
-        # create new leaves
-        child0 = self.__class__(parents = [self])
-        child1 = self.__class__(parents = [self])
-        child0.dat_ref = new_dat_ref[0]
-        child1.dat_ref = new_dat_ref[1]
+        if len(self.parents) == 2: # merged but same grandparent?
+            
+            # a split would be redundant here because the current node was just merged.
+            # so simply revert that merging...
 
-        # create list of children
-        self.children = []
-        self.children.append(child0)
-        self.children.append(child1)
-        self.status = 'split'
+            parent1 = self.parents[0]
+            parent2 = self.parents[1]
+            parent1.status = 'leaf'
+            parent2.status = 'leaf'
+            label1 = parent1.class_label()
+            label2 = parent2.class_label()
+
+            # make of copy of all labels
+            # increase labels above second node by one to make space for the split
+            new_labels = map(lambda l: l+1 if l > label2 else l, root.labels)
+            new_dat_ref = [[], []]
+    
+            # every entry belonging to this node has to be re-classified
+            for ref_i in self.dat_ref:
+                dat = root.data[ref_i]
+                label = root.classify(dat)
+                assert label == label1 or label == label2
+                if label == label1:
+                    new_dat_ref[0].append(ref_i)
+                else:
+                    new_labels[ref_i] = label2
+                    new_dat_ref[1].append(ref_i)
+                    
+            assert len(new_labels) == len(root.labels)
+            root.transitions = self._splitted_transition_matrix(new_labels, index1=label1, index2=label2)
+            root.labels = new_labels
+            
+            parent1.dat_ref = new_dat_ref[0]
+            parent2.dat_ref = new_dat_ref[1]
+            assert len(parent1.dat_ref) + len(parent2.dat_ref) == len(self.dat_ref)
+            
+            print parent1.status
+            print parent2.status
+            print len(parent1.dat_ref)
+            print len(parent2.dat_ref)
+            print root.transitions
+            
+            print 'SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSsss'
+            
+        else:
+            
+            # re-classify data
+            self._init_test()
+            new_labels, new_dat_ref = self._relabel_data()
+            root.transitions = self._splitted_transition_matrix(new_labels, self.class_label())
+            root.labels = new_labels
+            
+            # create new leaves
+            child0 = self.__class__(parents = [self])
+            child1 = self.__class__(parents = [self])
+            child0.dat_ref = new_dat_ref[0]
+            child1.dat_ref = new_dat_ref[1]
+    
+            # create list of children
+            self.children = []
+            self.children.append(child0)
+            self.children.append(child1)
+            self.status = 'split'
+            
         return
     
     
@@ -472,7 +526,7 @@ class WorldModelTree(object):
         assert self in root.leaves()
         self._init_test()
         new_labels, _ = self._relabel_data()
-        splitted_transition_matrix = self._splitted_transition_matrix(new_labels)
+        splitted_transition_matrix = self._splitted_transition_matrix(new_labels, self.class_label())
         new_mutual_information = self._mutual_information(transition_matrix=splitted_transition_matrix)
         old_mutual_information = self._mutual_information(transition_matrix=root.transitions)
         return new_mutual_information - old_mutual_information
@@ -533,8 +587,6 @@ class WorldModelTree(object):
             #best_entropy = float('inf')
             best_s1 = None
             best_s2 = None
-            best_trans = None
-            best_labels = None
             best_stats = root.stats[-1]
             best_diff = float("inf")
             
@@ -558,18 +610,10 @@ class WorldModelTree(object):
                 #new_stats = self._calc_stats(transitions_large=P0, transitions_small=merged_trans)
                 new_stats = self._calc_stats(transitions_large=root.transitions, transitions_small=merged_trans)
                 
-                #diff = abs(root.stats[-1].norm - new_stats.norm)
-                #diff = abs(root.stats[-1].entropy - new_stats.entropy)
                 diff = abs(root.stats[-1].mutual_information - new_stats.mutual_information)
                 
                 if (True and
-                    #new_stats.entropy_out_quot > best_quotient and
-                    #new_stats.entropy < root.stats[-1].entropy and
                     diff < best_diff and
-                    #new_stats.entropy_per_norm < best_stats.entropy_per_norm and
-                    #new_stats.normalized_entropy_per_norm < best_stats.normalized_entropy_per_norm and
-                    #new_stats.mutual_information > best_stats.mutual_information and
-                    #new_stats.norm > best_norm and
                     True):
                     
                     #print 'best entropy:', new_stats.entropy
@@ -586,8 +630,6 @@ class WorldModelTree(object):
                     #best_entropy = new_stats.entropy
                     best_s1 = s1
                     best_s2 = s2
-                    best_trans = merged_trans#np.array(merged_trans)
-                    best_labels = new_labels#list(new_labels)
                     best_stats = new_stats#Stats(*new_stats)
                     #best_norm = new_stats.norm
                     best_diff = diff
@@ -608,15 +650,54 @@ class WorldModelTree(object):
                     plotted_yet = True
                     return
             
-            # merge transitions again
-            root.transitions = best_trans
-            root.labels = best_labels
-            root.stats.append(best_stats)
+            self._merge_nodes(best_s1, best_s2)
+            print 'merged'
+            print root.transitions
+            print np.sum(root.transitions)
+                
+        return
+    
+    
+    def _merge_nodes(self, s1, s2):
+        """
+        Merges two nodes.
+        """
+        
+        root = self.root()
+        leaves = root.leaves()
+        leaf1 = leaves[s1]
+        leaf2 = leaves[s2]
+        assert leaf1.status == 'leaf'
+        assert leaf2.status == 'leaf'
+        
+        # merge transitions
+        root.transitions[s1,:] += root.transitions[s2,:]
+        root.transitions = np.delete(root.transitions, s2, 0)  
+        root.transitions[:,s1] += root.transitions[:,s2]
+        root.transitions = np.delete(root.transitions, s2, 1)
+        
+        # merge labels
+        for i in range(len(root.labels)):
+            if root.labels[i] == s2:
+                root.labels[i] = s1
+            if root.labels[i] > s2:
+                root.labels[i] -= 1
+
+        if leaf1.parents[0] == leaf2.parents[0]: # same parent
             
+            # trivial merge: revert split of parent
+            # merge data references and set new status
+            parent = leaf1.parents[0]
+            parent.dat_ref = leaf1.dat_ref + leaf2.dat_ref
+            parent.children = []
+            parent.status = 'leaf'
+
+        else:
+        
             # merge data references
             leaves = root.leaves()
-            parent1 = leaves[best_s1]            
-            parent2 = leaves[best_s2]            
+            parent1 = leaves[s1]            
+            parent2 = leaves[s2]            
             child = self.__class__(parents = [parent1, parent2])
             child.dat_ref = parent1.dat_ref + parent2.dat_ref
             parent1.dat_ref = []
@@ -625,17 +706,15 @@ class WorldModelTree(object):
             parent2.children = [child]
             parent1.status = 'merged'
             parent2.status = 'merged'
-            print 'merged'
-            print root.transitions
-            print np.sum(root.transitions)
-                
+            
         return
-        
+
         
     def _init_test(self):
         """
         Initializes the parameters that split the node in two halves.
         """
+        assert self.status == 'leaf'
         # calculate PCA of data
         data = self.get_data()
         self.pca = mdp.nodes.PCANode(output_dim=1)
@@ -794,6 +873,7 @@ if __name__ == "__main__":
 
 
         print tree.transitions
+        tree.sleep(min_gain=0.03, max_costs=0.03)
         tree.sleep(min_gain=0.03, max_costs=0.03)
         #for _ in range(15):
         #    tree.single_splitting_step()

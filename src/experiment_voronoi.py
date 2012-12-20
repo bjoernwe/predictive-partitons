@@ -112,22 +112,22 @@ class VoronoiData(object):
         return
     
     
-    def entropy(self, normalized_entropy, global_entropy):
-        return worldmodel.WorldModelTree._matrix_entropy(transitions=self.transitions, normalized_entropy=normalized_entropy, global_entropy=global_entropy)
+    def entropy(self, normalize=False):
+        return worldmodel.WorldModelTree._matrix_entropy(transitions=self.transitions, normalize=normalize)
 
 
 if __name__ == '__main__':
     
     k = 8
     voronoi = VoronoiData(n=10000, k=k, power=5)
-    entropy = voronoi.entropy(normalized_entropy=True, global_entropy='weighted') 
+    entropy = voronoi.entropy() 
     print voronoi.transitions
     print entropy
     print 'eigenvalues:\n', np.abs(np.linalg.eig(voronoi.transitions)[0])
     
-    model = worldmodel.WorldModelTree(normalized_entropy=True, global_entropy='weighted')
+    model = worldmodel.WorldModelTree()
     model.add_data(voronoi.data)
-    model.sleep(min_gain=0.03, max_costs=0.05)
+    model.sleep(min_gain=0.03, max_costs=0.03)
     #model.sleep(depth=2)
     #for _ in range(20):
     #    model.single_splitting_step()
@@ -150,7 +150,7 @@ if __name__ == '__main__':
     #pyplot.plot([-30, -2], [entropy, entropy], '--', c='gray')
     #pyplot.plot([-7, -7], [.1, 1], '--', c='gray')
     #pyplot.legend(list(model.stats[0]._fields)[1:], loc=3)# + ['true entropy', 'true #classes'], loc=3)
-    print 'true entropy:', voronoi.entropy(normalized_entropy=True, global_entropy='weighted')
+    print 'true entropy:', voronoi.entropy()
     print 'final number of nodes:', len(model.nodes())
 
     pyplot.title('opt: mutual information / stop: kl_divergence_rate >= 0.06 / data: deterministic')
