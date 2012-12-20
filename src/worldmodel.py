@@ -8,15 +8,12 @@ from matplotlib import pyplot
 import mdp
 
 
-Stats = collections.namedtuple('Stats', ['n_states', 
+Stats = collections.namedtuple('Stats', ['n_states',
+                                         'n_nodes', 
                                          'norm', 
                                          'entropy', 
                                          'entropy_normalized', 
-                                         #'entropy_per_norm', 
-                                         'mutual_information', 
-                                         #'normalized_mutual_information', 
-                                         'kl_divergence_rate'
-                                         ])
+                                         'mutual_information'])
 
 class WorldModelTree(object):
 
@@ -243,6 +240,7 @@ class WorldModelTree(object):
         Plots all the data that is stored in the tree.
         """
 
+
         if data_list is None:
             # list of data for the different classes
             data_list = []
@@ -261,42 +259,16 @@ class WorldModelTree(object):
         if show_plot:
             pyplot.show()
         return
-
-
-    def _get_data_for_target(self, dat_ref, target_state, labels=None):
-        """
-        Returns all the data with a certain target state. If no labels are
-        given, the global ones are taken. dat_ref is a list of indices belonging
-        the data matrix of the root node.
-        """
-
-        # data?
-        if len(dat_ref) == 0:
-            return None
-
-        # useful variables
-        root = self.root()
-        N = len(root.labels)
-
-        # which labels to use?
-        if labels is None:
-            labels = root.labels
-
-        # select data for target state
-        data_refs = []
-        for ref_i in dat_ref:
-            if ref_i >= N-1:
-                continue
-            if labels[ref_i+1] == target_state:
-                data_refs.append(ref_i)
-
-        # data?
-        if len(data_refs) == 0:
-            return None
-
-        # fetch the actual data
-        data_list = map(lambda i: root.data[i], data_refs)
-        return np.vstack(data_list)
+    
+    
+    def plot_stats(self, show_plot=True):
+        stats = np.vstack(self.root().stats)
+        #pyplot.gca().invert_xaxis()
+        #for i in range(1, stats.shape[1]):
+        #    pyplot.plot(stats[:,0], stats[:,i])
+        pyplot.plot(stats)
+        pyplot.legend(list(tree.stats[0]._fields)[0:], loc=2)
+        return
 
 
     def get_data_refs(self):
@@ -388,27 +360,6 @@ class WorldModelTree(object):
         Calculates the (weighted) entropy for the root node.
         """
         return self._matrix_entropy(transitions=self.root().transitions, normalize=False)
-        
-        if self.status == 'leaf':
-            
-            # return entropy of leaf node
-            root = self.root()
-            current_state = self.class_label()
-            trans = root.transitions[current_state]
-            entropy = self._entropy(trans=trans, normalized_entropy=root._normalized_entropy)
-            
-        else:
-        
-            # entropy of all leaves ...
-            root = self.root()
-            leaf_entropies = map(lambda t: WorldModelTree._entropy(trans=t, normalized_entropy=root._normalized_entropy), root.transitions)
-
-            # (weighted) average
-            weights = np.sum(self.root().transitions, axis=1)
-            weights /= np.sum(weights)
-            entropy = np.sum(weights * leaf_entropies)
-
-        return entropy
 
 
     @classmethod
@@ -483,14 +434,6 @@ class WorldModelTree(object):
             parent2.dat_ref = new_dat_ref[1]
             assert len(parent1.dat_ref) + len(parent2.dat_ref) == len(self.dat_ref)
             
-            print parent1.status
-            print parent2.status
-            print len(parent1.dat_ref)
-            print len(parent2.dat_ref)
-            print root.transitions
-            
-            print 'DOES THIS EVER HAPPEN???'
-            
         else:
             
             # re-classify data
@@ -539,57 +482,52 @@ class WorldModelTree(object):
         
         assert self is self.root()
         best_leaf = None
-        best_gain = 0
+        best_gain = float('-inf')
         
         for leaf in self.root().leaves():
             gain = leaf.calculate_splitting_gain()
-            if gain > best_gain:
+            if gain >= best_gain:
                 best_gain = gain
                 best_leaf = leaf
                 
         if best_leaf is not None and best_gain >= min_gain:
             best_leaf.split()
+            root = self.root()
+            root.stats.append(self._calc_stats(transitions=root.transitions))
             
         return best_gain
     
     
-    def sleep(self, min_gain=0.02, max_costs=0.02):
+    def learn(self, min_gain=0.02, max_costs=0.02):
         """
-        Create little splits and re-assemble them with less entropy.
+        Learns the model.
         """
         root = self.root()
         assert self is root
         
-        self.single_splitting_step()
+        self.single_splitting_step(min_gain=float('-inf'))
         best_gain = float('inf')
         while best_gain >= min_gain:
-            best_gain = self.single_splitting_step()
+            best_gain = self.single_splitting_step(min_gain=min_gain)
             print 'split with gain', best_gain 
             
-        print 'eigenvalues:\n', np.abs(np.linalg.eig(root.transitions)[0])
-        
-        #P0 = np.array(root.transitions)
-        root.stats.append(self._calc_stats(transitions_large=root.transitions, transitions_small=root.transitions))
-        plotted_yet = False
+        root.stats.append(self._calc_stats(transitions=root.transitions))
             
         # merge again ...
         for r in range(150):
         
             # useful variables    
-            root = self.root()
             K = root.transitions.shape[0]
             if K < 2:
                 break
             
             # find best merge ...
-            #best_entropy = float('inf')
             best_s1 = None
             best_s2 = None
-            best_stats = root.stats[-1]
-            best_diff = float("inf")
+            best_costs = float('inf')
             
-            if r%100 == 0:    
-                print 'r:', r
+            if r % 100 == 0:    
+                print 'round:', r
                 
             for _ in range(250):
 
@@ -605,53 +543,32 @@ class WorldModelTree(object):
                 merged_trans[:,s1] += merged_trans[:,s2]
                 merged_trans = np.delete(merged_trans, s2, 1)
                 
-                #new_stats = self._calc_stats(transitions_large=P0, transitions_small=merged_trans)
-                new_stats = self._calc_stats(transitions_large=root.transitions, transitions_small=merged_trans)
+                new_stats = self._calc_stats(transitions=merged_trans)
+                costs = root.stats[-1].mutual_information - new_stats.mutual_information
                 
-                diff = abs(root.stats[-1].mutual_information - new_stats.mutual_information)
-                
-                if (True and
-                    diff < best_diff and
-                    True):
+                if (costs < best_costs):
                     
-                    #print 'best entropy:', new_stats.entropy
-                    print 'best diff:', diff
-                    
-                    # merge labels again
-                    new_labels = list(root.labels)
-                    for i in range(len(new_labels)):
-                        if new_labels[i] == s2:
-                            new_labels[i] = s1
-                        if new_labels[i] > s2:
-                            new_labels[i] -= 1
+                    print 'best costs:', costs
 
-                    #best_entropy = new_stats.entropy
                     best_s1 = s1
                     best_s2 = s2
-                    best_stats = new_stats#Stats(*new_stats)
-                    #best_norm = new_stats.norm
-                    best_diff = diff
+                    best_costs = costs
+                    best_stats = new_stats
                     
                     merged_trans = None
-                    new_labels = None
                     new_stats = None
 
             if best_s1 is None:
                 continue
-            print '***'
             
-            if not plotted_yet:
-                #if best_stats.normalized_mutual_information < root.stats[-1].normalized_mutual_information:
-                if best_stats.kl_divergence_rate >= max_costs:
-                    pyplot.subplot(2,3,2)
-                    self.plot_tree_data(show_plot=False)
-                    plotted_yet = True
-                    return
-            
-            self._merge_nodes(best_s1, best_s2)
-            print 'merged'
-            print root.transitions
-            print np.sum(root.transitions)
+            if best_costs <= max_costs:
+                self._merge_nodes(best_s1, best_s2)
+                root.stats.append(best_stats)
+                print 'merged:', best_costs
+                print root.transitions
+                print np.sum(root.transitions)
+            else:
+                return
                 
         return
     
@@ -743,49 +660,34 @@ class WorldModelTree(object):
         return mutual_information
         
     
-    def _calc_stats(self, transitions_large, transitions_small):
+    def _calc_stats(self, transitions):
         """
         Calculates statistics for a given transition matrix.
         """
+
+        n_nodes = len(self.root().nodes())
         
-        P = transitions_large
-        Q = transitions_small
-        
-        q_entropy = self._matrix_entropy(transitions=Q)
-        q_entropy_normalized = self._matrix_entropy(transitions=Q)
+        P = transitions
+        K = P.shape[0]
+        entropy = self._matrix_entropy(transitions=P)
+        entropy_normalized = self._matrix_entropy(transitions=P, normalize=True)
         
         # norm of Q
-        q_weights = np.sum(Q, axis=1)
-        q_probs = Q / q_weights[:,np.newaxis]
-        q_mu = q_weights / np.sum(q_weights)
-        q_K = Q.shape[0]
-        q_norm = np.sum( ( q_probs**2 * q_mu[:,np.newaxis] ) / q_mu[np.newaxis,:] )
-        
-        #q_entropy_per_norm = q_entropy / q_norm
+        weights = np.sum(P, axis=1)
+        probs = P / weights[:,np.newaxis]
+        mu = weights / np.sum(weights)
+        norm = np.sum( ( probs**2 * mu[:,np.newaxis] ) / mu[np.newaxis,:] )
         
         # mutual information
-        q_entropy_mu = self._entropy(trans=q_mu, normalize=False)
-        q_mutual_information = q_entropy_mu - q_entropy
-        #q_normalized_mutual_information = q_mutual_information / np.log2(q_K)
+        entropy_mu = self._entropy(trans=mu)
+        mutual_information = entropy_mu - entropy
 
-        p_entropy = self._matrix_entropy(transitions=P)
-        p_weights = np.sum(P, axis=1)
-        p_mu = p_weights / np.sum(p_weights)
-        p_entropy_mu = self._entropy(trans=p_mu, normalize=False)
-        p_mutual_information = p_entropy_mu - p_entropy
-        
-        kl_divergence_rate = p_mutual_information - q_mutual_information
-        
-        
-        stats = Stats(n_states = q_K, 
-                      entropy = q_entropy, 
-                      entropy_normalized = q_entropy_normalized, 
-                      norm = q_norm, 
-                      #entropy_per_norm = q_entropy_per_norm,
-                      mutual_information = q_mutual_information,
-                      #normalized_mutual_information = q_normalized_mutual_information,
-                      kl_divergence_rate = kl_divergence_rate
-                      )
+        stats = Stats(n_states = K,
+                      n_nodes = n_nodes, 
+                      entropy = entropy, 
+                      entropy_normalized = entropy_normalized, 
+                      norm = norm, 
+                      mutual_information = mutual_information)
         return stats
 
 
@@ -857,8 +759,8 @@ def problemHoneycomb(n=1000, seed=None):
 
 if __name__ == "__main__":
 
-    #problems = [problemChain, problemDiamond, problemHoneycomb]
-    problems = [problemHoneycomb]
+    problems = [problemChain, problemDiamond, problemHoneycomb]
+    #problems = [problemHoneycomb]
 
     for p, problem in enumerate(problems):
 
@@ -871,11 +773,8 @@ if __name__ == "__main__":
 
 
         print tree.transitions
-        tree.sleep(min_gain=0.03, max_costs=0.03)
-        tree.sleep(min_gain=0.03, max_costs=0.03)
-        #for _ in range(15):
-        #    tree.single_splitting_step()
-        
+        #tree.learn(min_gain=0.03, max_costs=0.03)
+        tree.learn(min_gain=0.03, max_costs=0.05)
 
 
         n_trans = np.sum(tree.transitions)
@@ -886,12 +785,10 @@ if __name__ == "__main__":
         print 'final number of nodes:', len(tree.nodes())
         assert(n_trans == n-1)
 
-        pyplot.subplot(2, 3, 3)
+        # plot tree and stats
+        pyplot.subplot(2, 3, p+1)
         tree.plot_tree_data(show_plot=False)
+        pyplot.subplot(2, 3, p+3+1)
+        tree.plot_stats(show_plot=False)
 
-    pyplot.subplot(2, 1, 2)
-    #pyplot.plot(np.vstack(tree.stats)[:,1:])
-    #pyplot.plot([-30, -2], [entropy, entropy], '--', c='gray')
-    #pyplot.plot([-7, -7], [.1, 1], '--', c='gray')
-    #pyplot.legend(list(tree.stats[0]._fields)[1:], loc=3)# + ['true entropy', 'true #classes'])
     pyplot.show()
