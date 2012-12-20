@@ -103,21 +103,19 @@ class WorldModelTree(object):
         return new_labels, new_dat_ref
 
 
-    def _splitted_transition_matrix(self, new_labels, index1, index2=None):
+    @classmethod
+    def _splitted_transition_matrix(cls, root, new_labels, index1, index2=None):
         """
-        TODO: class method
-        Calculates a new transition matrix with the current state (self) split.
+        Calculates a new transition matrix with the split index1 -> index1 & index1+1.
+        
+        In special cases it might be necessary to have a split index1 -> index1 & index2.
         """
-        if not self.status == 'leaf':
-            return None
 
-        # helpful variable
-        root = self.root()
-        index1
+        N = len(new_labels)
+        assert root.leaves()[index1].status == 'leaf'
         if index2 is None:
             index2 = index1
-        assert index1 is not None
-        N = len(new_labels)
+            assert root.leaves()[index1].status == 'leaf'
 
         # new transition matrix
         new_trans = np.array(root.transitions)
@@ -478,7 +476,7 @@ class WorldModelTree(object):
                     new_dat_ref[1].append(ref_i)
                     
             assert len(new_labels) == len(root.labels)
-            root.transitions = self._splitted_transition_matrix(new_labels, index1=label1, index2=label2)
+            root.transitions = self._splitted_transition_matrix(root=root, new_labels=new_labels, index1=label1, index2=label2)
             root.labels = new_labels
             
             parent1.dat_ref = new_dat_ref[0]
@@ -491,14 +489,14 @@ class WorldModelTree(object):
             print len(parent2.dat_ref)
             print root.transitions
             
-            print 'SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSsss'
+            print 'DOES THIS EVER HAPPEN???'
             
         else:
             
             # re-classify data
             self._init_test()
             new_labels, new_dat_ref = self._relabel_data()
-            root.transitions = self._splitted_transition_matrix(new_labels, self.class_label())
+            root.transitions = self._splitted_transition_matrix(root=root, new_labels=new_labels, index1=self.class_label())
             root.labels = new_labels
             
             # create new leaves
@@ -526,7 +524,7 @@ class WorldModelTree(object):
         assert self in root.leaves()
         self._init_test()
         new_labels, _ = self._relabel_data()
-        splitted_transition_matrix = self._splitted_transition_matrix(new_labels, self.class_label())
+        splitted_transition_matrix = self._splitted_transition_matrix(root=root, new_labels=new_labels, index1=self.class_label())
         new_mutual_information = self._mutual_information(transition_matrix=splitted_transition_matrix)
         old_mutual_information = self._mutual_information(transition_matrix=root.transitions)
         return new_mutual_information - old_mutual_information
