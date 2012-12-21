@@ -110,6 +110,8 @@ class WorldModelTree(object):
 
         N = len(new_labels)
         assert root.leaves()[index1].status == 'leaf'
+        assert np.sum(root.transitions) == N-1
+        assert max(new_labels) == root.transitions.shape[0]
         if index2 is None:
             index2 = index1
             assert root.leaves()[index1].status == 'leaf'
@@ -122,7 +124,7 @@ class WorldModelTree(object):
         # split current column and set to zero
         new_trans[:,index1] = 0
         new_trans = np.insert(new_trans, index2, 0, axis=1)  # new column
-
+        
         # update all transitions from or to current state
         for i in range(N-1):
             source = root.labels[i]
@@ -262,12 +264,10 @@ class WorldModelTree(object):
     
     
     def plot_stats(self, show_plot=True):
-        stats = np.vstack(self.root().stats)
-        #pyplot.gca().invert_xaxis()
-        #for i in range(1, stats.shape[1]):
-        #    pyplot.plot(stats[:,0], stats[:,i])
+        root = self.root()
+        stats = np.vstack(root.stats)
         pyplot.plot(stats)
-        pyplot.legend(list(tree.stats[0]._fields)[0:], loc=2)
+        pyplot.legend(list(root.stats[0]._fields)[0:], loc=2)
         return
 
 
@@ -400,19 +400,23 @@ class WorldModelTree(object):
         root = self.root()
         if len(self.parents) == 2: # merged but same grandparent?
             
+            print len(root.nodes())
             # a split would be redundant here because the current node was just merged.
             # so simply revert that merging...
 
             parent1 = self.parents[0]
             parent2 = self.parents[1]
+            self.parents = []
             parent1.status = 'leaf'
             parent2.status = 'leaf'
+            parent1.children = []
+            parent2.children = []
             label1 = parent1.class_label()
             label2 = parent2.class_label()
 
             # make of copy of all labels
             # increase labels above second node by one to make space for the split
-            new_labels = map(lambda l: l+1 if l > label2 else l, root.labels)
+            new_labels = map(lambda l: l+1 if l >= label2 else l, root.labels)
             new_dat_ref = [[], []]
     
             # every entry belonging to this node has to be re-classified
@@ -423,8 +427,8 @@ class WorldModelTree(object):
                 if label == label1:
                     new_dat_ref[0].append(ref_i)
                 else:
-                    new_labels[ref_i] = label2
                     new_dat_ref[1].append(ref_i)
+                    new_labels[ref_i] = label2
                     
             assert len(new_labels) == len(root.labels)
             root.transitions = self._splitted_transition_matrix(root=root, new_labels=new_labels, index1=label1, index2=label2)
@@ -433,6 +437,9 @@ class WorldModelTree(object):
             parent1.dat_ref = new_dat_ref[0]
             parent2.dat_ref = new_dat_ref[1]
             assert len(parent1.dat_ref) + len(parent2.dat_ref) == len(self.dat_ref)
+            
+            print len(root.nodes())
+            print 'TRIVIAL SPLIT'
             
         else:
             
@@ -457,7 +464,7 @@ class WorldModelTree(object):
         return
     
     
-    def calculate_splitting_gain(self):
+    def _calculate_splitting_gain(self):
         """
         Calculates the gain in mutual information if this node would be splitted.
         
@@ -480,19 +487,19 @@ class WorldModelTree(object):
         TODO: only re-calculate states with some change
         """
         
-        assert self is self.root()
+        root = self.root()
+        assert self is root
         best_leaf = None
         best_gain = float('-inf')
         
         for leaf in self.root().leaves():
-            gain = leaf.calculate_splitting_gain()
+            gain = leaf._calculate_splitting_gain()
             if gain >= best_gain:
                 best_gain = gain
                 best_leaf = leaf
                 
         if best_leaf is not None and best_gain >= min_gain:
             best_leaf.split()
-            root = self.root()
             root.stats.append(self._calc_stats(transitions=root.transitions))
             
         return best_gain
@@ -505,13 +512,17 @@ class WorldModelTree(object):
         root = self.root()
         assert self is root
         
-        self.single_splitting_step(min_gain=float('-inf'))
-        best_gain = float('inf')
-        while best_gain >= min_gain:
-            best_gain = self.single_splitting_step(min_gain=min_gain)
-            print 'split with gain', best_gain 
+        if len(root.stats) == 0:
+            root.stats.append(self._calc_stats(transitions=root.transitions))
             
-        root.stats.append(self._calc_stats(transitions=root.transitions))
+        self.single_splitting_step(min_gain=float('-inf'))
+        gain = float('inf')
+        print root.transitions
+        print np.sum(root.transitions)
+        while gain >= min_gain:
+            gain = self.single_splitting_step(min_gain=min_gain)
+            if gain >= min_gain:
+                print 'split with gain', gain 
             
         # merge again ...
         for r in range(150):
@@ -538,35 +549,27 @@ class WorldModelTree(object):
                 
                 # merge rows and columns
                 merged_trans = np.array(root.transitions)
-                merged_trans[s1,:] += merged_trans[s2,:]
-                merged_trans = np.delete(merged_trans, s2, 0)  
-                merged_trans[:,s1] += merged_trans[:,s2]
-                merged_trans = np.delete(merged_trans, s2, 1)
+                merged_trans = self._merge_matrix(merged_trans, s1, s2)
                 
-                new_stats = self._calc_stats(transitions=merged_trans)
-                costs = root.stats[-1].mutual_information - new_stats.mutual_information
+                costs = self._mutual_information(transition_matrix=root.transitions) - self._mutual_information(transition_matrix=merged_trans)
                 
                 if (costs < best_costs):
                     
-                    print 'best costs:', costs
+                    #print 'best costs:', costs
 
                     best_s1 = s1
                     best_s2 = s2
                     best_costs = costs
-                    best_stats = new_stats
-                    
                     merged_trans = None
-                    new_stats = None
 
             if best_s1 is None:
                 continue
             
             if best_costs <= max_costs:
                 self._merge_nodes(best_s1, best_s2)
-                root.stats.append(best_stats)
+                stats = self._calc_stats(transitions=root.transitions) 
+                root.stats.append(stats)
                 print 'merged:', best_costs
-                print root.transitions
-                print np.sum(root.transitions)
             else:
                 return
                 
@@ -586,10 +589,7 @@ class WorldModelTree(object):
         assert leaf2.status == 'leaf'
         
         # merge transitions
-        root.transitions[s1,:] += root.transitions[s2,:]
-        root.transitions = np.delete(root.transitions, s2, 0)  
-        root.transitions[:,s1] += root.transitions[:,s2]
-        root.transitions = np.delete(root.transitions, s2, 1)
+        root.transitions = self._merge_matrix(root.transitions, s1, s2)
         
         # merge labels
         for i in range(len(root.labels)):
@@ -606,6 +606,7 @@ class WorldModelTree(object):
             parent.dat_ref = leaf1.dat_ref + leaf2.dat_ref
             parent.children = []
             parent.status = 'leaf'
+            print 'TRIVIAL MERGE'
 
         else:
         
@@ -623,6 +624,18 @@ class WorldModelTree(object):
             parent2.status = 'merged'
             
         return
+    
+    
+    @classmethod
+    def _merge_matrix(cls, matrix, s1, s2):
+        """
+        Merges rows and columns of a matrix.
+        """
+        matrix[s1,:] += matrix[s2,:]
+        matrix = np.delete(matrix, s2, 0)  
+        matrix[:,s1] += matrix[:,s2]
+        matrix = np.delete(matrix, s2, 1)
+        return matrix
 
         
     def _init_test(self):
@@ -771,17 +784,11 @@ if __name__ == "__main__":
         tree = WorldModelTree()
         tree.add_data(data)
 
-
         print tree.transitions
-        #tree.learn(min_gain=0.03, max_costs=0.03)
-        tree.learn(min_gain=0.03, max_costs=0.05)
-
+        tree.learn(min_gain=0.03, max_costs=0.03)
+        tree.learn(min_gain=0.02, max_costs=0.02)
 
         n_trans = np.sum(tree.transitions)
-        entropy = tree.entropy()
-        print 'final transitions:\n', tree.transitions
-        print 'sum:', n_trans
-        print 'final entropy:', entropy
         print 'final number of nodes:', len(tree.nodes())
         assert(n_trans == n-1)
 

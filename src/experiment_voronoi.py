@@ -37,9 +37,9 @@ class VoronoiData(object):
         ### fifty, fifty
         probs = np.zeros((k,k))
         for i in range(k):
-            #probs[i,i] = 1
+            probs[i,i] = 1
             probs[i,(i+1)%k] = .5
-            #probs[i,(i+2)%k] = .25
+            probs[i,(i+2)%k] = .25
             #probs[i,(i+3)%k] = .125
             #probs[i,(i+4)%k] = .0625
         
@@ -122,37 +122,23 @@ if __name__ == '__main__':
     voronoi = VoronoiData(n=10000, k=k, power=5)
     entropy = voronoi.entropy() 
     print voronoi.transitions
-    print entropy
     print 'eigenvalues:\n', np.abs(np.linalg.eig(voronoi.transitions)[0])
     
     model = worldmodel.WorldModelTree()
     model.add_data(voronoi.data)
-    model.sleep(min_gain=0.03, max_costs=0.03)
-    #model.sleep(depth=2)
-    #for _ in range(20):
-    #    model.single_splitting_step()
-    
-    print len(model.leaves())
-    print model.entropy()
+    model.learn(min_gain=0.02, max_costs=0.02)
+    print 'final number of nodes:', len(model.nodes())
     
     # plot target
-    pyplot.subplot(2,3,1)
+    pyplot.subplot(2,2,1)
     voronoi.plot(show_plot=False)
      
     # plot result
-    pyplot.subplot(2,3,3)
+    pyplot.subplot(2,2,2)
     model.plot_tree_data(show_plot=False)
     
     # plot stats
-    #stats = np.vstack(model.stats)
     pyplot.subplot(2,1,2)
-    #pyplot.plot(stats[:,1:])
-    #pyplot.plot([-30, -2], [entropy, entropy], '--', c='gray')
-    #pyplot.plot([-7, -7], [.1, 1], '--', c='gray')
-    #pyplot.legend(list(model.stats[0]._fields)[1:], loc=3)# + ['true entropy', 'true #classes'], loc=3)
-    print 'true entropy:', voronoi.entropy()
-    print 'final number of nodes:', len(model.nodes())
-
-    pyplot.title('opt: mutual information / stop: kl_divergence_rate >= 0.06 / data: deterministic')
+    model.plot_stats(show_plot=False)
     pyplot.show()
     
