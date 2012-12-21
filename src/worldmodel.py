@@ -208,14 +208,14 @@ class WorldModelTree(object):
             return children
         
         
-    def nodes(self):
+    def _nodes(self):
         """
         Returns a list of all nodes.
         """
         nodes = set([self])
         for child in self.children:
             nodes.add(child)
-            nodes = nodes.union(child.nodes())
+            nodes = nodes.union(child._nodes())
         return nodes
 
 
@@ -316,7 +316,7 @@ class WorldModelTree(object):
     def _entropy(cls, trans, normalize=False, ignore_empty_classes=False):
         """
         Calculates the (normalized) entropy over the target state distribution
-        for a leaf or a given list of transitions.
+        for a given list of transitions.
         """
 
         # negative values?
@@ -331,7 +331,6 @@ class WorldModelTree(object):
             return 1.0
 
         # empty class?
-        
         if trans_sum == 0:
             #if not ignore_empty_classes:
             #    assert trans_sum != 0
@@ -400,7 +399,6 @@ class WorldModelTree(object):
         root = self.root()
         if len(self.parents) == 2: # merged but same grandparent?
             
-            print len(root.nodes())
             # a split would be redundant here because the current node was just merged.
             # so simply revert that merging...
 
@@ -438,7 +436,6 @@ class WorldModelTree(object):
             parent2.dat_ref = new_dat_ref[1]
             assert len(parent1.dat_ref) + len(parent2.dat_ref) == len(self.dat_ref)
             
-            print len(root.nodes())
             print 'TRIVIAL SPLIT'
             
         else:
@@ -512,13 +509,13 @@ class WorldModelTree(object):
         root = self.root()
         assert self is root
         
+        # init stats
         if len(root.stats) == 0:
             root.stats.append(self._calc_stats(transitions=root.transitions))
-            
+
+        # split until as long as it's interesting            
         self.single_splitting_step(min_gain=float('-inf'))
         gain = float('inf')
-        print root.transitions
-        print np.sum(root.transitions)
         while gain >= min_gain:
             gain = self.single_splitting_step(min_gain=min_gain)
             if gain >= min_gain:
@@ -554,17 +551,11 @@ class WorldModelTree(object):
                 costs = self._mutual_information(transition_matrix=root.transitions) - self._mutual_information(transition_matrix=merged_trans)
                 
                 if (costs < best_costs):
-                    
-                    #print 'best costs:', costs
-
                     best_s1 = s1
                     best_s2 = s2
                     best_costs = costs
                     merged_trans = None
 
-            if best_s1 is None:
-                continue
-            
             if best_costs <= max_costs:
                 self._merge_nodes(best_s1, best_s2)
                 stats = self._calc_stats(transitions=root.transitions) 
@@ -678,7 +669,7 @@ class WorldModelTree(object):
         Calculates statistics for a given transition matrix.
         """
 
-        n_nodes = len(self.root().nodes())
+        n_nodes = len(self.root()._nodes())
         
         P = transitions
         K = P.shape[0]
@@ -789,7 +780,7 @@ if __name__ == "__main__":
         tree.learn(min_gain=0.02, max_costs=0.02)
 
         n_trans = np.sum(tree.transitions)
-        print 'final number of nodes:', len(tree.nodes())
+        print 'final number of nodes:', len(tree._nodes())
         assert(n_trans == n-1)
 
         # plot tree and stats

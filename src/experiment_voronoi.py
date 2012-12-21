@@ -127,7 +127,7 @@ if __name__ == '__main__':
     model = worldmodel.WorldModelTree()
     model.add_data(voronoi.data)
     model.learn(min_gain=0.02, max_costs=0.02)
-    print 'final number of nodes:', len(model.nodes())
+    print 'final number of nodes:', len(model._nodes())
     
     # plot target
     pyplot.subplot(2,2,1)
