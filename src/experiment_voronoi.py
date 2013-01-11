@@ -1,11 +1,8 @@
 import numpy as np
-import random
 
 from matplotlib import pyplot
 
 import worldmodel
-
-import sierpinsky
 
 
 class VoronoiData(object):
@@ -119,14 +116,14 @@ class VoronoiData(object):
 if __name__ == '__main__':
     
     k = 8
-    voronoi = VoronoiData(n=10000, k=k, power=5)
+    voronoi = VoronoiData(n=5000, k=k, power=5)
     entropy = voronoi.entropy() 
     print voronoi.transitions
     print 'eigenvalues:\n', np.abs(np.linalg.eig(voronoi.transitions)[0])
     
     model = worldmodel.WorldModelTree()
     model.add_data(voronoi.data)
-    model.learn(min_gain=0.02, max_costs=0.02)
+    model.learn(min_gain=0.015, max_costs=0.015)
     print 'final number of nodes:', len(model._nodes())
     
     # plot target
