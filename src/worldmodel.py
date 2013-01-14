@@ -33,7 +33,7 @@ class WorldModelTree(object):
         self.transitions = None
         self.random = random.Random()
         #self.random.seed(1)
-        self._min_class_size = 50
+        self._min_class_size = 1
         
         # data of leaf
         self.dat_ref = []    # indices of data belonging to this node
@@ -463,7 +463,7 @@ class WorldModelTree(object):
     
     def _calculate_splitting_gain(self):
         """
-        Calculates the gain in mutual information if this node would be splitted.
+        Calculates the gain in mutual information if this node would be split.
         
         TODO: cache result!
         """
@@ -776,7 +776,7 @@ if __name__ == "__main__":
         tree.add_data(data)
 
         print tree.transitions
-        tree.learn(min_gain=0.03, max_costs=0.03)
+        #tree.learn(min_gain=0.03, max_costs=0.03)
         tree.learn(min_gain=0.02, max_costs=0.02)
 
         n_trans = np.sum(tree.transitions)

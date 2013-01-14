@@ -1,3 +1,5 @@
+# coding: latin-1
+
 import numpy as np
 
 from matplotlib import pyplot
@@ -113,18 +115,22 @@ class VoronoiData(object):
         return worldmodel.WorldModelTree._matrix_entropy(transitions=self.transitions, normalize=normalize)
 
 
-if __name__ == '__main__':
+def experiment_plot():
     
     k = 8
     voronoi = VoronoiData(n=5000, k=k, power=5)
-    entropy = voronoi.entropy() 
-    print voronoi.transitions
-    print 'eigenvalues:\n', np.abs(np.linalg.eig(voronoi.transitions)[0])
+    #print voronoi.transitions
+    #print 'eigenvalues:\n', np.abs(np.linalg.eig(voronoi.transitions)[0])
     
     model = worldmodel.WorldModelTree()
     model.add_data(voronoi.data)
     model.learn(min_gain=0.015, max_costs=0.015)
+    
+    print ''
     print 'final number of nodes:', len(model._nodes())
+    print 'mutual information (model):', model._mutual_information(voronoi.probs)
+    print 'mutual information (data):', model._mutual_information(voronoi.transitions)
+    print 'mutual information (learned model):', model._mutual_information(model.transitions)
     
     # plot target
     pyplot.subplot(2,2,1)
@@ -138,4 +144,40 @@ if __name__ == '__main__':
     pyplot.subplot(2,1,2)
     model.plot_stats(show_plot=False)
     pyplot.show()
+    
+    
+def experiment_average():
+
+    N = 100
+    n_data_points = 5000
+    
+    stats_mi_model = np.zeros(N)
+    stats_mi_data = np.zeros(N)
+    stats_mi_learned = np.zeros(N)
+    stats_mi_diff = np.zeros(N)
+    
+    for i in range(N):
+        
+        voronoi = VoronoiData(n=n_data_points, k=8, power=5)
+        model = worldmodel.WorldModelTree()
+        model.add_data(voronoi.data)
+        model.learn(min_gain=0.015, max_costs=0.015)
+        
+        stats_mi_model[i] = model._mutual_information(transition_matrix=voronoi.probs)
+        stats_mi_data[i] = model._mutual_information(transition_matrix=voronoi.transitions)
+        stats_mi_learned[i] = model._mutual_information(transition_matrix=model.transitions)
+        stats_mi_diff[i] = abs(stats_mi_model[i] - stats_mi_learned[i])
+        
+    print '# of trials:', N
+    print '# data points:', n_data_points
+    print 'mutual information (model):   {avg:.2f} ± {std:.2f}'.format(avg=np.average(stats_mi_model), std=np.std(stats_mi_model))
+    print 'mutual information (data):    {avg:.2f} ± {std:.2f}'.format(avg=np.average(stats_mi_data), std=np.std(stats_mi_data))
+    print 'mutual information (learned): {avg:.2f} ± {std:.2f}'.format(avg=np.average(stats_mi_learned), std=np.std(stats_mi_learned))
+    print 'mutual information (error):   {avg:.2f} ± {std:.2f}'.format(avg=np.average(stats_mi_diff), std=np.std(stats_mi_diff))
+
+
+if __name__ == '__main__':
+
+    #experiment_plot()
+    experiment_average()
     

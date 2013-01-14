@@ -18,10 +18,11 @@ if __name__ == '__main__':
         W[i, (i+1)%n] = 1
     
     # add neighborhood affinity to transitions matrix
+    k = 10
     for i in range(n):
         distances = np.sqrt(((np.array(voronoi.data) - voronoi.data[i])**2).sum(axis=1))
         indices = np.argsort(distances)
-        neighbors = indices[1:10+1]
+        neighbors = indices[1:k+1]
         for j in neighbors:
             W[i,j] = 1.
             W[j,i] = 1.
@@ -49,4 +50,6 @@ if __name__ == '__main__':
     pyplot.subplot(1,2,1)
     voronoi.plot()
     #pyplot.show()
+    
+    
     
