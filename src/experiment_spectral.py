@@ -48,7 +48,7 @@ if __name__ == '__main__':
     
     if True:
         # eigenvector
-        E, U = sparse.linalg.eigen(Q, k=3, which='LM')
+        E, U = sparse.linalg.eigen(P, k=3, which='LM')
         #E, U = np.linalg.eig(P)
         idx = np.argsort(abs(E))
         u1 = U[:,idx[-2]] # gross
