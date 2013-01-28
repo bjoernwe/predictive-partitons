@@ -36,9 +36,9 @@ class VoronoiData(object):
         ### fifty, fifty
         probs = np.zeros((k,k))
         for i in range(k):
-            probs[i,i] = 1
+            #probs[i,i] = 1
             probs[i,(i+1)%k] = .5
-            probs[i,(i+2)%k] = .25
+            #probs[i,(i+2)%k] = .25
             #probs[i,(i+3)%k] = .125
             #probs[i,(i+4)%k] = .0625
         
@@ -98,13 +98,17 @@ class VoronoiData(object):
         for i, label in enumerate(self.labels):
             data_list[label].append(self.data[i])
         for i in range(self.k):
-            data_list[i] = np.vstack(data_list[i])
+            if len(data_list[i]) > 0:
+                data_list[i] = np.vstack(data_list[i])
+            else:
+                data_list[i] = None
             
         # plot
         colormap = pyplot.cm.prism
         pyplot.gca().set_color_cycle([colormap(i) for i in np.linspace(0, 0.98, 7)])
         for i, data in enumerate(data_list):
-            pyplot.plot(data[:,0], data[:,1], self.symbols[i%len(self.symbols)])
+            if data is not None:
+                pyplot.plot(data[:,0], data[:,1], self.symbols[i%len(self.symbols)])
 
         if show_plot:            
             pyplot.show()
@@ -125,6 +129,11 @@ def experiment_plot():
     model = worldmodel.WorldModelTree()
     model.add_data(voronoi.data)
     model.learn(min_gain=0.015, max_costs=0.015)
+    #model.single_splitting_step()
+    #model.single_splitting_step()
+    #model.single_splitting_step()
+    #model.single_splitting_step()
+    #model.single_splitting_step()
     
     print ''
     print 'final number of nodes:', len(model._nodes())
@@ -151,6 +160,7 @@ def experiment_average():
     N = 100
     n_data_points = 5000
     
+    stats_n_nodes = np.zeros(N)
     stats_mi_model = np.zeros(N)
     stats_mi_data = np.zeros(N)
     stats_mi_learned = np.zeros(N)
@@ -163,6 +173,7 @@ def experiment_average():
         model.add_data(voronoi.data)
         model.learn(min_gain=0.015, max_costs=0.015)
         
+        stats_n_nodes[i] = len(model._nodes())
         stats_mi_model[i] = model._mutual_information(transition_matrix=voronoi.probs)
         stats_mi_data[i] = model._mutual_information(transition_matrix=voronoi.transitions)
         stats_mi_learned[i] = model._mutual_information(transition_matrix=model.transitions)
@@ -170,6 +181,7 @@ def experiment_average():
         
     print '# of trials:', N
     print '# data points:', n_data_points
+    print '# of nodes: {avg:.2f} ± {std:.2f}'.format(avg=np.average(stats_n_nodes), std=np.std(stats_n_nodes))
     print 'mutual information (model):   {avg:.2f} ± {std:.2f}'.format(avg=np.average(stats_mi_model), std=np.std(stats_mi_model))
     print 'mutual information (data):    {avg:.2f} ± {std:.2f}'.format(avg=np.average(stats_mi_data), std=np.std(stats_mi_data))
     print 'mutual information (learned): {avg:.2f} ± {std:.2f}'.format(avg=np.average(stats_mi_learned), std=np.std(stats_mi_learned))
@@ -178,6 +190,6 @@ def experiment_average():
 
 if __name__ == '__main__':
 
-    #experiment_plot()
-    experiment_average()
+    experiment_plot()
+    #experiment_average()
     

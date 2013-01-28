@@ -4,6 +4,7 @@ import numpy as np
 import random
 
 from matplotlib import pyplot
+from scipy.sparse import linalg
 
 import mdp
 
@@ -33,7 +34,7 @@ class WorldModelTree(object):
         self.transitions = None
         self.random = random.Random()
         #self.random.seed(1)
-        self._min_class_size = 1
+        self._min_class_size = 30
         
         # data of leaf
         self.dat_ref = []    # indices of data belonging to this node
@@ -295,6 +296,26 @@ class WorldModelTree(object):
         else:            
             raise RuntimeError('Should not happen!')
         
+        
+    def get_data_strict(self):
+        """
+        Returns all transitions that start and end in the same node. Each of the transitions is given as a
+        data matrix containing with two rows. Since the transitions do not necessarily follow to each other
+        they are returned as a list instead of a big matrix. 
+        """
+        #assert self.status == 'leaf'
+        
+        root = self.root()
+        refs = self.get_data_refs()
+        chunks = []
+        
+        for t, ref in enumerate(refs):
+            if t < len(refs)-1:
+                if refs[t+1] == ref+1:
+                    chunks.append(np.vstack([root.data[ref], root.data[ref+1]]))
+                
+        return chunks
+        
 
     def get_data(self):
         """
@@ -393,8 +414,9 @@ class WorldModelTree(object):
         
         # test for minimum number of data points
         assert self.status == 'leaf'
-        if len(self.dat_ref) < self._min_class_size:
-            return
+        #if len(self.dat_ref) < self._min_class_size:
+        #if len(self.get_data_strict()) < self._min_class_size:
+        #    return
         
         root = self.root()
         if len(self.parents) == 2: # merged but same grandparent?
@@ -490,10 +512,11 @@ class WorldModelTree(object):
         best_gain = float('-inf')
         
         for leaf in self.root().leaves():
-            gain = leaf._calculate_splitting_gain()
-            if gain >= best_gain:
-                best_gain = gain
-                best_leaf = leaf
+            if len(leaf.get_data_strict()) >= self._min_class_size:
+                gain = leaf._calculate_splitting_gain()
+                if gain >= best_gain:
+                    best_gain = gain
+                    best_leaf = leaf
                 
         if best_leaf is not None and best_gain >= min_gain:
             best_leaf.split()
@@ -629,29 +652,126 @@ class WorldModelTree(object):
         return matrix
 
         
+#    def _init_test(self):
+#        """
+#        Initializes the parameters that split the node in two halves.
+#        """
+#        assert self.status == 'leaf'
+#        
+#        # the data
+#        data = self.get_data_2()
+#        n = data.shape[0]
+#        
+#        # transitions
+#        W = np.zeros((n, n))
+#        for i in range(n):
+#            W[i, (i+1)%n] = 1
+#            
+#        # add neighborhood affinity to transitions matrix
+#        k = 10
+#        for i in range(n):
+#            distances = np.sqrt(((data - data[i])**2).sum(axis=1))
+#            indices = np.argsort(distances)
+#            neighbors = indices[1:k+1]
+#            for j in neighbors:
+#                W[i,j] = 1.
+#                W[j,i] = 1.
+#
+#        # normalize matrix
+#        d = np.sum(W, axis=1)
+#        D = np.diag(d)
+#        L = D - W
+#        Lrw = L / d[:,np.newaxis]
+#
+#        # eigenvector
+#        E, U = linalg.eigen(Lrw, k=2, which='SM')
+#        idx = np.argsort(E)
+#        
+#        # bi-partition
+#        signs = np.sign(U[:,idx[1]].real)
+#        labels = map(lambda x: 1 if x >= 0 else 0, signs)
+#        print U[:,idx[1]].real
+#        print labels
+#        
+#        # classifier
+#        self.knn = mdp.nodes.KNNClassifier(k=k)
+#        self.knn.train(data, labels)
+#        self.knn.stop_training()
+#        return
+
+
     def _init_test(self):
         """
         Initializes the parameters that split the node in two halves.
         """
         assert self.status == 'leaf'
-        # calculate PCA of data
-        data = self.get_data()
-        self.pca = mdp.nodes.PCANode(output_dim=1)
-        self.pca.train(data)
-        self.pca.stop_training()
+        # calculate SFA of data
+        #data_list = self.get_data_strict()
+        #if data is None:
+        #    return
+        root = self.root()
+        #exp = mdp.nodes.PolynomialExpansionNode(degree=7)
+        #sfa = mdp.nodes.SFANode(input_dim=exp.output_dim, output_dim=1)
+        sfa = mdp.nodes.SFANode(output_dim=1)
+        #self.sfa = exp + sfa
+        self.sfa = sfa
+        for i, ref in enumerate(self.dat_ref):
+            if i < len(self.dat_ref)-1:
+                if self.dat_ref[i+1] == ref+1:
+                    data = np.vstack([root.data[ref], root.data[ref+1]])
+                    #sfa.train(exp(data))
+                    sfa.train(data)
+        #for data in data_list:
+        #    self.sfa.train(data)
+        #self.sfa.stop_training()
+        
         return
+        
+        
+#    def _init_test(self):
+#        """
+#        Initializes the parameters that split the node in two halves.
+#        """
+#        assert self.status == 'leaf'
+#        # calculate PCA of data
+#        data = self.get_data()
+#        self.pca = mdp.nodes.PCANode(output_dim=1)
+#        self.pca.train(data)
+#        self.pca.stop_training()
+#        return
     
     
+#    def _test(self, x):
+#        """
+#        Tests to which child the data point x belongs
+#        """
+#        if x.ndim < 2:
+#            x = np.array(x, ndmin=2)
+#        return self.knn.label(x)[0]
+
+
     def _test(self, x):
         """
         Tests to which child the data point x belongs
         """
         if x.ndim < 2:
             x = np.array(x, ndmin=2)
-        index = self.pca.execute(x)[0,0]
+        index = self.sfa.execute(x)[0,0]
         index = np.sign(index) + 1
         index = index // 2
         return int(index)
+    
+
+#    def _test(self, x):
+#        """
+#        Tests to which child the data point x belongs
+#        """
+#        if x.ndim < 2:
+#            x = np.array(x, ndmin=2)
+#        index = self.pca.execute(x)[0,0]
+#        index = np.sign(index) + 1
+#        index = index // 2
+#        return int(index)
     
     
     def _mutual_information(self, transition_matrix):
@@ -769,15 +889,19 @@ if __name__ == "__main__":
     for p, problem in enumerate(problems):
 
         # create data
-        n = 10000
+        n = 1000
         data = problem(n=n, seed=1)
 
         tree = WorldModelTree()
         tree.add_data(data)
 
         print tree.transitions
+        #tree.single_splitting_step()
+        #tree.single_splitting_step()
+        #tree.single_splitting_step()
+        #tree.single_splitting_step()
         #tree.learn(min_gain=0.03, max_costs=0.03)
-        tree.learn(min_gain=0.02, max_costs=0.02)
+        tree.learn(min_gain=0.015, max_costs=0.015)
 
         n_trans = np.sum(tree.transitions)
         print 'final number of nodes:', len(tree._nodes())
