@@ -31,7 +31,7 @@ if __name__ == '__main__':
         #    W[j,i] = .1
         # add transitions of neighbors to current point
         for j in neighbors[0:]:
-            W[i,(j+1)%n] = .01
+            #W[i,(j+1)%n] = .01
         #    W[(j+1)%n,i] = .1
             W[j, (i+1)%n] = .01
             

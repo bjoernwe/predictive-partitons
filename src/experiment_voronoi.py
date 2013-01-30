@@ -36,7 +36,7 @@ class VoronoiData(object):
         ### fifty, fifty
         probs = np.zeros((k,k))
         for i in range(k):
-            #probs[i,i] = 1
+            probs[i,i] = 1
             probs[i,(i+1)%k] = .5
             #probs[i,(i+2)%k] = .25
             #probs[i,(i+3)%k] = .125

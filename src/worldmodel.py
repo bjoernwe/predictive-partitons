@@ -297,24 +297,51 @@ class WorldModelTree(object):
             raise RuntimeError('Should not happen!')
         
         
-    def get_data_strict(self):
+    def get_data_refs_strict(self):
         """
-        Returns all transitions that start and end in the same node. Each of the transitions is given as a
-        data matrix containing with two rows. Since the transitions do not necessarily follow to each other
-        they are returned as a list instead of a big matrix. 
         """
-        #assert self.status == 'leaf'
         
-        root = self.root()
         refs = self.get_data_refs()
-        chunks = []
+        result_1 = []
+        result_2 = []
         
-        for t, ref in enumerate(refs):
-            if t < len(refs)-1:
-                if refs[t+1] == ref+1:
-                    chunks.append(np.vstack([root.data[ref], root.data[ref+1]]))
+        for t in refs:
+            if (t+1) in refs:
+                result_1.append(t)
+                result_2.append(t)
+                result_2.append(t+1)
                 
-        return chunks
+        return [result_1, result_2]
+    
+    
+    def get_data_strict(self):
+        root = self.root()
+        [refs_1, refs_2] = self.get_data_refs_strict()
+        data_list_1 = map(lambda t: root.data[t], refs_1)
+        data_list_2 = map(lambda t: root.data[t], refs_2)
+        data_1 = np.vstack(data_list_1) 
+        data_2 = np.vstack(data_list_2) 
+        return [data_1, data_2]
+        
+        
+#    def get_data_strict(self):
+#        """
+#        Returns all transitions that start and end in the same node. Each of the transitions is given as a
+#        data matrix containing with two rows. Since the transitions do not necessarily follow to each other
+#        they are returned as a list instead of a big matrix. 
+#        """
+#        #assert self.status == 'leaf'
+#        
+#        root = self.root()
+#        refs = self.get_data_refs()
+#        chunks = []
+#        
+#        for t, ref in enumerate(refs):
+#            if t < len(refs)-1:
+#                if refs[t+1] == ref+1:
+#                    chunks.append(np.vstack([root.data[ref], root.data[ref+1]]))
+#                
+#        return chunks
         
 
     def get_data(self):
@@ -512,7 +539,8 @@ class WorldModelTree(object):
         best_gain = float('-inf')
         
         for leaf in self.root().leaves():
-            if len(leaf.get_data_strict()) >= self._min_class_size:
+            if len(leaf.get_data_refs_strict()[0]) >= self._min_class_size:
+                print 'init'
                 gain = leaf._calculate_splitting_gain()
                 if gain >= best_gain:
                     best_gain = gain
@@ -652,80 +680,86 @@ class WorldModelTree(object):
         return matrix
 
         
-#    def _init_test(self):
-#        """
-#        Initializes the parameters that split the node in two halves.
-#        """
-#        assert self.status == 'leaf'
-#        
-#        # the data
-#        data = self.get_data_2()
-#        n = data.shape[0]
-#        
-#        # transitions
-#        W = np.zeros((n, n))
-#        for i in range(n):
-#            W[i, (i+1)%n] = 1
-#            
-#        # add neighborhood affinity to transitions matrix
-#        k = 10
-#        for i in range(n):
-#            distances = np.sqrt(((data - data[i])**2).sum(axis=1))
-#            indices = np.argsort(distances)
-#            neighbors = indices[1:k+1]
-#            for j in neighbors:
-#                W[i,j] = 1.
-#                W[j,i] = 1.
-#
-#        # normalize matrix
-#        d = np.sum(W, axis=1)
-#        D = np.diag(d)
-#        L = D - W
-#        Lrw = L / d[:,np.newaxis]
-#
-#        # eigenvector
-#        E, U = linalg.eigen(Lrw, k=2, which='SM')
-#        idx = np.argsort(E)
-#        
-#        # bi-partition
-#        signs = np.sign(U[:,idx[1]].real)
-#        labels = map(lambda x: 1 if x >= 0 else 0, signs)
-#        print U[:,idx[1]].real
-#        print labels
-#        
-#        # classifier
-#        self.knn = mdp.nodes.KNNClassifier(k=k)
-#        self.knn.train(data, labels)
-#        self.knn.stop_training()
-#        return
-
-
     def _init_test(self):
         """
         Initializes the parameters that split the node in two halves.
         """
         assert self.status == 'leaf'
-        # calculate SFA of data
-        #data_list = self.get_data_strict()
-        #if data is None:
-        #    return
-        root = self.root()
-        #exp = mdp.nodes.PolynomialExpansionNode(degree=7)
-        #sfa = mdp.nodes.SFANode(input_dim=exp.output_dim, output_dim=1)
-        sfa = mdp.nodes.SFANode(output_dim=1)
-        #self.sfa = exp + sfa
-        self.sfa = sfa
-        for i, ref in enumerate(self.dat_ref):
-            if i < len(self.dat_ref)-1:
-                if self.dat_ref[i+1] == ref+1:
-                    data = np.vstack([root.data[ref], root.data[ref+1]])
-                    #sfa.train(exp(data))
-                    sfa.train(data)
-        #for data in data_list:
-        #    self.sfa.train(data)
-        #self.sfa.stop_training()
         
+        # the data
+        # we have two lists. one with only the source points of all transactions
+        # and one with sources and targets
+        [refs_1, refs_2] = self.get_data_refs_strict()
+        [data_1, data_2] = self.get_data_strict()
+        n1 = len(refs_1)
+        n2 = len(refs_2)
+        
+        # transitions
+        k = 10
+        W = np.zeros((n2, n2))
+        for i in range(n1):
+            distances = np.sqrt(((data_1 - data_1[i])**2).sum(axis=1))
+            idx = np.argsort(distances)
+            for j in idx[:k+1]:
+                # i and j are indices for the first list
+                # we have to translate them into indices of the second list
+                i2 = refs_2.index(refs_1[i])
+                j2 = refs_2.index(refs_1[j])
+                W[i2,(j2+1)] = 1
+                W[j2,(i2+1)] = 1
+
+        # transition matrix
+        d = np.sum(W, axis=1)
+        
+        P = W / d[:,np.newaxis]
+
+        # eigenvector
+        print ':/'
+        print n
+        E, U = linalg.eigen(P, k=2, which='LM')
+        print ':)'
+        idx = np.argsort(abs(E))
+        
+        # bi-partition
+        u = U[:,idx[-2]]
+        signs = np.sign(u.real)
+        labels = map(lambda x: 1 if x >= 0 else 0, signs)
+        #print u.real
+        #print labels
+        
+        # classifier
+        self.knn = mdp.nodes.KNNClassifier(k=k)
+        self.knn.train(data_1, labels)
+        self.knn.stop_training()
         return
+
+
+#    def _init_test(self):
+#        """
+#        Initializes the parameters that split the node in two halves.
+#        """
+#        assert self.status == 'leaf'
+#        # calculate SFA of data
+#        #data_list = self.get_data_strict()
+#        #if data is None:
+#        #    return
+#        root = self.root()
+#        #exp = mdp.nodes.PolynomialExpansionNode(degree=7)
+#        #sfa = mdp.nodes.SFANode(input_dim=exp.output_dim, output_dim=1)
+#        sfa = mdp.nodes.SFANode(output_dim=1)
+#        #self.sfa = exp + sfa
+#        self.sfa = sfa
+#        for i, ref in enumerate(self.dat_ref):
+#            if i < len(self.dat_ref)-1:
+#                if self.dat_ref[i+1] == ref+1:
+#                    data = np.vstack([root.data[ref], root.data[ref+1]])
+#                    #sfa.train(exp(data))
+#                    sfa.train(data)
+#        #for data in data_list:
+#        #    self.sfa.train(data)
+#        #self.sfa.stop_training()
+#        
+#        return
         
         
 #    def _init_test(self):
@@ -741,25 +775,25 @@ class WorldModelTree(object):
 #        return
     
     
-#    def _test(self, x):
-#        """
-#        Tests to which child the data point x belongs
-#        """
-#        if x.ndim < 2:
-#            x = np.array(x, ndmin=2)
-#        return self.knn.label(x)[0]
-
-
     def _test(self, x):
         """
         Tests to which child the data point x belongs
         """
         if x.ndim < 2:
             x = np.array(x, ndmin=2)
-        index = self.sfa.execute(x)[0,0]
-        index = np.sign(index) + 1
-        index = index // 2
-        return int(index)
+        return self.knn.label(x)[0]
+
+
+#    def _test(self, x):
+#        """
+#        Tests to which child the data point x belongs
+#        """
+#        if x.ndim < 2:
+#            x = np.array(x, ndmin=2)
+#        index = self.sfa.execute(x)[0,0]
+#        index = np.sign(index) + 1
+#        index = index // 2
+#        return int(index)
     
 
 #    def _test(self, x):
@@ -896,12 +930,12 @@ if __name__ == "__main__":
         tree.add_data(data)
 
         print tree.transitions
-        #tree.single_splitting_step()
+        tree.single_splitting_step()
         #tree.single_splitting_step()
         #tree.single_splitting_step()
         #tree.single_splitting_step()
         #tree.learn(min_gain=0.03, max_costs=0.03)
-        tree.learn(min_gain=0.015, max_costs=0.015)
+        #tree.learn(min_gain=0.015, max_costs=0.015)
 
         n_trans = np.sum(tree.transitions)
         print 'final number of nodes:', len(tree._nodes())
@@ -910,7 +944,7 @@ if __name__ == "__main__":
         # plot tree and stats
         pyplot.subplot(2, 3, p+1)
         tree.plot_tree_data(show_plot=False)
-        pyplot.subplot(2, 3, p+3+1)
-        tree.plot_stats(show_plot=False)
+        #pyplot.subplot(2, 3, p+3+1)
+        #tree.plot_stats(show_plot=False)
 
     pyplot.show()
