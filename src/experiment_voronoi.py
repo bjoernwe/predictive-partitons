@@ -38,7 +38,7 @@ class VoronoiData(object):
         for i in range(k):
             probs[i,i] = 1
             probs[i,(i+1)%k] = .5
-            #probs[i,(i+2)%k] = .25
+            probs[i,(i+2)%k] = .25
             #probs[i,(i+3)%k] = .125
             #probs[i,(i+4)%k] = .0625
         
@@ -122,15 +122,15 @@ class VoronoiData(object):
 def experiment_plot():
     
     k = 8
-    voronoi = VoronoiData(n=2000, k=k, power=5)
+    voronoi = VoronoiData(n=3000, k=k, power=5)
     #print voronoi.transitions
     #print 'eigenvalues:\n', np.abs(np.linalg.eig(voronoi.transitions)[0])
     
     model = worldmodel.WorldModelTree()
     model.add_data(voronoi.data)
-    #model.learn(min_gain=0.015, max_costs=0.015)
-    model.single_splitting_step()
-    model.single_splitting_step()
+    model.learn(min_gain=0.015, max_costs=0.015)
+    #model.single_splitting_step()
+    #model.single_splitting_step()
     #model.single_splitting_step()
     #model.single_splitting_step()
     #model.single_splitting_step()

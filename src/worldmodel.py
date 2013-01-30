@@ -34,7 +34,7 @@ class WorldModelTree(object):
         self.transitions = None
         self.random = random.Random()
         #self.random.seed(1)
-        self._min_class_size = 30
+        self._min_class_size = 50
         
         # data of leaf
         self.dat_ref = []    # indices of data belonging to this node
@@ -696,7 +696,7 @@ class WorldModelTree(object):
         n1 = len(refs_1)
         
         # transitions
-        k = 10  # k neighbors
+        k = 20  # k neighbors
         W = np.zeros((n, n))
         for i in range(n1):
             distances = np.sqrt(((data_1 - data_1[i])**2).sum(axis=1))
