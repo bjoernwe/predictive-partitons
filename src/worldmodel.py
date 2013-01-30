@@ -4,7 +4,7 @@ import numpy as np
 import random
 
 from matplotlib import pyplot
-from scipy.sparse import linalg
+#from scipy import sparse
 
 import mdp
 
@@ -308,7 +308,6 @@ class WorldModelTree(object):
         for t in refs:
             if (t+1) in refs:
                 result_1.append(t)
-                result_2.append(t)
                 result_2.append(t+1)
                 
         return [result_1, result_2]
@@ -687,43 +686,54 @@ class WorldModelTree(object):
         assert self.status == 'leaf'
         
         # the data
-        # we have two lists. one with only the source points of all transactions
-        # and one with sources and targets
+        # we have two lists. one with only source points of all transactions
+        # and one with the targets
         [refs_1, refs_2] = self.get_data_refs_strict()
         [data_1, data_2] = self.get_data_strict()
+        refs_all = list(set(refs_1 + refs_2))
+        refs_all.sort()
+        n = len(refs_all)
         n1 = len(refs_1)
-        n2 = len(refs_2)
         
         # transitions
-        k = 10
-        W = np.zeros((n2, n2))
+        k = 10  # k neighbors
+        W = np.zeros((n, n))
         for i in range(n1):
             distances = np.sqrt(((data_1 - data_1[i])**2).sum(axis=1))
             idx = np.argsort(distances)
             for j in idx[:k+1]:
                 # i and j are indices for the first list
-                # we have to translate them into indices of the second list
-                i2 = refs_2.index(refs_1[i])
-                j2 = refs_2.index(refs_1[j])
-                W[i2,(j2+1)] = 1
-                W[j2,(i2+1)] = 1
+                # we have to translate them into indices of the W matrix
+                i1 = refs_all.index(refs_1[i])
+                j1 = refs_all.index(refs_1[j])
+                W[i1,(j1+1)] = 1
+                W[j1,(i1+1)] = 1
 
         # transition matrix
         d = np.sum(W, axis=1)
-        
-        P = W / d[:,np.newaxis]
+        P = W
+        for i in range(n):
+            if d[i] > 0:
+                P[i] = P[i] / d[i]
+        #P = W / d[:,np.newaxis]
 
         # eigenvector
         print ':/'
         print n
-        E, U = linalg.eigen(P, k=2, which='LM')
+        #E, U = sparse.linalg.eigen(P, k=2, which='LM')
+        E, U = np.linalg.eig(P)
         print ':)'
-        idx = np.argsort(abs(E))
         
         # bi-partition
-        u = U[:,idx[-2]]
-        signs = np.sign(u.real)
-        labels = map(lambda x: 1 if x >= 0 else 0, signs)
+        idx = np.argsort(abs(E))
+        col = idx[-2]
+        u = np.zeros(n1)
+        for i in range(n1):
+            row = refs_all.index(refs_1[i])
+            u[i] = U[row,col].real
+        #u = U[:,idx[-2]]
+        signs = np.sign(u)
+        labels = map(lambda x: 1 if x > 0 else 0, signs)
         #print u.real
         #print labels
         
