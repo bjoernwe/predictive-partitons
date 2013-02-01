@@ -122,7 +122,7 @@ class VoronoiData(object):
 def experiment_plot():
     
     k = 8
-    voronoi = VoronoiData(n=3000, k=k, power=5)
+    voronoi = VoronoiData(n=5000, k=k, power=5)
     #print voronoi.transitions
     #print 'eigenvalues:\n', np.abs(np.linalg.eig(voronoi.transitions)[0])
     

@@ -2,9 +2,10 @@ import collections
 import math
 import numpy as np
 import random
+import scipy
 
 from matplotlib import pyplot
-#from scipy import sparse
+from scipy.sparse import linalg
 
 import mdp
 
@@ -299,6 +300,9 @@ class WorldModelTree(object):
         
     def get_data_refs_strict(self):
         """
+        Finds all transitions that happen strictly inside this node. The result is given
+        in two lists: one with the starting point of the transition and one with the 
+        corresponding target points.
         """
         
         refs = self.get_data_refs()
@@ -539,7 +543,6 @@ class WorldModelTree(object):
         
         for leaf in self.root().leaves():
             if len(leaf.get_data_refs_strict()[0]) >= self._min_class_size:
-                print 'init'
                 gain = leaf._calculate_splitting_gain()
                 if gain >= best_gain:
                     best_gain = gain
@@ -696,7 +699,7 @@ class WorldModelTree(object):
         n1 = len(refs_1)
         
         # transitions
-        k = 20  # k neighbors
+        k = 30  # k neighbors
         W = np.zeros((n, n))
         for i in range(n1):
             distances = np.sqrt(((data_1 - data_1[i])**2).sum(axis=1))
@@ -720,8 +723,8 @@ class WorldModelTree(object):
         # eigenvector
         print ':/'
         print n
-        #E, U = sparse.linalg.eigen(P, k=2, which='LM')
-        E, U = np.linalg.eig(P)
+        E, U = linalg.eigs(P, k=2, which='LM')
+        #E, U = np.linalg.eig(P)
         print ':)'
         
         # bi-partition
@@ -926,6 +929,8 @@ def problemHoneycomb(n=1000, seed=None):
 
 
 if __name__ == "__main__":
+    
+    print scipy.version.version
 
     problems = [problemChain, problemDiamond, problemHoneycomb]
     #problems = [problemHoneycomb]
