@@ -33,7 +33,7 @@ class SimpleActionsData(object):
             # new data point
             x = self.data[i-1]
             y = np.array(x)
-            y[a] += .3 * np.random.randn()
+            y[a] += (.3 + .0*a) * np.random.randn()
             # bounds
             y[a] = 0 if y[a] < 0 else y[a] 
             y[a] = 1 if y[a] > 1 else y[a]
@@ -62,6 +62,7 @@ if __name__ == '__main__':
     data = SimpleActionsData(n=5000)
     model = worldmodel.WorldModelTree()
     model.add_data(x=data.data, actions=data.actions)
+    print [np.sum(m) for m in model.transitions.itervalues()]
     model.learn(min_gain=0.02, max_costs=.02)
     model.plot_tree_data(show_plot=False) 
     # plot training data
