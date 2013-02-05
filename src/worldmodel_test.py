@@ -39,7 +39,7 @@ class TrivialTransitionsTest(unittest.TestCase):
         data = worldmodel.problemChain(n=1000, seed=0)
         tree = worldmodel.WorldModelTree()
         tree.add_data(data)
-        trans = tree.transitions
+        trans = tree._merge_transition_matrices()
         self.assertEqual(trans.shape, (1,1))
         self.assertEqual(trans[0,0], data.shape[0]-1) # n of transitions
 
@@ -59,7 +59,8 @@ class TrivialEntropyTests(unittest.TestCase):
     def testTrivialTransEntropy(self):
         tree = worldmodel.WorldModelTree()
         tree.add_data(self.data)
-        entropy = worldmodel.WorldModelTree._matrix_entropy(transitions=tree.transitions)
+        transitions = tree._merge_transition_matrices()
+        entropy = worldmodel.WorldModelTree._matrix_entropy(transitions=transitions)
         self.assertEqual(entropy, 1.0)
 
     def testTrivialLeafEntropy(self):

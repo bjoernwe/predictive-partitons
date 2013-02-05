@@ -128,7 +128,7 @@ def experiment_plot():
     
     model = worldmodel.WorldModelTree()
     model.add_data(voronoi.data)
-    model.learn(min_gain=0.015, max_costs=0.015)
+    model.learn(min_gain=0.03, max_costs=0.03)
     #model.single_splitting_step()
     #model.single_splitting_step()
     #model.single_splitting_step()
@@ -139,7 +139,7 @@ def experiment_plot():
     print 'final number of nodes:', len(model._nodes())
     print 'mutual information (model):', model._mutual_information(voronoi.probs)
     print 'mutual information (data):', model._mutual_information(voronoi.transitions)
-    print 'mutual information (learned model):', model._mutual_information(model.transitions)
+    print 'mutual information (learned model):', model._mutual_information(model._merge_transition_matrices())
     
     # plot target
     pyplot.subplot(2,2,1)
