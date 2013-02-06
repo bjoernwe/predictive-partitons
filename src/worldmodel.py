@@ -40,8 +40,7 @@ class WorldModelTree(object):
         # data of leaf
         self.dat_ref = []    # indices of data belonging to this node
         self.stats = []
-
-
+        
 
     def classify(self, x):
         """
@@ -186,8 +185,9 @@ class WorldModelTree(object):
             self.data = x
             self.labels = labels
             if actions is None:
-                actions = [None for _ in range(n-1)]
-            actions.append(None)
+                actions = [0 for _ in range(n)]
+            else:
+                actions.append(None)
             assert len(actions) == n
             self.actions = actions
         else:
@@ -196,8 +196,9 @@ class WorldModelTree(object):
             self.data = np.vstack([self.data, x])
             self.labels = np.vstack([self.labels, labels])
             if actions is None:
-                actions = [None for _ in range(n-1)]
-            actions.append(None)
+                actions = [None for _ in range(n)]
+            else:
+                actions.append(None)
             assert len(actions) == n
             self.actions = self.actions + actions
 
@@ -271,6 +272,18 @@ class WorldModelTree(object):
         """
         return self.root().leaves().index(self)
 
+
+    def plot_states(self, show_plot=True):
+        x = np.linspace(0, 1, 100)
+        y = np.linspace(0, 1, 100)
+        X, Y = np.meshgrid(x, y)
+        v_classify = np.vectorize(lambda x, y: self.classify(np.array([x,y])))
+        Z = v_classify(X, Y)
+        pyplot.contourf(X, Y, Z)
+        if show_plot:
+            pyplot.show()
+        return
+         
 
     def plot_tree_data(self, data_list=None, show_plot=True):
         """
@@ -579,20 +592,23 @@ class WorldModelTree(object):
             if action is None:
                 continue
             print 'testing leaf', self.class_label(), 'with action', action
-            self._init_test(action=action)
-            new_labels, _ = self._relabel_data()
-            splitted_transition_matrices = self._splitted_transition_matrices(root=root, new_labels=new_labels, index1=self.class_label())
-            print [np.sum(m) for m in splitted_transition_matrices.itervalues()]
-            new_mutual_information = self._mutual_information(transition_matrix=splitted_transition_matrices[action])
-            old_mutual_information = self._mutual_information(transition_matrix=root.transitions[action]) # TODO cache
-            gain = new_mutual_information - old_mutual_information
-            if gain > best_gain:
-                best_gain = gain
-                best_action = action
+            try:
+                self._init_test(action=action)
+                new_labels, _ = self._relabel_data()
+                splitted_transition_matrices = self._splitted_transition_matrices(root=root, new_labels=new_labels, index1=self.class_label())
+                print [np.sum(m) for m in splitted_transition_matrices.itervalues()]
+                new_mutual_information = self._mutual_information(transition_matrix=splitted_transition_matrices[action])
+                old_mutual_information = self._mutual_information(transition_matrix=root.transitions[action]) # TODO cache
+                gain = new_mutual_information - old_mutual_information
+                if gain > best_gain:
+                    best_gain = gain
+                    best_action = action
+            except scipy.sparse.linalg.eigen.arpack.ArpackNoConvergence:
+                print 'Error calculating splitting gain'
         return [best_gain, best_action]
     
     
-    def single_splitting_step(self, min_gain=0):
+    def single_splitting_step(self, min_gain=float('-inf')):
         """
         Calculates the gain for each state and splits the best one.
         
@@ -608,16 +624,19 @@ class WorldModelTree(object):
             if leaf._reached_min_sample_size():
                 [gain, action] = leaf._calculate_splitting_gain()
                 print 'best split: action', action, 'with gain', gain
-                if gain >= best_gain:
+                if gain > best_gain:
                     best_gain = gain
                     best_action = action
                     best_leaf = leaf
                 
-        if best_leaf is not None and best_gain >= min_gain:
-            print 'decided for split'
-            best_leaf._init_test(action=best_action)
-            best_leaf.split(action=best_action)
-            root.stats.append(self._calc_stats(transitions=root.transitions))
+        if best_leaf is not None and best_action is not None and best_gain > min_gain:
+            try:
+                print 'decided for split with action', best_action, 'and gain', best_gain
+                best_leaf._init_test(action=best_action)
+                best_leaf.split(action=best_action)
+                root.stats.append(self._calc_stats(transitions=root.transitions))
+            except:
+                print 'Error splitting'
             
         return best_gain
     
@@ -778,6 +797,8 @@ class WorldModelTree(object):
                 j1 = refs_all.index(refs[j][0])
                 W[i1,(j1+1)] = 1
                 W[j1,(i1+1)] = 1
+                W[i1,j1] = 0.01
+                W[j1,i1] = 0.01
 
         # transition matrix
         d = np.sum(W, axis=1)
@@ -790,20 +811,23 @@ class WorldModelTree(object):
         # eigenvector
         print ':/'
         print n_all
-        E, U = linalg.eigs(P, k=2, which='LM')
+        print 'rank of P:', np.linalg.matrix_rank(P)
+        E, U = linalg.eigs(np.array(P), k=2, which='LM')
         #E, U = np.linalg.eig(P)
         print ':)'
         
         # bi-partition
         idx = np.argsort(abs(E))
         col = idx[-2]
+        print 'first eigenvalues:', [abs(E[idx[-i]]) for i in range(1,3)]
         u = np.zeros(n1)
         for i in range(n1):
             row = refs_all.index(refs[i][0])
             u[i] = U[row,col].real
-        u = u - np.mean(u)
+        u -= np.mean(u)
         assert -1 in np.sign(u)
         assert 1 in np.sign(u)
+        print 'average:', np.average(np.sign(u))
         labels = map(lambda x: 1 if x > 0 else 0, u)
         #print u.real
         #print labels
@@ -902,7 +926,10 @@ class WorldModelTree(object):
     def _reached_min_sample_size(self):
         transitions = self.root().transitions
         for action in transitions.keys():
+            if action is None:
+                continue
             refs = self.get_data_refs_strict(action=action)
+            print 'number of samples for leaf', self.class_label(), 'action', action, ':', len(refs)
             if len(refs) < self._min_class_size:
                 return False
         return True
@@ -1010,7 +1037,7 @@ if __name__ == "__main__":
     print scipy.version.version
 
     problems = [problemChain, problemDiamond, problemHoneycomb]
-    #problems = [problemHoneycomb]
+    #problems = [problemChain]
 
     for p, problem in enumerate(problems):
 
@@ -1022,12 +1049,12 @@ if __name__ == "__main__":
         tree.add_data(data)
 
         print tree.transitions
-        #tree.single_splitting_step()
-        #tree.single_splitting_step()
+        tree.single_splitting_step()
+        tree.single_splitting_step()
         #tree.single_splitting_step()
         #tree.single_splitting_step()
         #tree.learn(min_gain=0.03, max_costs=0.03)
-        tree.learn(min_gain=0.015, max_costs=0.015)
+        #tree.learn(min_gain=0.015, max_costs=0.015)
 
         n_trans = np.sum(tree._merge_transition_matrices())
         print 'final number of nodes:', len(tree._nodes())
@@ -1035,7 +1062,8 @@ if __name__ == "__main__":
 
         # plot tree and stats
         pyplot.subplot(2, 3, p+1)
-        tree.plot_tree_data(show_plot=False)
+        #tree.plot_tree_data(show_plot=False)
+        tree.plot_states(show_plot=False)
         #pyplot.subplot(2, 3, p+3+1)
         #tree.plot_stats(show_plot=False)
 

@@ -147,7 +147,8 @@ def experiment_plot():
      
     # plot result
     pyplot.subplot(2,2,2)
-    model.plot_tree_data(show_plot=False)
+    #model.plot_tree_data(show_plot=False)
+    model.plot_states(show_plot=False)
     
     # plot stats
     pyplot.subplot(2,1,2)

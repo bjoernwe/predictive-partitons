@@ -59,14 +59,17 @@ class SimpleActionsData(object):
 
             
 if __name__ == '__main__':
+
+    # train model
     data = SimpleActionsData(n=5000)
     model = worldmodel.WorldModelTree()
     model.add_data(x=data.data, actions=data.actions)
-    print [np.sum(m) for m in model.transitions.itervalues()]
     model.learn(min_gain=0.02, max_costs=.02)
-    model.plot_tree_data(show_plot=False) 
-    # plot training data
-    #pyplot.subplot(1,2,1)
-    #data.plot(show_plot=False)
+    
+    # plot data and result
+    pyplot.subplot(1, 2, 1)
+    data.plot(show_plot=False)
+    pyplot.subplot(1, 2, 2)
+    model.plot_states(show_plot=False)
     pyplot.show()
     
