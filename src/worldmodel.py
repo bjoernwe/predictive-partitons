@@ -813,6 +813,8 @@ class WorldModelTree(object):
                 W[j1,(i1+1)] = 1
                 #W[i1,j1] = 0.01
                 #W[j1,i1] = 0.01
+                W[(j1+1),i1] = 1
+                W[(i1+1),j1] = 1
 
         # transition matrix
         d = np.sum(W, axis=1)
@@ -831,13 +833,16 @@ class WorldModelTree(object):
         
         # bi-partition
         idx = np.argsort(abs(E))
+        #col0 = idx[-1]
         col = idx[-2]
         print 'first eigenvalues:', [abs(E[idx[-i]]) for i in range(1,3)]
         u = np.zeros(n1)
         for i in range(n1):
             row = refs_all.index(refs[i][0])
             u[i] = U[row,col].real
-            #print U[row,col]
+            print U[row,col]
+        #print U[:,col0].real
+        #print U[:,col].real
         u -= np.mean(u)
         #assert -1 in np.sign(u)
         #assert 1 in np.sign(u)
