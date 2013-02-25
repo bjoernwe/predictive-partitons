@@ -5,9 +5,7 @@ from matplotlib import pyplot
 import worldmodel
 
 
-class SimpleActionsData(object):
-    
-    symbols = ['o', '^', 'd', 's', '*']
+class NoisyDimData(object):
     
     def __init__(self, n=1000, seed=None):
         
@@ -22,21 +20,19 @@ class SimpleActionsData(object):
         # containers for data
         self.data = np.zeros((n, 2))
         self.labels = np.zeros(n, dtype=int)
-        self.actions = []
         
         # generate the data
         self.data[0] = np.random.random(2)
         for i in range(1, n):
-            # action
-            a = np.random.randint(2)
-            self.actions.append(a)
             # new data point
             x = self.data[i-1]
             y = np.array(x)
-            y[a] += (.3 + .0*a) * np.random.randn()
+            y[0] += .3 * np.random.randn() # left-right step
+            y[1] = np.random.random()      # complete noise
             # bounds
-            y[a] = 0 if y[a] < 0 else y[a] 
-            y[a] = 1 if y[a] > 1 else y[a]
+            for d in [0,1]:
+                y[d] = 0 if y[d] < 0 else y[d] 
+                y[d] = 1 if y[d] > 1 else y[d]
             # store data
             self.data[i] = y
             
@@ -48,8 +44,7 @@ class SimpleActionsData(object):
         n = self.data.shape[0]
         
         for i in range(n-1):
-            color = 'r' if self.actions[i] else 'b'
-            pyplot.plot(self.data[i:i+2,0], self.data[i:i+2,1], color)
+            pyplot.plot(self.data[i:i+2,0], self.data[i:i+2,1], 'b')
 
         if show_plot:            
             pyplot.show()
@@ -61,9 +56,9 @@ class SimpleActionsData(object):
 if __name__ == '__main__':
 
     # train model
-    data = SimpleActionsData(n=5000)
+    data = NoisyDimData(n=1000)
     model = worldmodel.WorldModelTree()
-    model.add_data(x=data.data, actions=data.actions)
+    model.add_data(x=data.data, actions=None)
     model.learn(min_gain=0.02, max_costs=.02)
     
     # plot data and result

@@ -7,8 +7,6 @@ import worldmodel
 
 class SimpleActionsData(object):
     
-    symbols = ['o', '^', 'd', 's', '*']
-    
     def __init__(self, n=1000, seed=None):
         
         # store parameters
