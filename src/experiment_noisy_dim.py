@@ -12,6 +12,7 @@ class NoisyDimData(object):
         # store parameters
         self.n = n
         self.seed = seed
+        self.actions = None
         
         # init random
         if seed is not None:
@@ -27,12 +28,11 @@ class NoisyDimData(object):
             # new data point
             x = self.data[i-1]
             y = np.array(x)
-            y[0] += .3 * np.random.randn() # left-right step
+            y[0] += .1 * np.random.randn() # left-right step
             y[1] = np.random.random()      # complete noise
             # bounds
-            for d in [0,1]:
-                y[d] = 0 if y[d] < 0 else y[d] 
-                y[d] = 1 if y[d] > 1 else y[d]
+            y[0] = 0 if y[0] < 0 else y[0] 
+            y[0] = 1 if y[0] > 1 else y[0]
             # store data
             self.data[i] = y
             
@@ -56,7 +56,7 @@ class NoisyDimData(object):
 if __name__ == '__main__':
 
     # train model
-    data = NoisyDimData(n=1000)
+    data = NoisyDimData(n=5000)
     model = worldmodel.WorldModelTree()
     model.add_data(x=data.data, actions=None)
     model.learn(min_gain=0.02, max_costs=.02)

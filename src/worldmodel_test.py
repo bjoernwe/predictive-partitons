@@ -76,39 +76,39 @@ class VectorEntropyTests(unittest.TestCase):
     def testZeroEntropy(self):
         for i in range(10):
             zeros = np.zeros(i)
-            entropy = worldmodel.WorldModelTree._entropy(trans=zeros, normalize=True, ignore_empty_classes=True)
+            entropy = worldmodel.WorldModelTree._entropy(dist=zeros, normalize=True, ignore_empty_classes=True)
             self.assertEqual(entropy, 1.0)
         for i in range(2,10):
             zeros = np.zeros(i)
-            entropy = worldmodel.WorldModelTree._entropy(trans=zeros, normalize=False, ignore_empty_classes=True)
+            entropy = worldmodel.WorldModelTree._entropy(dist=zeros, normalize=False, ignore_empty_classes=True)
             self.assertEqual(entropy, np.log2(i))
 
     def testOneEntropy(self):
         for i in range(2,10):
             ones = np.ones(i)
-            entropy = worldmodel.WorldModelTree._entropy(trans=ones, normalize=True)
+            entropy = worldmodel.WorldModelTree._entropy(dist=ones, normalize=True)
             self.assertEqual(entropy, 1.0)
         for i in range(2,10):
             ones = np.ones(i)
-            entropy = worldmodel.WorldModelTree._entropy(trans=ones, normalize=False)
+            entropy = worldmodel.WorldModelTree._entropy(dist=ones, normalize=False)
             self.assertEqual(entropy, np.log2(i))
 
     def testCustomEntropy(self):
 
         # normalized
-        entropy = worldmodel.WorldModelTree._entropy(trans=np.array(range(2)), normalize=True)
+        entropy = worldmodel.WorldModelTree._entropy(dist=np.array(range(2)), normalize=True)
         self.assertEqual(entropy, 0.0)
-        entropy = worldmodel.WorldModelTree._entropy(trans=np.array(range(3)), normalize=True)
+        entropy = worldmodel.WorldModelTree._entropy(dist=np.array(range(3)), normalize=True)
         self.assertEqual(entropy, 0.5793801642856950)
-        entropy = worldmodel.WorldModelTree._entropy(trans=np.array(range(4)), normalize=True)
+        entropy = worldmodel.WorldModelTree._entropy(dist=np.array(range(4)), normalize=True)
         self.assertEqual(entropy, 0.72957395851362239)
 
         # not normalized
-        entropy = worldmodel.WorldModelTree._entropy(trans=np.array(range(2)), normalize=False)
+        entropy = worldmodel.WorldModelTree._entropy(dist=np.array(range(2)), normalize=False)
         self.assertEqual(entropy, 0.0)
-        entropy = worldmodel.WorldModelTree._entropy(trans=np.array(range(3)), normalize=False)
+        entropy = worldmodel.WorldModelTree._entropy(dist=np.array(range(3)), normalize=False)
         self.assertEqual(entropy, 0.91829583405448956)
-        entropy = worldmodel.WorldModelTree._entropy(trans=np.array(range(4)), normalize=False)
+        entropy = worldmodel.WorldModelTree._entropy(dist=np.array(range(4)), normalize=False)
         self.assertEqual(entropy, 1.4591479170272448)
 
     def testRandomEntropy(self):
@@ -119,14 +119,14 @@ class VectorEntropyTests(unittest.TestCase):
         for l in range(10):
             for _ in range(1000):
                 p = l * np.random.random(l)
-                e = worldmodel.WorldModelTree._entropy(trans=p, normalize=True)
+                e = worldmodel.WorldModelTree._entropy(dist=p, normalize=True)
                 self.assertGreaterEqual(e, 0.)
                 self.assertLessEqual(e, 1.)
 
         for l in range(2, 10):
             for _ in range(1000):
                 p = l * np.random.random(l)
-                e = worldmodel.WorldModelTree._entropy(trans=p, normalize=True)
+                e = worldmodel.WorldModelTree._entropy(dist=p, normalize=True)
                 self.assertGreaterEqual(e, 0.)
                 self.assertLessEqual(e, np.log2(l))
 

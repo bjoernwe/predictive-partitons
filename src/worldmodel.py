@@ -3,6 +3,7 @@ import math
 import numpy as np
 import random
 import scipy
+import traceback
 
 from matplotlib import pyplot
 from scipy.sparse import linalg
@@ -655,8 +656,10 @@ class WorldModelTree(object):
                 #best_leaf._init_test(action=best_action)
                 best_leaf.split(action=best_action)
                 root.stats.append(self._calc_stats(transitions=root.transitions))
-            except:
-                print 'Error splitting'
+            except Exception as e:
+                print 'Error splitting:', type(e)
+                print traceback.print_stack()
+                return float('-inf')
             
         return best_gain
     
@@ -847,7 +850,7 @@ class WorldModelTree(object):
         for i in range(n1):
             row = refs_all.index(refs[i][0])
             u[i] = U[row,col].real
-            print U[row,col]
+            #print U[row,col]
         #print U[:,col0].real
         #print U[:,col].real
         u -= np.mean(u)

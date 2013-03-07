@@ -31,7 +31,7 @@ class SimpleActionsData(object):
             # new data point
             x = self.data[i-1]
             y = np.array(x)
-            y[a] += .3 * np.random.randn()
+            y[a] += .1 * np.random.randn()
             # bounds
             y[a] = 0 if y[a] < 0 else y[a] 
             y[a] = 1 if y[a] > 1 else y[a]
