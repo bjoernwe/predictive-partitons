@@ -288,39 +288,41 @@ class WorldModelTree(object):
         return self.root().leaves().index(self)
 
 
-    def plot_states(self, show_plot=True):
+    def plot_states(self, show_plot=True, range_x=None, range_y=None):
         """
         Shows a contour plot of the learned states (2D). 
         """
         
         root = self.root()
         data = root.get_data()
+        K = len(root.leaves())
         
-        min_x = np.min(data[:,0])
-        min_y = np.min(data[:,1])
-        max_x = np.max(data[:,0])
-        max_y = np.max(data[:,1])
-        
-        x = np.linspace(min_x, max_x, 100)
-        y = np.linspace(min_y, max_y, 100)
+        if range_x is None:
+            range_x = [np.min(data[:,0]), np.max(data[:,0])]
+            
+        if range_y is None:
+            range_y = [np.min(data[:,1]), np.max(data[:,1])]
+            
+        x = np.linspace(range_x[0], range_x[1], 100)
+        y = np.linspace(range_y[0], range_y[1], 100)
         X, Y = np.meshgrid(x, y)
         v_classify = np.vectorize(lambda x, y: self.classify(np.array([x,y])))
         Z = v_classify(X, Y)
-        pyplot.contourf(X, Y, Z)
+        pyplot.contour(X, Y, Z, levels = range(-1, K), colors='b', linewidths=1)
         
         if show_plot:
             pyplot.show()
         return
          
 
-    def plot_tree_data(self, data_list=None, show_plot=True):
+    def plot_tree_data(self, color_coded=True, show_plot=True):
         """
         Plots all the data that is stored in the tree with color and shape
         according to the learned state.
         """
 
+        if color_coded:
 
-        if data_list is None:
             # list of data for the different classes
             data_list = []
             all_leaves = self.leaves()
@@ -328,12 +330,17 @@ class WorldModelTree(object):
                 data = leaf.get_data()
                 if data is not None:
                     data_list.append(data)
-
-        # plot
-        colormap = pyplot.cm.prism
-        pyplot.gca().set_color_cycle([colormap(i) for i in np.linspace(0, 0.98, 7)])
-        for i, data in enumerate(data_list):
-            pyplot.plot(data[:,0], data[:,1], self.symbols[i%len(self.symbols)])
+    
+            # plot
+            colormap = pyplot.cm.prism
+            pyplot.gca().set_color_cycle([colormap(i) for i in np.linspace(0, 0.98, 7)])
+            for i, data in enumerate(data_list):
+                pyplot.plot(data[:,0], data[:,1], self.symbols[i%len(self.symbols)])
+                
+        else:
+            
+            data = self.root().get_data()
+            pyplot.plot(data[:,0], data[:,1], '.', color='0.5')
             
         if show_plot:
             pyplot.show()
@@ -802,7 +809,7 @@ class WorldModelTree(object):
         # and one with the targets
         refs = self.get_data_refs_strict(action=action)
         [data_1, _] = self.get_data_strict(action=action)
-        refs_all = list(set([ref[i] for ref in refs for i in [0,1]]))
+        refs_all = list(set([ref[0] for ref in refs] + [ref[1] for ref in refs]))
         refs_all.sort()
         n_all = len(refs_all)
         n1 = len(refs)
