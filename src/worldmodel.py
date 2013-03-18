@@ -64,7 +64,7 @@ class WorldModelTree(object):
             assert status in ['leaf', 'split', 'merged']
 
             if status == 'leaf':
-                return self.class_label()
+                return self.get_class_label()
             elif status == 'split':
                 child_index = int(self._test(x))
                 return self.children[child_index].classify(x)
@@ -84,7 +84,7 @@ class WorldModelTree(object):
 
         # some useful variables
         root = self.root()
-        current_state = self.class_label()
+        current_state = self.get_class_label()
         assert current_state is not None
         
         # make of copy of all labels
@@ -103,6 +103,9 @@ class WorldModelTree(object):
         # does the split really split the data in two?
         assert len(new_dat_ref[0]) > 0
         assert len(new_dat_ref[1]) > 0
+        if (len(new_dat_ref[0]) == 0 or
+            len(new_dat_ref[1]) == 0):
+            return None, None
         return new_labels, new_dat_ref
 
 
@@ -137,12 +140,12 @@ class WorldModelTree(object):
 
         N = len(new_labels)
         
-        assert root.leaves()[index1].status == 'leaf'
+        assert root.get_leaves()[index1].status == 'leaf'
         print  max(new_labels),   root.transitions[action].shape[0]
         assert max(new_labels) == root.transitions[action].shape[0]
         if index2 is None:
             index2 = index1
-            assert root.leaves()[index1].status == 'leaf'
+            assert root.get_leaves()[index1].status == 'leaf'
 
         # new transition matrix
         new_trans = np.array(root.transitions[action])
@@ -164,6 +167,19 @@ class WorldModelTree(object):
                     new_trans[new_source, new_target] += 1
         
         return new_trans
+    
+    
+    def get_number_of_states(self):
+        """Returns the number of states in the model."""
+        return len(self.root().get_leaves())
+    
+    
+    def get_number_of_samples(self):
+        """Returns the number of data points stored in the model."""
+        if self is self.root():
+            return self.data.shape[0]
+        else:
+            return len(self.get_refs())
 
 
     def add_data(self, x, actions=None):
@@ -218,7 +234,7 @@ class WorldModelTree(object):
             self.actions = self.actions + actions
 
         # add references to data in all leaves
-        all_leaves = self.leaves()
+        all_leaves = self.get_leaves()
         N = self.data.shape[0]
         for i in range(first_data, N):
             state = self.labels[i]
@@ -243,7 +259,7 @@ class WorldModelTree(object):
         return
     
 
-    def leaves(self):
+    def get_leaves(self):
         """
         Returns a list of all leaves belonging to the node.
         """
@@ -253,7 +269,7 @@ class WorldModelTree(object):
               self.status == 'merged'):
             children = []
             for child in self.children:
-                for new_child in child.leaves():
+                for new_child in child.get_leaves():
                     if new_child not in children:
                         children += [new_child]
             return children
@@ -280,12 +296,12 @@ class WorldModelTree(object):
             return self.parents[0].root()
 
 
-    def class_label(self):
+    def get_class_label(self):
         """
         Returns an integer class label for a leaf-node. If the node isn't a 
         leaf, 'None' is returned.
         """
-        return self.root().leaves().index(self)
+        return self.root().get_leaves().index(self)
 
 
     def plot_states(self, show_plot=True, range_x=None, range_y=None):
@@ -295,7 +311,7 @@ class WorldModelTree(object):
         
         root = self.root()
         data = root.get_data()
-        K = len(root.leaves())
+        K = len(root.get_leaves())
         
         if range_x is None:
             range_x = [np.min(data[:,0]), np.max(data[:,0])]
@@ -325,7 +341,7 @@ class WorldModelTree(object):
 
             # list of data for the different classes
             data_list = []
-            all_leaves = self.leaves()
+            all_leaves = self.get_leaves()
             for leaf in all_leaves:
                 data = leaf.get_data()
                 if data is not None:
@@ -388,7 +404,24 @@ class WorldModelTree(object):
             raise RuntimeError('Should not happen!')
         
         
-    def get_data_refs_strict(self, action=None):
+    def get_transition_refs(self, action=None):
+        """
+        Finds all transitions that start in the node. The result is given as a 
+        list of tuples (t, t+1).
+        """
+        
+        refs = self.get_data_refs()
+        action_list = self.root().actions
+        N = self.root().get_number_of_samples()
+        
+        if action is None:
+            result = [(t,t+1) for t in refs if (t+1) < N]
+        else:
+            result = [(t,t+1) for t in refs if action_list[t] == action and (t+1) < N]
+        return result
+        
+        
+    def get_transition_refs_strict(self, action=None):
         """
         Finds all transitions that happen strictly inside this node. The result 
         is given as a list of tuples (t, t+1).
@@ -403,14 +436,14 @@ class WorldModelTree(object):
         return result
     
     
-    def get_data_strict(self, action):
+    def get_transition_data_strict(self, action):
         """
         Returns the data of all transitions happening inside of the state. The
         first matrix contains the starting points and the second matrix the
         targets.
         """
         root = self.root()
-        refs = self.get_data_refs_strict(action=action)
+        refs = self.get_transition_refs_strict(action=action)
         data_list_1 = map(lambda t: root.data[t[0]], refs)
         data_list_2 = map(lambda t: root.data[t[1]], refs)
         data_1 = np.vstack(data_list_1) 
@@ -590,7 +623,7 @@ class WorldModelTree(object):
             #self._init_test(action=action)
             new_labels, new_dat_ref = self._relabel_data()
             #print [np.sum(m) for m in root.transitions.itervalues()]
-            root.transitions = self._split_transition_matrices(root=root, new_labels=new_labels, index1=self.class_label())
+            root.transitions = self._split_transition_matrices(root=root, new_labels=new_labels, index1=self.get_class_label())
             #print [np.sum(m) for m in root.transitions.itervalues()]
             root.labels = new_labels
             
@@ -617,18 +650,21 @@ class WorldModelTree(object):
         """
         
         root = self.root()
-        assert self in root.leaves()
+        assert self in root.get_leaves()
         best_gain = float('-Inf')
         best_action = None
         
         for action in root.transitions.keys():
             if action is None:
                 continue
-            print 'testing leaf', self.class_label(), 'with action', action
+            print 'testing leaf', self.get_class_label(), 'with action', action
             try:
                 if self._init_test(action=action):
                     new_labels, _ = self._relabel_data()
-                    split_transition_matrices = self._split_transition_matrices(root=root, new_labels=new_labels, index1=self.class_label())
+                    if new_labels is None:
+                        print 'USELESS SPLIT'
+                        continue
+                    split_transition_matrices = self._split_transition_matrices(root=root, new_labels=new_labels, index1=self.get_class_label())
                     #print [np.sum(m) for m in split_transition_matrices.itervalues()]
                     new_mutual_information = self._mutual_information(transition_matrix=split_transition_matrices[action])
                     old_mutual_information = self._mutual_information(transition_matrix=root.transitions[action]) # TODO cache
@@ -653,7 +689,7 @@ class WorldModelTree(object):
         best_leaf = None
         best_gain = float('-inf')
         
-        for leaf in self.root().leaves():
+        for leaf in self.root().get_leaves():
             if leaf._reached_min_sample_size():
                 [gain, action] = leaf._calculate_splitting_gain()
                 print 'best split: action', action, 'with gain', gain
@@ -812,8 +848,8 @@ class WorldModelTree(object):
         # the data
         # we have two lists. one with only source points of all transactions
         # and one with the targets
-        refs = self.get_data_refs_strict(action=action)
-        [data_1, _] = self.get_data_strict(action=action)
+        refs = self.get_transition_refs_strict(action=action)
+        [data_1, _] = self.get_transition_data_strict(action=action)
         refs_all = list(set([ref[0] for ref in refs] + [ref[1] for ref in refs]))
         refs_all.sort()
         n_all = len(refs_all)
@@ -827,6 +863,7 @@ class WorldModelTree(object):
             distances = np.sqrt(((data_1 - data_1[i])**2).sum(axis=1))
             idx = np.argsort(distances)
             i1 = refs_all.index(refs[i][0])
+            # TODO starting from 1?
             for j in idx[:k+1]:
                 # i and j are indices for the first list
                 # we have to translate them into indices of the W matrix
@@ -878,6 +915,7 @@ class WorldModelTree(object):
         #print labels
         
         # classifier
+        # TODO train with data strictly inside
         self.knn = mdp.nodes.KNNClassifier(k=k)
         self.knn.train(data_1, labels)
         self.knn.stop_training()
@@ -982,8 +1020,8 @@ class WorldModelTree(object):
         for action in transitions.keys():
             if action is None:
                 continue
-            refs = self.get_data_refs_strict(action=action)
-            print 'number of samples for leaf', self.class_label(), 'action', action, ':', len(refs)
+            refs = self.get_transition_refs_strict(action=action)
+            print 'number of samples for leaf', self.get_class_label(), 'action', action, ':', len(refs)
             if len(refs) < self._min_class_size:
                 return False
         return True
