@@ -37,7 +37,7 @@ def sierpinsky_square(N, iterations=200000, normalize=True):
 
 if __name__ == '__main__':
     
-    A = sierpinsky_square(N=8)
+    A = sierpinsky_square(N=128)
     E, U = np.linalg.eig(A)
     print np.abs(E)
     print np.sign(U)    

@@ -358,7 +358,7 @@ class WorldModelTree(object):
         return
 
 
-    def get_data_refs(self):
+    def get_data_refs(self, action=None):
         """
         Returns the data references (i.e. indices for root.data) belonging to 
         the node. If the node isn't a leaf, the data of sub-nodes is returned.
@@ -366,7 +366,12 @@ class WorldModelTree(object):
 
         if self.status == 'leaf':
         
-            return self.dat_ref
+            if action is None:
+                return self.dat_ref
+            else:
+                refs = self.dat_ref
+                actions = self.root().actions
+                return [t for t in refs if actions[t] == action]
         
         elif (self.status == 'split' or
               self.status == 'merged'):
