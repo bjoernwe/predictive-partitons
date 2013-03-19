@@ -12,7 +12,7 @@ if __name__ == '__main__':
                        experiment_noisy_dim.NoisyDimData,
                        experiment_random_walk_2d.RandomWalk2DData]
     plot_ranges = [[-1, 1], [0, 1], [0, 1]]
-    data_sizes = [2000, 2000, 2000]
+    data_sizes = [4000, 4000, 4000]
     titles = ['(a)', '(b)', '(c)']
 
     for i, generator in enumerate(data_generators):
