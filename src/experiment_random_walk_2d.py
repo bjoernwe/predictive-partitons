@@ -59,7 +59,7 @@ class RandomWalk2DData(object):
 if __name__ == '__main__':
 
     # train model
-    data = RandomWalk2DData(n=5000)
+    data = RandomWalk2DData(n=4000)
     model = worldmodel.WorldModelTree()
     model.add_data(x=data.data, actions=data.actions)
     model.learn(min_gain=0.02, max_costs=.02)

@@ -18,6 +18,13 @@ Stats = collections.namedtuple('Stats', ['n_states',
                                          'entropy_normalized', 
                                          'mutual_information'])
 
+SplitResult = collections.namedtuple('SplitResult', ['node',
+                                                     'action',
+                                                     'gain',
+                                                     'split_labels',
+                                                     'split_data',
+                                                     'knn'])
+
 class WorldModelTree(object):
 
     symbols = ['o', '^', 'd', 's', '*']
@@ -620,9 +627,8 @@ class WorldModelTree(object):
         else:
             
             # re-classify data
-            #self._init_test(action=action)
+            self._init_test(action=action)
             new_labels, new_dat_ref = self._relabel_data()
-            print 'hash:', hash(str(new_labels))
 
             #print [np.sum(m) for m in root.transitions.itervalues()]
             root.transitions = self._split_transition_matrices(root=root, new_labels=new_labels, index1=self.get_class_label())
@@ -655,6 +661,7 @@ class WorldModelTree(object):
         assert self in root.get_leaves()
         best_gain = float('-Inf')
         best_action = None
+        #best_split = None
         
         for action in root.transitions.keys():
             if action is None:
@@ -662,11 +669,10 @@ class WorldModelTree(object):
             print 'testing leaf', self.get_class_label(), 'with action', action
             try:
                 if self._init_test(action=action):
-                    new_labels, _ = self._relabel_data()
+                    new_labels, new_data = self._relabel_data()
                     if new_labels is None:
                         print 'USELESS SPLIT'
                         continue
-                    print 'hash:', hash(str(new_labels))
                     split_transition_matrices = self._split_transition_matrices(root=root, new_labels=new_labels, index1=self.get_class_label())
                     #print [np.sum(m) for m in split_transition_matrices.itervalues()]
                     new_mutual_information = self._mutual_information(transition_matrix=split_transition_matrices[action])
@@ -675,6 +681,9 @@ class WorldModelTree(object):
                     if gain > best_gain:
                         best_gain = gain
                         best_action = action
+                        #best_split = SplitResult(node=self, action=action, gain=gain, split_labels=new_labels, split_data=new_data, knn=self.knn)
+                else:
+                    print 'init_test failed'
             except scipy.sparse.linalg.eigen.arpack.ArpackNoConvergence:
                 print 'Error calculating splitting gain'
         return [best_gain, best_action]
@@ -703,15 +712,15 @@ class WorldModelTree(object):
                     best_leaf = leaf
                 
         if best_leaf is not None and best_action is not None and best_gain >= min_gain:
-            try:
+            #try:
                 print 'decided for leaf', best_leaf.get_class_label(), 'with action', best_action, 'and gain', best_gain
                 #best_leaf._init_test(action=best_action)
                 best_leaf.split(action=best_action)
                 root.stats.append(self._calc_stats(transitions=root.transitions))
-            except Exception as e:
-                print 'Error splitting:', type(e)
-                print traceback.print_stack()
-                return float('-inf')
+            #except Exception as e:
+            #    print 'Error splitting:', type(e)
+            #    print traceback.print_stack()
+            #    return float('-inf')
             
         return best_gain
     
