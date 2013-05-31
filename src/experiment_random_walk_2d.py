@@ -62,7 +62,7 @@ if __name__ == '__main__':
     data = RandomWalk2DData(n=4000)
     model = worldmodel.WorldModelTree()
     model.add_data(x=data.data, actions=data.actions)
-    model.learn(min_gain=0.02, max_costs=.02)
+    model.learn(min_gain=0.02)
     
     # plot data and result
     pyplot.subplot(1, 2, 1)
