@@ -3,6 +3,7 @@ import math
 import numpy as np
 import random
 import scipy
+import scipy.spatial.distance
 import traceback
 
 from matplotlib import pyplot
@@ -22,7 +23,8 @@ SplitResult = collections.namedtuple('SplitResult', ['node',
                                                      'action',
                                                      'gain',
                                                      'split_labels',
-                                                     'split_data',
+                                                     'split_data_refs',
+                                                     'split_transitions',
                                                      'knn'])
 
 class WorldModelTree(object):
@@ -52,7 +54,9 @@ class WorldModelTree(object):
 
     def classify(self, x):
         """
-        Takes a single vector and returns an integer class label.
+        Returns the state that x belongs to according to the current model. If
+        x is a matrix, a list is returned containing a integer state for every
+        row.
         """
 
         # is x a matrix?
@@ -79,6 +83,35 @@ class WorldModelTree(object):
                 return self.children[0].classify(x)
             else:
                 raise RuntimeError('Should not happen!')
+            
+            
+    def classify_to_vector(self, x):
+        """
+        Returns an indicator vector [.. 0 1 0 ..] instead of an integer class
+        label. Can be useful for instance, to perform a regression analysis on
+        the states. If x is a matrix, a matrix will be returned with one
+        indicator vector in each row.
+        """
+        
+        K = self.get_number_of_states()
+        
+        # is x a matrix?
+        if x.ndim > 1:
+
+            labels = self.classify(x)
+            N = x.shape[0]
+            Y = np.zeros((N, K))
+            for i in range(N):
+                s = labels[i]
+                Y[i,s] = 1
+
+        else:
+            
+            s = self.classify(x)
+            Y = np.ones(K)
+            Y[s] = 1
+            
+        return Y
                 
 
     def _relabel_data(self):
@@ -311,7 +344,7 @@ class WorldModelTree(object):
         return self.root().get_leaves().index(self)
 
 
-    def plot_states(self, show_plot=True, range_x=None, range_y=None):
+    def plot_states(self, show_plot=True, range_x=None, range_y=None, resolution=100):
         """
         Shows a contour plot of the learned states (2D). 
         """
@@ -326,8 +359,8 @@ class WorldModelTree(object):
         if range_y is None:
             range_y = [np.min(data[:,1]), np.max(data[:,1])]
             
-        x = np.linspace(range_x[0], range_x[1], 100)
-        y = np.linspace(range_y[0], range_y[1], 100)
+        x = np.linspace(range_x[0], range_x[1], resolution)
+        y = np.linspace(range_y[0], range_y[1], resolution)
         X, Y = np.meshgrid(x, y)
         v_classify = np.vectorize(lambda x, y: self.classify(np.array([x,y])))
         Z = v_classify(X, Y)
@@ -378,6 +411,9 @@ class WorldModelTree(object):
         stats = np.vstack(root.stats)
         pyplot.plot(stats)
         pyplot.legend(list(root.stats[0]._fields)[0:], loc=2)
+        
+        if show_plot:
+            pyplot.show()
         return
 
 
@@ -564,93 +600,122 @@ class WorldModelTree(object):
         return P
     
     
-    def split(self, action):
+#    def split(self, action):
+#        """
+#        Splits all leaves belonging to that node.
+#        """
+#        
+#        print 'splitting...'
+#        # recursion to leaves
+#        if self.status != 'leaf':
+#            for leaf in self.leaves():
+#                leaf.split(action)
+#            return
+#        
+#        # test for minimum number of data points
+#        assert self.status == 'leaf'
+#        #if len(self.dat_ref) < self._min_class_size:
+#        #if len(self.get_data_strict()) < self._min_class_size:
+#        #    return
+#        
+#        root = self.root()
+#        if len(self.parents) == 2: # a leaf that was just merged
+#            
+#            # a split would be redundant here because the current node was just 
+#            # merged. so 'simply' revert that merging...
+#
+#            parent1 = self.parents[0]
+#            parent2 = self.parents[1]
+#            self.parents = []
+#            parent1.status = 'leaf'
+#            parent2.status = 'leaf'
+#            parent1.children = []
+#            parent2.children = []
+#            label1 = parent1.class_label()
+#            label2 = parent2.class_label()
+#
+#            # make of copy of all labels
+#            # increase labels above second node by one to make space for the split
+#            new_labels = map(lambda l: l+1 if l >= label2 else l, root.labels)
+#            new_dat_ref = [[], []]
+#    
+#            # every entry belonging to this node has to be re-classified
+#            for ref_i in self.dat_ref:
+#                dat = root.data[ref_i]
+#                label = root.classify(dat)
+#                assert label == label1 or label == label2
+#                if label == label1:
+#                    new_dat_ref[0].append(ref_i)
+#                else:
+#                    new_dat_ref[1].append(ref_i)
+#                    new_labels[ref_i] = label2
+#                    
+#            assert len(new_labels) == len(root.labels)
+#            root.transitions = self._split_transition_matrices(root=root, new_labels=new_labels, index1=label1, index2=label2)
+#            root.labels = new_labels
+#            
+#            parent1.dat_ref = new_dat_ref[0]
+#            parent2.dat_ref = new_dat_ref[1]
+#            assert len(parent1.dat_ref) + len(parent2.dat_ref) == len(self.dat_ref)
+#            
+#            print 'TRIVIAL SPLIT'
+#            
+#        else:
+#            
+#            # re-classify data
+#            self._init_test(action=action)
+#            new_labels, new_dat_ref = self._relabel_data()
+#
+#            #print [np.sum(m) for m in root.transitions.itervalues()]
+#            root.transitions = self._split_transition_matrices(root=root, new_labels=new_labels, index1=self.get_class_label())
+#            #print [np.sum(m) for m in root.transitions.itervalues()]
+#            root.labels = new_labels
+#            
+#            # create new leaves
+#            child0 = self.__class__(parents = [self])
+#            child1 = self.__class__(parents = [self])
+#            child0.dat_ref = new_dat_ref[0]
+#            child1.dat_ref = new_dat_ref[1]
+#    
+#            # create list of children
+#            self.children = []
+#            self.children.append(child0)
+#            self.children.append(child1)
+#            self.status = 'split'
+#            
+#        return
+    
+    
+    def _apply_split(self, split_result):
         """
         Splits all leaves belonging to that node.
         """
         
         print 'splitting...'
-        # recursion to leaves
-        if self.status != 'leaf':
-            for leaf in self.leaves():
-                leaf.split(action)
-            return
-        
-        # test for minimum number of data points
         assert self.status == 'leaf'
-        #if len(self.dat_ref) < self._min_class_size:
-        #if len(self.get_data_strict()) < self._min_class_size:
-        #    return
-        
         root = self.root()
-        if len(self.parents) == 2: # a leaf that was just merged
-            
-            # a split would be redundant here because the current node was just 
-            # merged. so 'simply' revert that merging...
 
-            parent1 = self.parents[0]
-            parent2 = self.parents[1]
-            self.parents = []
-            parent1.status = 'leaf'
-            parent2.status = 'leaf'
-            parent1.children = []
-            parent2.children = []
-            label1 = parent1.class_label()
-            label2 = parent2.class_label()
+        # copy split
+        self.knn = split_result.knn
+        root.transitions = split_result.split_transitions
+        root.labels = split_result.split_labels
+        
+        # create new leaves
+        child0 = self.__class__(parents = [self])
+        child1 = self.__class__(parents = [self])
+        child0.dat_ref = split_result.split_data_refs[0]
+        child1.dat_ref = split_result.split_data_refs[1]
 
-            # make of copy of all labels
-            # increase labels above second node by one to make space for the split
-            new_labels = map(lambda l: l+1 if l >= label2 else l, root.labels)
-            new_dat_ref = [[], []]
-    
-            # every entry belonging to this node has to be re-classified
-            for ref_i in self.dat_ref:
-                dat = root.data[ref_i]
-                label = root.classify(dat)
-                assert label == label1 or label == label2
-                if label == label1:
-                    new_dat_ref[0].append(ref_i)
-                else:
-                    new_dat_ref[1].append(ref_i)
-                    new_labels[ref_i] = label2
-                    
-            assert len(new_labels) == len(root.labels)
-            root.transitions = self._split_transition_matrices(root=root, new_labels=new_labels, index1=label1, index2=label2)
-            root.labels = new_labels
-            
-            parent1.dat_ref = new_dat_ref[0]
-            parent2.dat_ref = new_dat_ref[1]
-            assert len(parent1.dat_ref) + len(parent2.dat_ref) == len(self.dat_ref)
-            
-            print 'TRIVIAL SPLIT'
-            
-        else:
-            
-            # re-classify data
-            self._init_test(action=action)
-            new_labels, new_dat_ref = self._relabel_data()
-
-            #print [np.sum(m) for m in root.transitions.itervalues()]
-            root.transitions = self._split_transition_matrices(root=root, new_labels=new_labels, index1=self.get_class_label())
-            #print [np.sum(m) for m in root.transitions.itervalues()]
-            root.labels = new_labels
-            
-            # create new leaves
-            child0 = self.__class__(parents = [self])
-            child1 = self.__class__(parents = [self])
-            child0.dat_ref = new_dat_ref[0]
-            child1.dat_ref = new_dat_ref[1]
-    
-            # create list of children
-            self.children = []
-            self.children.append(child0)
-            self.children.append(child1)
-            self.status = 'split'
+        # create list of children
+        self.children = []
+        self.children.append(child0)
+        self.children.append(child1)
+        self.status = 'split'
             
         return
     
     
-    def _calculate_splitting_gain(self):
+    def _calculate_best_split(self):
         """
         Calculates the gain in mutual information if this node would be split.
         
@@ -660,8 +725,7 @@ class WorldModelTree(object):
         root = self.root()
         assert self in root.get_leaves()
         best_gain = float('-Inf')
-        best_action = None
-        #best_split = None
+        best_split = None
         
         for action in root.transitions.keys():
             if action is None:
@@ -671,22 +735,27 @@ class WorldModelTree(object):
                 if self._init_test(action=action):
                     new_labels, new_data = self._relabel_data()
                     if new_labels is None:
+                        # should not happen
                         print 'USELESS SPLIT'
                         continue
                     split_transition_matrices = self._split_transition_matrices(root=root, new_labels=new_labels, index1=self.get_class_label())
-                    #print [np.sum(m) for m in split_transition_matrices.itervalues()]
                     new_mutual_information = self._mutual_information(transition_matrix=split_transition_matrices[action])
                     old_mutual_information = self._mutual_information(transition_matrix=root.transitions[action]) # TODO cache
                     gain = new_mutual_information - old_mutual_information
                     if gain > best_gain:
                         best_gain = gain
-                        best_action = action
-                        #best_split = SplitResult(node=self, action=action, gain=gain, split_labels=new_labels, split_data=new_data, knn=self.knn)
+                        best_split = SplitResult(node = self, 
+                                                 action = action, 
+                                                 gain = gain, 
+                                                 split_labels = new_labels, 
+                                                 split_data_refs = new_data,
+                                                 split_transitions = split_transition_matrices, 
+                                                 knn = self.knn)
                 else:
                     print 'init_test failed'
             except scipy.sparse.linalg.eigen.arpack.ArpackNoConvergence:
                 print 'Error calculating splitting gain'
-        return [best_gain, best_action]
+        return best_split
     
     
     def single_splitting_step(self, min_gain=float('-inf')):
@@ -698,29 +767,23 @@ class WorldModelTree(object):
         
         root = self.root()
         assert self is root
-        best_leaf = None
         best_gain = float('-inf')
+        best_split = None
         
         for leaf in self.root().get_leaves():
             print 'testing leaf', leaf.get_class_label(), '...'
             if leaf._reached_min_sample_size():
-                [gain, action] = leaf._calculate_splitting_gain()
-                print 'best split: leaf', leaf.get_class_label(), 'with action', action, 'with gain', gain
-                if gain > best_gain:
-                    best_gain = gain
-                    best_action = action
-                    best_leaf = leaf
+                split = leaf._calculate_best_split()
+                if split is not None:
+                    print 'best split: leaf', leaf.get_class_label(), 'with action', split.action, 'with gain', split.gain
+                    if split.gain > best_gain:
+                        best_gain = split.gain
+                        best_split = split
                 
-        if best_leaf is not None and best_action is not None and best_gain >= min_gain:
-            #try:
-                print 'decided for leaf', best_leaf.get_class_label(), 'with action', best_action, 'and gain', best_gain
-                #best_leaf._init_test(action=best_action)
-                best_leaf.split(action=best_action)
-                root.stats.append(self._calc_stats(transitions=root.transitions))
-            #except Exception as e:
-            #    print 'Error splitting:', type(e)
-            #    print traceback.print_stack()
-            #    return float('-inf')
+        if best_split is not None and best_gain >= min_gain:
+            print 'decided for leaf', best_split.node.get_class_label(), 'with action', best_split.action, 'and gain', best_split.gain
+            best_split.node._apply_split(split_result=best_split)
+            root.stats.append(self._calc_stats(transitions=root.transitions))
             
         return best_gain
     
@@ -867,14 +930,18 @@ class WorldModelTree(object):
         refs_all.sort()
         n_all = len(refs_all)
         n1 = len(refs)
+
+        # pairwise distances
+        distances = scipy.spatial.distance.pdist(data_1)
+        distances = scipy.spatial.distance.squareform(distances)
         
         # transitions
         k = 50  # k neighbors
         W = np.zeros((n_all, n_all))
         W += 0.01
+
         for i in range(n1):
-            distances = np.sqrt(((data_1 - data_1[i])**2).sum(axis=1))
-            idx = np.argsort(distances)
+            idx = np.argsort(distances[i])
             i1 = refs_all.index(refs[i][0])
             # TODO starting from 1?
             for j in idx[:k+1]:
@@ -929,7 +996,8 @@ class WorldModelTree(object):
         
         # classifier
         # TODO train with data strictly inside
-        self.knn = mdp.nodes.KNNClassifier(k=k)
+        #self.knn = mdp.nodes.KNNClassifier(k=k)
+        self.knn = mdp.nodes.NearestMeanClassifier()
         self.knn.train(data_1, labels)
         self.knn.stop_training()
         y = self.knn.label(data_1)

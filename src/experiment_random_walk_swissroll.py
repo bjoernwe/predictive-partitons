@@ -67,5 +67,6 @@ if __name__ == '__main__':
     data.plot(show_plot=False)
     pyplot.subplot(1, 2, 2)
     model.plot_states(show_plot=False)
+    model.plot_tree_data(color_coded=False, show_plot=False)
     pyplot.show()
     
