@@ -1356,6 +1356,7 @@ class WorldModelSpectral(WorldModelTree):
 
     def _get_transition_graph(self, action=None, k=10, normalize=True):
         assert self.status == 'leaf'
+        assert action in self.get_possible_actions(ignore_none=False)
         
         # data and references
         [refs_1, refs_2] = self._get_transition_refs_for_action(action=action)
