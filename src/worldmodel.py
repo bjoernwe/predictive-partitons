@@ -408,13 +408,13 @@ class WorldModelTree(object):
         return
          
 
-    def plot_tree_data(self, color_coded=True, show_plot=True):
+    def plot_tree_data(self, color='state', show_plot=True):
         """
         Plots all the data that is stored in the tree with color and shape
         according to the learned state.
         """
 
-        if color_coded:
+        if color == 'state':
 
             # list of data for the different classes
             data_list = []
@@ -425,15 +425,27 @@ class WorldModelTree(object):
                     data_list.append(data)
     
             # plot
-            colormap = pyplot.cm.prism
+            colormap = pyplot.cm.get_cmap('prism')
             pyplot.gca().set_color_cycle([colormap(i) for i in np.linspace(0, 0.98, 7)])
             for i, data in enumerate(data_list):
                 pyplot.plot(data[:,0], data[:,1], self.symbols[i%len(self.symbols)])
                 
+        elif color == 'last_gain':
+            
+            leaves = self.get_leaves()
+            vmin = min([leaf.last_gain for leaf in leaves])
+            vmax = max([leaf.last_gain for leaf in leaves])
+            colormap = pyplot.cm.get_cmap('summer')
+            
+            for leaf in leaves:
+                data = leaf.get_data()
+                colors = [leaf.last_gain for _ in range(data.shape[0])]
+                pyplot.scatter(x=data[:,0], y=data[:,1], c=colors, cmap=colormap, edgecolors='none', vmin=vmin, vmax=vmax)
+                
         else:
             
             data = self.root().get_data()
-            pyplot.plot(data[:,0], data[:,1], '.', color='0.5')
+            pyplot.plot(data[:,0], data[:,1], '.')
             
         if show_plot:
             pyplot.show()
@@ -851,10 +863,10 @@ class WorldModelTree(object):
         child0.dat_ref = split_result.split_data_refs[0]
         child1.dat_ref = split_result.split_data_refs[1]
         
-        # remember last performance gain
+        # initialize last_gain with values of parent
         child0.last_gain = split_result.gain
         child1.last_gain = split_result.gain
-
+        
         # create list of children
         self.children = []
         self.children.append(child0)
@@ -945,6 +957,7 @@ class WorldModelTree(object):
                     if split.gain > best_gain:
                         best_gain = split.gain
                         best_split = split
+                        leaf.last_gain = split.gain
                 
         if best_split is not None and best_gain >= min_gain:
             print 'decided for leaf', best_split.node.get_leaf_index(), 'with action', best_split.action, 'and gain', best_split.gain
@@ -1646,12 +1659,11 @@ if __name__ == "__main__":
         assert(n_trans == n-1)
 
         # plot tree and stats
-        pyplot.subplot(3, 3, p+1)
-        tree.plot_tree_data(show_plot=False)
-        pyplot.subplot(3, 3, p+4)
+        pyplot.subplot(2, 2, p+1)
+        tree.plot_tree_data(color='last_gain', show_plot=False)
+        pyplot.subplot(2, 2, p+3)
         tree.plot_states(show_plot=False)
-        pyplot.subplot(3, 3, p+7)
-        tree.plot_stats(show_plot=False)
+        tree.plot_tree_data(color='none', show_plot=False)
 
     #pyplot.figure()
     #refs_1, refs_2 = tree.get_leaves()[1]._get_transition_refs_for_action(action=None)
@@ -1659,7 +1671,5 @@ if __name__ == "__main__":
     #pyplot.plot(data[:,0], data[:,1], 'o')
     #data = tree.get_leaves()[0]._get_data_for_refs(refs=refs_2)
     #pyplot.plot(data[:,0], data[:,1], 'x')    
-    print tree.get_most_interesting_leaf()
-    print tree.get_most_interesting_leaf().last_gain
     pyplot.show()
     
