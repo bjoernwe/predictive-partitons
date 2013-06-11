@@ -1,9 +1,52 @@
-#! /usr/bin/python
-
 import numpy as np
 import unittest
 
 import worldmodel
+
+
+class DataReferencesTest(unittest.TestCase):
+    
+    def testTransitionRefs(self):
+        """
+        Generate some simple transitions and verify correctness of getter
+        functions. 
+        """
+        # generate some test data
+        data = np.zeros((4, 2))
+        data[0] = [ 3.0, -1]
+        data[1] = [ 1.0, -1]
+        data[2] = [-1.0,  1]
+        data[3] = [-3.0,  1]
+        actions = [None, 0, 1, 0]
+        # add data to model
+        model = worldmodel.WorldModelPCA()
+        model.add_data(x=data, actions=actions)
+        # transitions in one single state
+        self.assertEqual(model._get_transition_refs(heading_in=False, inside=False, heading_out=False), [[], []])
+        self.assertEqual(model._get_transition_refs(heading_in=True, inside=False, heading_out=False), [[], []])
+        self.assertEqual(model._get_transition_refs(heading_in=False, inside=True, heading_out=False), [[0, 1, 2], [1, 2, 3]])
+        self.assertEqual(model._get_transition_refs(heading_in=False, inside=False, heading_out=True), [[], []])
+        # more data and split node
+        for _ in range(99):
+            model.add_data(data, actions=actions)
+        model.single_splitting_step()
+        # test again with two states
+        leaf1, _ = model.get_leaves()
+        refs1, refs2 = leaf1._get_transition_refs(heading_in=True, inside=False, heading_out=False)
+        self.assertEqual([refs1[:2], refs2[:2]], [[3, 7], [4, 8]])
+        refs1, refs2 = leaf1._get_transition_refs(heading_in=False, inside=True, heading_out=False)
+        self.assertEqual([refs1[:2], refs2[:2]], [[0, 4], [1, 5]])
+        refs1, refs2 = leaf1._get_transition_refs(heading_in=False, inside=False, heading_out=True)
+        self.assertEqual([refs1[:2], refs2[:2]], [[1, 5], [2, 6]])
+        # test again with action
+        refs1, refs2 = leaf1._get_transition_refs_for_action(action=None, heading_in=True, inside=False, heading_out=False)
+        self.assertEqual([refs1[:2], refs2[:2]], [[3, 7], [4, 8]])
+        refs1, refs2 = leaf1._get_transition_refs_for_action(action=0, heading_in=False, inside=True, heading_out=False)
+        self.assertEqual([refs1[:2], refs2[:2]], [[0, 4], [1, 5]])
+        refs1, refs2 = leaf1._get_transition_refs_for_action(action=1, heading_in=False, inside=False, heading_out=True)
+        self.assertEqual([refs1[:2], refs2[:2]], [[1, 5], [2, 6]])
+        return True
+        
 
 
 class DataTests(unittest.TestCase):

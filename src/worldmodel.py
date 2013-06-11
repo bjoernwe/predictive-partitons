@@ -142,8 +142,8 @@ class WorldModelTree(object):
 
         assert len(new_labels) == len(root.labels)
         # does the split really split the data in two?
-        assert len(new_dat_ref[0]) > 0
-        assert len(new_dat_ref[1]) > 0
+        #assert len(new_dat_ref[0]) > 0
+        #assert len(new_dat_ref[1]) > 0
         if (len(new_dat_ref[0]) == 0 or
             len(new_dat_ref[1]) == 0):
             return None, None
@@ -523,28 +523,35 @@ class WorldModelTree(object):
             raise RuntimeError('Should not happen!')
         
         
-    def _get_transition_refs(self):
+    def _get_transition_refs(self, heading_in=False, inside=True, heading_out=True):
         """
-        Finds all transitions that start in the node. The result is given as two
-        lists of references. One for the start and one for the end of the
-        transition.
+        Finds all transitions that start, end or happen strictly inside the 
+        node. The result is given as two lists of references. One for the start 
+        and one for the end of the transition.
         """
-        # TODO do we need this method at all?
-        
         refs = self._get_data_refs()
         N = self.root().get_number_of_samples()
         
-        # remove last point. it has no transition.
-        if (N-1) in refs:
-            refs.remove(N-1)
+        refs_in = [] 
+        refs_inside = [] 
+        refs_out = []
+         
+        if heading_in:
+            refs_in = [ref-1 for ref in refs if (ref-1 not in refs) and (ref > 0)]
+            
+        if inside:
+            refs_inside = [ref for ref in refs if (ref+1 in refs)]
 
-        #        
-        refs_1 = refs
+        if heading_out:
+            refs_out = [ref for ref in refs if (ref+1 not in refs) and (ref+1 < N)]
+            
+        refs_1 = list(np.sort(refs_in + refs_inside + refs_out))
         refs_2 = [t+1 for t in refs_1]
+        
         return [refs_1, refs_2]
         
         
-    def _get_transition_refs_for_action(self, action):
+    def _get_transition_refs_for_action(self, action, heading_in=False, inside=True, heading_out=True):
         """
         Finds all transitions that start in the node. The result is given as two
         lists of references. One for the start and one for the end of the
@@ -554,20 +561,12 @@ class WorldModelTree(object):
         if root.actions is None:
             return self._get_transition_refs()
         
-        refs = self._get_data_refs()
-        action_list = root.actions
-        N = root.get_number_of_samples()
-        
-        # remove last point. it has no transition.
-        if (N-1) in refs:
-            refs.remove(N-1)
-        
-        # 
-        refs_1 = [t for t in refs if action_list[t+1] == action]
-        refs_2 = [t+1 for t in refs_1]
+        r1, r2 = self._get_transition_refs(heading_in=heading_in, inside=inside, heading_out=heading_out)
+        refs_2 = [r for r in r2 if root.actions[r] == action]
+        refs_1 = [r-1 for r in refs_2]
         return [refs_1, refs_2]
         
-
+        
     def _get_data_for_refs(self, refs):
         root = self.root()
         if len(refs) == 0:
@@ -594,47 +593,83 @@ class WorldModelTree(object):
 #         return [data_1, data_2]
         
         
-    def _get_transition_refs_strict(self):
-        """
-        Finds all transitions that happen strictly inside this node. The result 
-        is given as two lists of references: starting points and ending points.
-        """
-        
-        refs = self._get_data_refs()
-        refs_1 = [ref for i, ref in enumerate(refs[:-1]) if refs[i+1] == ref+1]
-        refs_2 = [ref+1 for ref in refs_1]
-        return refs_1, refs_2
-    
-    
-    def _get_transition_refs_strict_for_action(self, action):
-        """
-        Finds all transitions that happen strictly inside this node. The result 
-        is given as two lists of references: starting points and ending points.
-        """
-        actions = self.root().actions
-        if actions is None:
-            return self._get_transition_refs_strict()
-        refs = self._get_data_refs()
-        refs_1 = [ref for i, ref in enumerate(refs[:-1]) if refs[i+1] == ref+1 and actions[i+1] == action]
-        refs_2 = [ref+1 for ref in refs_1]
-        return refs_1, refs_2
-    
-    
-#     def get_transition_data_strict(self, action):
+#     def _get_transition_refs_strict(self):
 #         """
-#         Returns the data of all transitions happening inside of the state. The
-#         first matrix contains the starting points and the second matrix the
-#         targets.
+#         Finds all transitions that happen strictly inside this node. The result 
+#         is given as two lists of references: starting points and ending points.
 #         """
-#         root = self.root()
-#         refs = self.get_transition_refs_strict(action=action)
-#         data_list_1 = map(lambda t: root.data[t[0]], refs)
-#         data_list_2 = map(lambda t: root.data[t[1]], refs)
-#         data_1 = np.vstack(data_list_1) 
-#         data_2 = np.vstack(data_list_2) 
-#         return [data_1, data_2]
-        
-        
+#         
+#         refs = self._get_data_refs()
+#         #refs_1 = [ref for i, ref in enumerate(refs[:-1]) if refs[i+1] == ref+1]
+#         refs_1 = [ref for ref in refs if ref+1 in refs]
+#         refs_2 = [ref+1 for ref in refs_1]
+#         return refs_1, refs_2
+    
+    
+#     def _get_transition_refs_strict_for_action(self, action):
+#         """
+#         Finds all transitions that happen strictly inside this node. The result 
+#         is given as two lists of references: starting points and ending points.
+#         """
+#         actions = self.root().actions
+#         if actions is None:
+#             return self._get_transition_refs_strict()
+#         refs = self._get_data_refs()
+#         refs_1 = [ref for ref in refs if (ref+1 in refs) and (actions[ref+1] == action)]
+#         refs_2 = [ref+1 for ref in refs_1]
+#         return refs_1, refs_2
+    
+    
+#     def _get_transition_refs_in(self):
+#         """
+#         Finds all transitions that lead inside this node. The result 
+#         is given as two lists of references: starting points and ending points.
+#         """
+#         
+#         refs = self._get_data_refs()
+#         refs_1 = [ref for ref in refs if (ref not in refs) and (ref+1 in refs)]
+#         refs_2 = [ref+1 for ref in refs_1]
+#         return refs_1, refs_2
+    
+    
+#     def _get_transition_refs_in_for_action(self, action):
+#         """
+#         Finds all transitions that lead inside this node. The result 
+#         is given as two lists of references: starting points and ending points.
+#         """
+#         
+#         refs = self._get_data_refs()
+#         actions = self.root().actions
+#         refs_1 = [ref for ref in refs if (ref not in refs) and (ref+1 in refs) and (actions[refs+1] == action)]
+#         refs_2 = [ref+1 for ref in refs_1]
+#         return refs_1, refs_2
+    
+    
+#     def _get_transition_refs_out(self):
+#         """
+#         Finds all transitions that lead out of this node. The result 
+#         is given as two lists of references: starting points and ending points.
+#         """
+#         
+#         refs = self._get_data_refs()
+#         refs_1 = [ref for ref in refs if (ref in refs) and (ref+1 not in refs)]
+#         refs_2 = [ref+1 for ref in refs_1]
+#         return refs_1, refs_2
+    
+    
+#     def _get_transition_refs_out_for_action(self, action):
+#         """
+#         Finds all transitions that lead out of this node. The result 
+#         is given as two lists of references: starting points and ending points.
+#         """
+#         
+#         refs = self._get_data_refs()
+#         actions = self.root().actions
+#         refs_1 = [ref for ref in refs if (ref in refs) and (ref+1 not in refs) and (actions[refs+1] == action)]
+#         refs_2 = [ref+1 for ref in refs_1]
+#         return refs_1, refs_2
+    
+    
     def get_data(self):
         """
         Returns the data belonging to the node. If the node isn't a leaf, the
@@ -651,20 +686,20 @@ class WorldModelTree(object):
         return np.vstack(data_list)
 
 
-    def get_data_for_action(self, action):
-        """
-        Returns the data belonging to the node. If the node isn't a leaf, the
-        data of sub-nodes is returned.
-        """
-        
-        dat_refs = self._get_data_refs_for_action(action=action)
-        if len(dat_refs) == 0:
-            return None
-        
-        # fetch the actual data
-        root = self.root()
-        data_list = map(lambda i: root.data[i], dat_refs)
-        return np.vstack(data_list)
+#     def get_data_for_action(self, action):
+#         """
+#         Returns the data belonging to the node. If the node isn't a leaf, the
+#         data of sub-nodes is returned.
+#         """
+#         
+#         dat_refs = self._get_data_refs_for_action(action=action)
+#         if len(dat_refs) == 0:
+#             return None
+#         
+#         # fetch the actual data
+#         root = self.root()
+#         data_list = map(lambda i: root.data[i], dat_refs)
+#         return np.vstack(data_list)
 
 
     @classmethod
@@ -913,7 +948,7 @@ class WorldModelTree(object):
                     if new_labels is None:
                         # should not happen
                         print 'USELESS SPLIT'
-                        assert False
+                        #assert False
                         continue
                     split_transition_matrices = self._split_transition_matrices(root=root, new_labels=new_labels, index1=self.get_leaf_index())
                     new_mutual_information = self._mutual_information(transition_matrix=split_transition_matrices[action])
@@ -1324,13 +1359,11 @@ class WorldModelPCA(WorldModelTree):
         """
         assert self.status == 'leaf'
         
-        refs_1, refs_2 = self._get_transition_refs_for_action(action=action)
-        data_1 = self._get_data_for_refs(refs=refs_1)
-        #data_2 = self._get_data_for_refs(refs=refs_2)
-        avg = np.mean(data_1, axis=0)
-        #diff = data_2 - data_1
-        #cov = diff.T.dot(diff)
-        data_0 = data_1 - avg
+        refs_1, refs_2 = self._get_transition_refs_for_action(action=action, heading_in=False, inside=True, heading_out=False)
+        refs = list(set(refs_1 + refs_2))
+        data = self._get_data_for_refs(refs=refs)
+        avg = np.mean(data, axis=0)
+        data_0 = data - avg
         cov = data_0.T.dot(data_0)
         E, U = np.linalg.eigh(cov)
         idx = np.argsort(E)
@@ -1383,8 +1416,12 @@ class WorldModelSpectral(WorldModelTree):
             s = refs_all.index(refs_1[i])
             for j in indices[0:k+1]:
                 # index: refs -> refs_all
-                t = refs_all.index(refs_2[j])
-                W[s,t] = 1
+                t = refs_all.index(refs_1[j])
+                u = refs_all.index(refs_2[j])
+                #W[s,t] = 0.1
+                #W[t,s] = 0.1
+                W[s,u] = 1
+                W[u,s] = 1
 
         # make symmetric        
         #W = W + W.T
@@ -1406,7 +1443,7 @@ class WorldModelSpectral(WorldModelTree):
         """
         assert self.status == 'leaf'
         
-        refs_all, refs_1, P = self._get_transition_graph(action=action, k=15, normalize=True)
+        refs_all, refs_1, P = self._get_transition_graph(action=action, k=5, normalize=True)
         data = self._get_data_for_refs(refs=refs_1)
         n_trans = len(refs_1)
         
@@ -1451,6 +1488,91 @@ class WorldModelSpectral(WorldModelTree):
         if x.ndim < 2:
             x = np.array(x, ndmin=2)
         return int(self.classifier.label(x)[0])
+    
+    
+    
+class WorldModelSFA(WorldModelTree):
+    
+    
+#     def _get_data_refs_in(self):
+#         """
+#         Returns references for those data points that lie outside that node but
+#         are followed by a data point inside (transition into that node).
+#         """
+#         refs = self._get_data_refs()
+#         refs_in = [(ref-1) for ref in refs if (ref-1) not in refs]
+#         if -1 in refs_in:
+#             refs_in.remove(-1)
+#         return refs_in
+#         
+#     
+#     def _get_data_refs_in_for_action(self, action):
+#         """
+#         Returns references for those data points that lie outside that node but
+#         are followed by a data point inside (transition into that node).
+#         """
+#         refs = self._get_data_refs_for_action(action=action)
+#         refs_in = [(ref-1) for ref in refs if (ref-1) not in refs]
+#         if -1 in refs_in:
+#             refs_in.remove(-1)
+#         return refs_in
+#         
+#     
+#     def _get_data_refs_out(self):
+#         """
+#         Returns references for those data points that lie outside that node but
+#         are preceded by a data point inside (transition out of that node).
+#         """
+#         N = self.root().get_number_of_samples()
+#         refs = self._get_data_refs()
+#         refs_out = [(ref+1) for ref in refs if (ref+1) not in refs]
+#         if N in refs_out:
+#             refs_out.remove(N) 
+#         return refs_out
+#         
+#     
+#     def _get_data_refs_in_out(self):
+#         """
+#         Returns references to data belonging to this node. It will include
+#         data points strictly inside this node as well as the ones used for
+#         transitions in and out.
+#         """
+#         refs_strict = self._get_data_refs()
+#         refs_in = self._get_data_refs_in()
+#         refs_out = self._get_data_refs_out()
+#         refs_all = np.sort(refs_strict + refs_in + refs_out)
+#         return refs_all
+        
+    
+    def _init_test(self, action):
+        """
+        Initializes the parameters that split the node in two halves.
+        """
+        assert self.status == 'leaf'
+        refs_1, refs_2 = self._get_transition_refs_for_action(action=action, heading_in=True, inside=True, heading_out=True)
+        refs = np.sort(list(set(refs_1 + refs_2)))
+        data = self._get_data_for_refs(refs=refs)
+        _, D = data.shape
+        self.classifier = mdp.Flow([])
+        for _ in range(2):
+            self.classifier += mdp.Flow([mdp.nodes.SFA2Node(output_dim=D)])
+        self.classifier.train(data)
+        labels = (np.sign(self.classifier.execute(data)) + 1) // 2
+        if 0 not in labels:
+            return False
+        if 1 not in labels:
+            return False
+        return True
+
+
+    def _test(self, x):
+        """
+        Tests to which child the data point x belongs
+        """
+        if x.ndim < 2:
+            x = np.array(x, ndmin=2)
+        signal = self.classifier.execute(x)[0,0]
+        return 0 if signal < .5 else 1
     
     
     
@@ -1636,8 +1758,8 @@ if __name__ == "__main__":
     
     print scipy.version.version
 
-    #problems = [problemChain, problemDiamond, problemHoneycomb]
-    problems = [problemHoneycomb]
+    problems = [problemChain, problemDiamond, problemHoneycomb]
+    #problems = [problemHoneycomb]
 
     for p, problem in enumerate(problems):
 
@@ -1645,7 +1767,7 @@ if __name__ == "__main__":
         n = 1000
         data = problem(n=n, seed=None)
 
-        tree = WorldModelSpectral()
+        tree = WorldModelSFA()
         tree.add_data(data)
 
         #print tree.transitions
@@ -1653,18 +1775,19 @@ if __name__ == "__main__":
         #tree.single_splitting_step()
         #tree.single_splitting_step()
         #tree.single_splitting_step()
-        tree.learn(min_gain=0.02)
+        tree.learn(min_gain=0.05)
 
         n_trans = np.sum(tree._merge_transition_matrices())
         print 'final number of nodes:', len(tree._nodes()), '\n'
         assert(n_trans == n-1)
 
         # plot tree and stats
-        pyplot.subplot(2, 2, p+1)
-        tree.plot_tree_data(color='last_gain', show_plot=False)
-        pyplot.subplot(2, 2, p+3)
+        pyplot.subplot(3, 3, p+1)
+        tree.plot_tree_data(color='state', show_plot=False)
+        pyplot.subplot(3, 3, p+4)
         tree.plot_states(show_plot=False)
-        tree.plot_tree_data(color='none', show_plot=False)
+        pyplot.subplot(3, 3, p+7)
+        tree.plot_tree_data(color='last_gain', show_plot=False)
 
     #pyplot.figure()
     #refs_1, refs_2 = tree.get_leaves()[1]._get_transition_refs_for_action(action=None)
