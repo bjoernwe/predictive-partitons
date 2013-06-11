@@ -576,100 +576,6 @@ class WorldModelTree(object):
         return data
         
                 
-#     def get_transition_data(self, action):
-#         """
-#         Returns the data of all transitions starting in that state. The
-#         first matrix contains the starting points and the second matrix the
-#         targets.
-#         """
-#         root = self.root()
-#         [refs_1, refs_2] = self._get_transition_refs_for_action(action=action)
-#         if len(refs_1) == 0:
-#             return [None, None]
-#         data_list_1 = [root.data[t] for t in refs_1]
-#         data_list_2 = [root.data[t] for t in refs_2]
-#         data_1 = np.vstack(data_list_1)
-#         data_2 = np.vstack(data_list_2)
-#         return [data_1, data_2]
-        
-        
-#     def _get_transition_refs_strict(self):
-#         """
-#         Finds all transitions that happen strictly inside this node. The result 
-#         is given as two lists of references: starting points and ending points.
-#         """
-#         
-#         refs = self._get_data_refs()
-#         #refs_1 = [ref for i, ref in enumerate(refs[:-1]) if refs[i+1] == ref+1]
-#         refs_1 = [ref for ref in refs if ref+1 in refs]
-#         refs_2 = [ref+1 for ref in refs_1]
-#         return refs_1, refs_2
-    
-    
-#     def _get_transition_refs_strict_for_action(self, action):
-#         """
-#         Finds all transitions that happen strictly inside this node. The result 
-#         is given as two lists of references: starting points and ending points.
-#         """
-#         actions = self.root().actions
-#         if actions is None:
-#             return self._get_transition_refs_strict()
-#         refs = self._get_data_refs()
-#         refs_1 = [ref for ref in refs if (ref+1 in refs) and (actions[ref+1] == action)]
-#         refs_2 = [ref+1 for ref in refs_1]
-#         return refs_1, refs_2
-    
-    
-#     def _get_transition_refs_in(self):
-#         """
-#         Finds all transitions that lead inside this node. The result 
-#         is given as two lists of references: starting points and ending points.
-#         """
-#         
-#         refs = self._get_data_refs()
-#         refs_1 = [ref for ref in refs if (ref not in refs) and (ref+1 in refs)]
-#         refs_2 = [ref+1 for ref in refs_1]
-#         return refs_1, refs_2
-    
-    
-#     def _get_transition_refs_in_for_action(self, action):
-#         """
-#         Finds all transitions that lead inside this node. The result 
-#         is given as two lists of references: starting points and ending points.
-#         """
-#         
-#         refs = self._get_data_refs()
-#         actions = self.root().actions
-#         refs_1 = [ref for ref in refs if (ref not in refs) and (ref+1 in refs) and (actions[refs+1] == action)]
-#         refs_2 = [ref+1 for ref in refs_1]
-#         return refs_1, refs_2
-    
-    
-#     def _get_transition_refs_out(self):
-#         """
-#         Finds all transitions that lead out of this node. The result 
-#         is given as two lists of references: starting points and ending points.
-#         """
-#         
-#         refs = self._get_data_refs()
-#         refs_1 = [ref for ref in refs if (ref in refs) and (ref+1 not in refs)]
-#         refs_2 = [ref+1 for ref in refs_1]
-#         return refs_1, refs_2
-    
-    
-#     def _get_transition_refs_out_for_action(self, action):
-#         """
-#         Finds all transitions that lead out of this node. The result 
-#         is given as two lists of references: starting points and ending points.
-#         """
-#         
-#         refs = self._get_data_refs()
-#         actions = self.root().actions
-#         refs_1 = [ref for ref in refs if (ref in refs) and (ref+1 not in refs) and (actions[refs+1] == action)]
-#         refs_2 = [ref+1 for ref in refs_1]
-#         return refs_1, refs_2
-    
-    
     def get_data(self):
         """
         Returns the data belonging to the node. If the node isn't a leaf, the
@@ -684,22 +590,6 @@ class WorldModelTree(object):
         root = self.root()
         data_list = map(lambda i: root.data[i], dat_refs)
         return np.vstack(data_list)
-
-
-#     def get_data_for_action(self, action):
-#         """
-#         Returns the data belonging to the node. If the node isn't a leaf, the
-#         data of sub-nodes is returned.
-#         """
-#         
-#         dat_refs = self._get_data_refs_for_action(action=action)
-#         if len(dat_refs) == 0:
-#             return None
-#         
-#         # fetch the actual data
-#         root = self.root()
-#         data_list = map(lambda i: root.data[i], dat_refs)
-#         return np.vstack(data_list)
 
 
     @classmethod
@@ -1492,57 +1382,6 @@ class WorldModelSpectral(WorldModelTree):
     
     
 class WorldModelSFA(WorldModelTree):
-    
-    
-#     def _get_data_refs_in(self):
-#         """
-#         Returns references for those data points that lie outside that node but
-#         are followed by a data point inside (transition into that node).
-#         """
-#         refs = self._get_data_refs()
-#         refs_in = [(ref-1) for ref in refs if (ref-1) not in refs]
-#         if -1 in refs_in:
-#             refs_in.remove(-1)
-#         return refs_in
-#         
-#     
-#     def _get_data_refs_in_for_action(self, action):
-#         """
-#         Returns references for those data points that lie outside that node but
-#         are followed by a data point inside (transition into that node).
-#         """
-#         refs = self._get_data_refs_for_action(action=action)
-#         refs_in = [(ref-1) for ref in refs if (ref-1) not in refs]
-#         if -1 in refs_in:
-#             refs_in.remove(-1)
-#         return refs_in
-#         
-#     
-#     def _get_data_refs_out(self):
-#         """
-#         Returns references for those data points that lie outside that node but
-#         are preceded by a data point inside (transition out of that node).
-#         """
-#         N = self.root().get_number_of_samples()
-#         refs = self._get_data_refs()
-#         refs_out = [(ref+1) for ref in refs if (ref+1) not in refs]
-#         if N in refs_out:
-#             refs_out.remove(N) 
-#         return refs_out
-#         
-#     
-#     def _get_data_refs_in_out(self):
-#         """
-#         Returns references to data belonging to this node. It will include
-#         data points strictly inside this node as well as the ones used for
-#         transitions in and out.
-#         """
-#         refs_strict = self._get_data_refs()
-#         refs_in = self._get_data_refs_in()
-#         refs_out = self._get_data_refs_out()
-#         refs_all = np.sort(refs_strict + refs_in + refs_out)
-#         return refs_all
-        
     
     def _init_test(self, action):
         """
