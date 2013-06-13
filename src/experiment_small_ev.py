@@ -30,24 +30,24 @@ if __name__ == '__main__':
         print env.get_available_actions()
         data, actions = env.do_random_steps(num_steps=4000)
         model.add_data(x=data, actions=actions)
-        refs_all, refs_1, P = model._get_transition_graph(action=plot_action[i], k=10, normalize=True)
+        refs_all, refs_1, P = model._get_transition_graph(action=plot_action[i], k=15, normalize=True)
         data = model._get_data_for_refs(refs=refs_all)
         
         # get eigenvalues
-        print P.shape
         #E_large, U_large = linalg.eigs(np.array(P), k=2, which='LR')
         #E_small, U_small = linalg.eigs(np.array(P), k=1, which='SR')
         E, U = linalg.eigs(np.array(P), k=15, which='SR')
+        U *= np.sqrt(data.shape[0])
 
         # plot
         pyplot.figure()
         cm = pyplot.cm.get_cmap('summer')
         for j in range(15):
             pyplot.subplot(3, 5, j+1)
-            pyplot.scatter(x=data[:,0], y=data[:,1], c=(np.real(U[:,j])), edgecolors='none', vmin=-0.2, vmax=0.2)
+            pyplot.scatter(x=data[:,0], y=data[:,1], c=(np.real(U[:,j])), edgecolors='none', vmin=-7, vmax=7)
             #pyplot.scatter(x=data[:,0], y=data[:,1], c=np.sign(np.real(U[:,j])), edgecolors='none', cmap=cm)
             pyplot.title(str(E[j]))
-            print np.min(np.real(U[:,j]))
+            print np.max(U[:,0])
 
     pyplot.colorbar()
     pyplot.show()
