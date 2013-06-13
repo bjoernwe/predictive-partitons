@@ -58,15 +58,16 @@ if __name__ == '__main__':
 
     # train model
     data = RandomSwissRollData(n=1000)
-    model = worldmodel.WorldModelTree()
+    model = worldmodel.WorldModelSFA()
     model.add_data(x=data.data, actions=data.actions)
-    model.learn(min_gain=0.02, max_costs=.02)
+    model.learn(min_gain=0.02)
     
     # plot data and result
     pyplot.subplot(1, 2, 1)
     data.plot(show_plot=False)
     pyplot.subplot(1, 2, 2)
     model.plot_states(show_plot=False)
-    model.plot_tree_data(color_coded=False, show_plot=False)
+    model.plot_states(show_plot=False)
+    model.plot_tree_data(color='state', show_plot=False)
     pyplot.show()
     

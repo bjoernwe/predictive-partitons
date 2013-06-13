@@ -1394,7 +1394,9 @@ class WorldModelSFA(WorldModelTree):
         _, D = data.shape
         self.classifier = mdp.Flow([])
         for _ in range(2):
-            self.classifier += mdp.Flow([mdp.nodes.SFA2Node(output_dim=D)])
+            mdp_exp = mdp.nodes.PolynomialExpansionNode(degree=2)
+            mdp_sfa = mdp.nodes.SFANode(output_dim=D)
+            self.classifier += mdp.Flow([mdp_exp, mdp_sfa])
         self.classifier.train(data)
         labels = (np.sign(self.classifier.execute(data)) + 1) // 2
         if 0 not in labels:

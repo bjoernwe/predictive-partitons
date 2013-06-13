@@ -57,9 +57,9 @@ if __name__ == '__main__':
 
     # train model
     data = NoisyDimData(n=5000)
-    model = worldmodel.WorldModelTree()
+    model = worldmodel.WorldModelSFA()
     model.add_data(x=data.data, actions=None)
-    model.learn(min_gain=0.02, max_costs=.02)
+    model.learn(min_gain=0.02)
     
     # plot data and result
     pyplot.subplot(1, 2, 1)
