@@ -1118,16 +1118,23 @@ class WorldModelTree(object):
         return stats
     
     
-    def get_transition_probabilities(self):
+    def get_transition_probabilities(self, action=None):
         """
         Returns a dictionary containing for every action a matrix with 
-        transition probabilities.
+        transition probabilities. If an action is specified only the 
+        corresponding transition matrix is returned.
         """
         root = self.root()
-        probs = {}
-        for action in root.transitions.keys():
-            probs[action] = root.transitions[action]
-            probs[action] /= probs[action].sum(axis=1)[:, np.newaxis] # normalize 
+        
+        if action is None:
+            probs = {}
+            for action in root.transitions.keys():
+                probs[action] = root.transitions[action]
+                probs[action] /= probs[action].sum(axis=1)[:, np.newaxis] # normalize
+                
+        else:
+            probs = np.array(root.transitions[action]) 
+            probs /= probs.sum(axis=1)[:, np.newaxis]
         
         return probs
     
@@ -1282,7 +1289,7 @@ class WorldModelSpectral(WorldModelTree):
         assert action in self.get_possible_actions(ignore_none=False)
         
         # data and references
-        [refs_1, refs_2] = self._get_transition_refs_for_action(action=action)
+        [refs_1, refs_2] = self._get_transition_refs_for_action(action=action, heading_in=False, inside=True, heading_out=False)
         data = self._get_data_for_refs(refs_1)
         refs_all = list(set(refs_1 + refs_2))
         n_trans_all = len(refs_all)
@@ -1308,8 +1315,8 @@ class WorldModelSpectral(WorldModelTree):
                 # index: refs -> refs_all
                 t = refs_all.index(refs_1[j])
                 u = refs_all.index(refs_2[j])
-                #W[s,t] = 0.1
-                #W[t,s] = 0.1
+                W[s,t] = 1
+                W[t,s] = 1
                 W[s,u] = 1
                 W[u,s] = 1
 
@@ -1332,8 +1339,9 @@ class WorldModelSpectral(WorldModelTree):
         Initializes the parameters that split the node in two halves.
         """
         assert self.status == 'leaf'
-        
-        refs_all, refs_1, P = self._get_transition_graph(action=action, k=5, normalize=True)
+
+        # data        
+        refs_all, refs_1, P = self._get_transition_graph(action=action, k=15, normalize=True)
         data = self._get_data_for_refs(refs=refs_1)
         n_trans = len(refs_1)
         
@@ -1388,20 +1396,140 @@ class WorldModelSFA(WorldModelTree):
         Initializes the parameters that split the node in two halves.
         """
         assert self.status == 'leaf'
-        refs_1, refs_2 = self._get_transition_refs_for_action(action=action, heading_in=True, inside=True, heading_out=True)
+        
+        # data
+        refs_1, refs_2 = self._get_transition_refs_for_action(action=action, heading_in=False, inside=True, heading_out=False)
         refs = np.sort(list(set(refs_1 + refs_2)))
         data = self._get_data_for_refs(refs=refs)
-        _, D = data.shape
+        
+        # SFA
         self.classifier = mdp.Flow([])
-        for _ in range(2):
+        for _ in range(3):
             mdp_exp = mdp.nodes.PolynomialExpansionNode(degree=2)
-            mdp_sfa = mdp.nodes.SFANode(output_dim=D)
+            mdp_sfa = mdp.nodes.SFANode(output_dim=4)
             self.classifier += mdp.Flow([mdp_exp, mdp_sfa])
         self.classifier.train(data)
-        labels = (np.sign(self.classifier.execute(data)) + 1) // 2
-        if 0 not in labels:
-            return False
+        
+        # verify solution
+        labels = np.sign(self.classifier.execute(data)[:,0])
         if 1 not in labels:
+            return False
+        if -1 not in labels:
+            return False
+        return True
+
+
+    def _test(self, x):
+        """
+        Tests to which child the data point x belongs
+        """
+        if x.ndim < 2:
+            x = np.array(x, ndmin=2)
+        signal = self.classifier.execute(x)[0,0]
+        return 0 if signal < .5 else 1
+    
+    
+
+class SimpleIterable(object):
+    def __init__(self, blocks):
+        self.blocks = blocks
+    def __iter__(self):
+        # this is a generator
+        for block in self.blocks:
+            yield block
+
+    
+class WorldModelGraphSFA(WorldModelTree):
+    
+    def _get_transition_graph(self, action=None, k=10, normalize=True):
+        assert self.status == 'leaf'
+        assert action in self.get_possible_actions(ignore_none=False)
+        
+        # data and references
+        [refs_1, refs_2] = self._get_transition_refs_for_action(action=action, heading_in=False, inside=True, heading_out=False)
+        data = self._get_data_for_refs(refs_1)
+        refs_all = list(set(refs_1 + refs_2))
+        n_trans_all = len(refs_all)
+        n_trans = len(refs_1)        
+        if n_trans <= 0:
+            return [], [], None
+        
+        # pairwise distances
+        distances = scipy.spatial.distance.pdist(data)
+        distances = scipy.spatial.distance.squareform(distances)
+        
+        # transitions
+        W = np.zeros((n_trans_all, n_trans_all))
+        #W += 0.001
+        
+        # big transition matrix
+        # including transitions of the k nearest neighbors
+        for i in range(n_trans):
+            indices = np.argsort(distances[i])  # closest one should be the point itself
+            # index: refs -> refs_all
+            s = refs_all.index(refs_1[i])
+            for j in indices[0:k+1]:
+                # index: refs -> refs_all
+                t = refs_all.index(refs_1[j])
+                u = refs_all.index(refs_2[j])
+                #W[s,t] = 0.1
+                #W[t,s] = 0.1
+                W[s,u] = 1
+                W[u,s] = 1
+
+        # make symmetric        
+        #W = W + W.T
+        P = (W + W.T) / 2.
+        
+        # normalize matrix
+        if normalize:
+            d = np.sum(P, axis=1)
+            for i in range(n_trans_all):
+                if d[i] > 0:
+                    P[i] = P[i] / d[i]
+            
+        return refs_all, refs_1, P
+    
+    
+    def _init_test(self, action):
+        """
+        Initializes the parameters that split the node in two halves.
+        """
+        assert self.status == 'leaf'
+        
+        # get data and graph
+        refs_all, refs_1, W = self._get_transition_graph(action=action, k=10, normalize=False)
+        print refs_all
+        data = self._get_data_for_refs(refs=refs_all)
+        N, D = data.shape
+        
+        # create training chunks according to connection graph
+        chunks = []
+        for i in range(N):
+            for j in range(i+1, N):
+                if W[i,j] >= 1:
+                    chunk = np.array([data[i], data[j]])
+                    chunks.append(chunk)
+        train_iterable = SimpleIterable(chunks)
+                    
+        # (repeated) graph-based SFA
+        self.classifier = mdp.Flow([])
+        train_list = []
+        for _ in range(2):
+            mdp_exp = mdp.nodes.PolynomialExpansionNode(degree=2)
+            mdp_sfa = mdp.nodes.SFANode(output_dim=2*D, include_last_sample=False)
+            self.classifier += mdp.Flow([mdp_exp, mdp_sfa])
+            train_list.append(None)
+            train_list.append(train_iterable)
+            
+        # train SFA
+        self.classifier.train(train_list)
+        
+        # verify solution
+        labels = np.sign(self.classifier.execute(data)[:,0])
+        if 1 not in labels:
+            return False
+        if -1 not in labels:
             return False
         return True
 
@@ -1608,7 +1736,7 @@ if __name__ == "__main__":
         n = 1000
         data = problem(n=n, seed=None)
 
-        tree = WorldModelSFA()
+        tree = WorldModelSpectral()
         tree.add_data(data)
 
         #print tree.transitions
