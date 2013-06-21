@@ -77,6 +77,7 @@ if __name__ == '__main__':
             # plot data and eigenvector
             pyplot.figure(0)
             pyplot.subplot(2, 2, 2*i+j+1)
+            pyplot.title('data fast: %s / partition fast: %s' % (fast_data, fast_partition))
             if fast_partition:
                 pyplot.scatter(x=data[:,0], y=data[:,1], s=100, c=U[:,0], edgecolor='None')
             else:
@@ -85,6 +86,7 @@ if __name__ == '__main__':
             # plot spectral
             pyplot.figure(1)
             pyplot.subplot(2, 2, 2*i+j+1)
+            pyplot.title('data fast: %s / partition fast: %s' % (fast_data, fast_partition))
             pyplot.scatter(x=U[:,0], y=U[:,1], s=100)
             
     # show plot
