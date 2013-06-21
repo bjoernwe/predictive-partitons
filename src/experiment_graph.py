@@ -73,6 +73,7 @@ if __name__ == '__main__':
             W = get_graph(data, fast_partition=fast_partition, k=k, normalize=True)
             E, U = linalg.eigs(W, k=2, which='LR')
             E, U = np.real(E), np.real(U)
+            print E
     
             # plot data and eigenvector
             pyplot.figure(0)

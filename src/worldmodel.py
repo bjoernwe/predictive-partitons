@@ -3,13 +3,12 @@ import math
 import numpy as np
 import random
 import scipy.spatial.distance
+import traceback
 
 from matplotlib import pyplot
 from scipy.sparse import linalg
 
 import mdp
-
-from studienprojekt import visualization
 
 
 Stats = collections.namedtuple('Stats', ['n_states',
@@ -825,38 +824,39 @@ class WorldModelTree(object):
                 action_list = [action]
         
         for action in action_list:
-            #if action is None:
-                # we assume here that None is only a rarely used dummy action 
-                # used to fill unknown transitions
-            #    continue
             if root.transitions[action].sum() < root._min_class_size:
                 continue
             print 'testing leaf', self.get_leaf_index(), 'with action', action
-            try:
-                if self._init_test(action=action):
-                    new_labels, new_data = self._relabel_data()
-                    if new_labels is None:
-                        # should not happen
-                        print 'USELESS SPLIT'
-                        #assert False
-                        continue
-                    split_transition_matrices = self._split_transition_matrices(root=root, new_labels=new_labels, index1=self.get_leaf_index())
-                    new_mutual_information = self._mutual_information(transition_matrix=split_transition_matrices[action])
-                    old_mutual_information = self._mutual_information(transition_matrix=root.transitions[action]) # TODO cache
-                    gain = new_mutual_information - old_mutual_information
-                    if gain > best_gain:
-                        best_gain = gain
-                        best_split = SplitResult(node = self, 
-                                                 action = action, 
-                                                 gain = gain, 
-                                                 split_labels = new_labels, 
-                                                 split_data_refs = new_data,
-                                                 split_transitions = split_transition_matrices, 
-                                                 classifier = self.classifier)
-                else:
-                    print 'init_test failed'
-            except scipy.sparse.linalg.eigen.arpack.ArpackNoConvergence:
-                print 'Error calculating splitting gain'
+            for fast_partition in [False, True]:
+                try:
+                    if self._init_test(action=action, fast_partition=fast_partition):
+                        new_labels, new_data = self._relabel_data()
+                        if new_labels is None:
+                            print 'USELESS SPLIT'
+                            #assert False
+                            continue
+                        split_transition_matrices = self._split_transition_matrices(root=root, new_labels=new_labels, index1=self.get_leaf_index())
+                        new_mutual_information = self._mutual_information_average(transition_matrices=split_transition_matrices.values())
+                        old_mutual_information = self._mutual_information_average(transition_matrices=root.transitions.values()) # TODO cache
+                        gain = new_mutual_information - old_mutual_information
+                        if gain > best_gain:
+                            best_gain = gain
+                            best_split = SplitResult(node = self, 
+                                                     action = action, 
+                                                     gain = gain, 
+                                                     split_labels = new_labels, 
+                                                     split_data_refs = new_data,
+                                                     split_transitions = split_transition_matrices, 
+                                                     classifier = self.classifier)
+                            best_strategy = fast_partition
+                    else:
+                        print 'init_test failed'
+                except Exception as e:
+                    print 'Error calculating splitting gain'
+                    print e
+                    print traceback.print_exc()
+                    #tkMessageBox.showinfo(title='Exception', message='%s' % e)
+
         return best_split
     
     
@@ -976,54 +976,13 @@ class WorldModelTree(object):
         return matrix
     
     
-    def _init_test(self, action):
+    def _init_test(self, action, fast_partition=False):
         """
         Initializes the parameters that split the node in two halves.
         """
         raise NotImplementedError("Use subclass like WorldModelSpectral instead.")
 
 
-#    def _init_test(self):
-#        """
-#        Initializes the parameters that split the node in two halves.
-#        """
-#        assert self.status == 'leaf'
-#        # calculate SFA of data
-#        #data_list = self.get_data_strict()
-#        #if data is None:
-#        #    return
-#        root = self.root()
-#        #exp = mdp.nodes.PolynomialExpansionNode(degree=7)
-#        #sfa = mdp.nodes.SFANode(input_dim=exp.output_dim, output_dim=1)
-#        sfa = mdp.nodes.SFANode(output_dim=1)
-#        #self.sfa = exp + sfa
-#        self.sfa = sfa
-#        for i, ref in enumerate(self.dat_ref):
-#            if i < len(self.dat_ref)-1:
-#                if self.dat_ref[i+1] == ref+1:
-#                    data = np.vstack([root.data[ref], root.data[ref+1]])
-#                    #sfa.train(exp(data))
-#                    sfa.train(data)
-#        #for data in data_list:
-#        #    self.sfa.train(data)
-#        #self.sfa.stop_training()
-#        
-#        return
-        
-        
-#    def _init_test(self):
-#        """
-#        Initializes the parameters that split the node in two halves.
-#        """
-#        assert self.status == 'leaf'
-#        # calculate PCA of data
-#        data = self.get_data()
-#        self.pca = mdp.nodes.PCANode(output_dim=1)
-#        self.pca.train(data)
-#        self.pca.stop_training()
-#        return
-    
-    
     def _test(self, x):
         """
         Tests to which child the data point x belongs
@@ -1031,29 +990,6 @@ class WorldModelTree(object):
         raise NotImplementedError("Use subclass like WorldModelSpectral instead.")
 
 
-#    def _test(self, x):
-#        """
-#        Tests to which child the data point x belongs
-#        """
-#        if x.ndim < 2:
-#            x = np.array(x, ndmin=2)
-#        index = self.sfa.execute(x)[0,0]
-#        index = np.sign(index) + 1
-#        index = index // 2
-#        return int(index)
-    
-
-#    def _test(self, x):
-#        """
-#        Tests to which child the data point x belongs
-#        """
-#        if x.ndim < 2:
-#            x = np.array(x, ndmin=2)
-#        index = self.pca.execute(x)[0,0]
-#        index = np.sign(index) + 1
-#        index = index // 2
-#        return int(index)
-    
     def _mutual_information(self, transition_matrix):
         """
         Calculates the mutual information between t and t+1 for a model given
@@ -1068,6 +1004,16 @@ class WorldModelTree(object):
         mutual_information = entropy_mu - entropy
         return mutual_information
     
+    
+    def _mutual_information_average(self, transition_matrices):
+        """
+        Calculates the weighted average of mutual information for several models 
+        given as a list of transition matrices.
+        """
+        weights = [np.sum(P) for P in transition_matrices]
+        list_mi = [weights[i] * self._mutual_information(P) for i, P in enumerate(transition_matrices) if weights[i] > 0]
+        return np.sum(list_mi) / np.sum(weights)
+            
     
     def _reached_min_sample_size(self, action=None):
         
@@ -1250,10 +1196,13 @@ class WorldModelMeta(object):
 class WorldModelPCA(WorldModelTree):    
 
     
-    def _init_test(self, action):
+    def _init_test(self, action, fast_partition=False):
         """
         Initializes the parameters that split the node in two halves.
         """
+        if fast_partition:
+            return False
+        
         assert self.status == 'leaf'
         
         refs_1, refs_2 = self._get_transition_refs_for_action(action=action, heading_in=False, inside=True, heading_out=False)
@@ -1284,7 +1233,7 @@ class WorldModelPCA(WorldModelTree):
 class WorldModelSpectral(WorldModelTree):
 
 
-    def _get_transition_graph(self, action=None, k=10, normalize=True):
+    def _get_transition_graph(self, action=None, k=10, fast_partition=False, normalize=True):
         assert self.status == 'leaf'
         assert action in self.get_possible_actions(ignore_none=False)
         
@@ -1315,14 +1264,20 @@ class WorldModelSpectral(WorldModelTree):
                 # index: refs -> refs_all
                 t = refs_all.index(refs_1[j])
                 u = refs_all.index(refs_2[j])
-                W[s,t] = 1
-                W[t,s] = 1
-                W[s,u] = 1
-                W[u,s] = 1
+                if s != t:
+                    W[s,t] = 1
+                    W[t,s] = 1
+                if fast_partition:
+                    W[s,u] = -1
+                    W[u,s] = -1
+                else:
+                    W[s,u] = 1
+                    W[u,s] = 1
 
         # make symmetric        
         #W = W + W.T
-        P = W + W.T
+        #P = W + W.T
+        P = W
         
         # normalize matrix
         if normalize:
@@ -1334,23 +1289,28 @@ class WorldModelSpectral(WorldModelTree):
         return refs_all, refs_1, P
 
 
-    def _init_test(self, action):
+    def _init_test(self, action, fast_partition=False):
         """
         Initializes the parameters that split the node in two halves.
         """
         assert self.status == 'leaf'
 
         # data        
-        refs_all, refs_1, P = self._get_transition_graph(action=action, k=15, normalize=True)
+        refs_all, refs_1, P = self._get_transition_graph(action=action, k=15, fast_partition=fast_partition, normalize=True)
         data = self._get_data_for_refs(refs=refs_1)
         n_trans = len(refs_1)
         
         # second eigenvector
         E, U = linalg.eigs(np.array(P), k=2, which='LR')
+        E, U = np.real(E), np.real(U)
         
         # bi-partition
-        idx = np.argsort(abs(E))
-        col = idx[-2]
+        if fast_partition:
+            idx = np.argsort(abs(E))
+            col = idx[-1]
+        else:
+            idx = np.argsort(abs(E))
+            col = idx[-2]
         u = np.zeros(n_trans)
         for i in range(n_trans):
             # index: refs -> refs_all
@@ -1391,7 +1351,7 @@ class WorldModelSpectral(WorldModelTree):
     
 class WorldModelSFA(WorldModelTree):
     
-    def _init_test(self, action):
+    def _init_test(self, action, fast_partition=False):
         """
         Initializes the parameters that split the node in two halves.
         """
@@ -1401,14 +1361,27 @@ class WorldModelSFA(WorldModelTree):
         refs_1, refs_2 = self._get_transition_refs_for_action(action=action, heading_in=False, inside=True, heading_out=False)
         refs = np.sort(list(set(refs_1 + refs_2)))
         data = self._get_data_for_refs(refs=refs)
+        _, D = data.shape
         
         # SFA
         self.classifier = mdp.Flow([])
-        for _ in range(3):
+        
+        for _ in range(1):
             mdp_exp = mdp.nodes.PolynomialExpansionNode(degree=2)
             mdp_sfa = mdp.nodes.SFANode(output_dim=4)
             self.classifier += mdp.Flow([mdp_exp, mdp_sfa])
+        
+        mdp_exp = mdp.nodes.PolynomialExpansionNode(degree=2)
+        mdp_sfa = mdp.nodes.SFANode(output_dim=D)
+        self.classifier += mdp.Flow([mdp_exp, mdp_sfa])
+        
         self.classifier.train(data)
+        
+        # 
+        if fast_partition:
+            self.classifier[-1].sf = self.classifier[-1].sf[:,::-1]
+            self.classifier[-1].d = self.classifier[-1].d[::-1]
+            self.classifier[-1]._bias = self.classifier[-1]._bias[::-1]
         
         # verify solution
         labels = np.sign(self.classifier.execute(data)[:,0])
@@ -1491,10 +1464,13 @@ class WorldModelGraphSFA(WorldModelTree):
         return refs_all, refs_1, P
     
     
-    def _init_test(self, action):
+    def _init_test(self, action, fast_partition=False):
         """
         Initializes the parameters that split the node in two halves.
         """
+        if fast_partition:
+            return False
+        
         assert self.status == 'leaf'
         
         # get data and graph
@@ -1597,10 +1573,13 @@ class WorldModelFactorize(WorldModelTree):
         return refs_all, refs_1, P
     
     
-    def _init_test(self, action):
+    def _init_test(self, action, fast_partition=False):
         """
         Initializes the parameters that split the node in two halves.
         """
+        if fast_partition:
+            return False
+        
         N = len(self._get_data_refs())
         P = np.zeros((N, N))
         actions = self.get_possible_actions(ignore_none=True)

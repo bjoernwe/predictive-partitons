@@ -67,9 +67,9 @@ if __name__ == '__main__':
 
     # train model
     data = SimpleActionsData(n=5000)
-    model = worldmodel.WorldModelTree()
+    model = worldmodel.WorldModelSpectral()
     model.add_data(x=data.data, actions=data.actions)
-    model.learn(min_gain=0.02, max_costs=.02)
+    model.learn(min_gain=0.02)
     
     # plot data and result
     pyplot.subplot(1, 2, 1)

@@ -58,7 +58,7 @@ if __name__ == '__main__':
 
     # train model
     data = RandomSwissRollData(n=1000)
-    model = worldmodel.WorldModelSFA()
+    model = worldmodel.WorldModelSpectral()
     model.add_data(x=data.data, actions=data.actions)
     model.learn(min_gain=0.02)
     
