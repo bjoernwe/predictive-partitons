@@ -52,7 +52,7 @@ if __name__ == '__main__':
 
     # parameters
     k = 10    
-    N = 500
+    N = 1000
     
     for i, fast_data in enumerate([False, True]):
         

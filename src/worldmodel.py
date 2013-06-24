@@ -400,14 +400,41 @@ class WorldModelTree(object):
         X, Y = np.meshgrid(x, y)
         v_classify = np.vectorize(lambda x, y: self.classify(np.array([x,y])))
         Z = v_classify(X, Y)
-        pyplot.contourf(X, Y, Z, levels = range(-1, K))#, colors='b', linewidths=1)
+        pyplot.contourf(X, Y, Z, levels = range(-1, K))
         
         if show_plot:
             pyplot.show()
         return
          
 
-    def plot_tree_data(self, color='state', show_plot=True):
+    def plot_state_borders(self, show_plot=True, range_x=None, range_y=None, resolution=100):
+        """
+        Shows a contour plot of the learned state borders (2D). 
+        """
+        
+        root = self.root()
+        data = root.get_data()
+        K = len(root.get_leaves())
+        
+        if range_x is None:
+            range_x = [np.min(data[:,0]), np.max(data[:,0])]
+            
+        if range_y is None:
+            range_y = [np.min(data[:,1]), np.max(data[:,1])]
+            
+        x = np.linspace(range_x[0], range_x[1], resolution)
+        y = np.linspace(range_y[0], range_y[1], resolution)
+        X, Y = np.meshgrid(x, y)
+        v_classify = np.vectorize(lambda x, y: self.classify(np.array([x,y])))
+        Z = v_classify(X, Y)
+        pyplot.contour(X, Y, Z, levels = range(-1, K), colors='b', linewidths=1)
+        
+        if show_plot:
+            pyplot.show()
+        return
+         
+
+    def plot_tree_data(self, color='state', vmin=None, vmax=None, show_plot=True):
         """
         Plots all the data that is stored in the tree with color and shape
         according to the learned state.
@@ -432,8 +459,10 @@ class WorldModelTree(object):
         elif color == 'last_gain':
             
             leaves = self.get_leaves()
-            vmin = min([leaf.last_gain for leaf in leaves])
-            vmax = max([leaf.last_gain for leaf in leaves])
+            if vmin is None:
+                vmin = min([leaf.last_gain for leaf in leaves])
+            if vmax is None:
+                vmax = max([leaf.last_gain for leaf in leaves])
             colormap = pyplot.cm.get_cmap('summer')
             
             for leaf in leaves:
@@ -848,7 +877,6 @@ class WorldModelTree(object):
                                                      split_data_refs = new_data,
                                                      split_transitions = split_transition_matrices, 
                                                      classifier = self.classifier)
-                            best_strategy = fast_partition
                     else:
                         print 'init_test failed'
                 except Exception as e:
@@ -879,10 +907,10 @@ class WorldModelTree(object):
                 split = leaf._calculate_best_split(action=action)
                 if split is not None:
                     print 'best split: leaf', leaf.get_leaf_index(), 'with action', split.action, 'with gain', split.gain
+                    leaf.last_gain = split.gain
                     if split.gain > best_gain:
                         best_gain = split.gain
                         best_split = split
-                        leaf.last_gain = split.gain
                 
         if best_split is not None and best_gain >= min_gain:
             print 'decided for leaf', best_split.node.get_leaf_index(), 'with action', best_split.action, 'and gain', best_split.gain
