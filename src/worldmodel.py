@@ -1100,7 +1100,7 @@ class WorldModelTree(object):
         """
         root = self.root()
         
-        if action is None:
+        if root.actions is not None and action is None:
             probs = {}
             for action in root.transitions.keys():
                 probs[action] = root.transitions[action]
