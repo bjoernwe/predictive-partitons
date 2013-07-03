@@ -23,17 +23,26 @@ def get_graph(data, fast_partition, k=5, normalize=False):
     W = np.zeros((N, N))
     W += 1e-8
 
-    # transitions
+    # transitions to neighbors
+    # s - current node
+    # t - neighbor node
+    for s in range(N-1):
+        indices = np.argsort(distances[s])  # closest one should be the point itself
+        for t in indices[0:k+1]:
+            if s != t:
+                W[s,t] = 1
+                W[t,s] = 1
+
+    # transitions to successors
     # s - current node
     # t - neighbor node
     # u - following node
     for s in range(N-1):
         indices = np.argsort(distances[s])  # closest one should be the point itself
         for t in indices[0:k+1]:
-            u = s+1
-            if s != t:
-                W[s,t] = 1
-                W[t,s] = 1
+            u = t+1
+            if u >= N:
+                continue
             if fast_partition:
                 W[s,u] = -1
                 W[u,s] = -1
@@ -54,13 +63,13 @@ def get_graph(data, fast_partition, k=5, normalize=False):
 if __name__ == '__main__':
 
     # data
-    #env = EnvCube(step_size=0.2, sigma=0.01)
-    env = EnvCube(step_size=0.1, sigma=0.05)
+    env = EnvCube(step_size=0.2, sigma=0.01)
+    #env = EnvCube(step_size=0.1, sigma=0.05)
     print env.get_available_actions()
     data, actions = env.do_random_steps(num_steps=1000)
     
     # get eigenvalues
-    W = get_graph(data=data, fast_partition=False, k=10, normalize=True)
+    W = get_graph(data=data, fast_partition=False, k=15, normalize=True)
     E, U = scipy.linalg.eig(a=W)
     #U *= np.sqrt(data.shape[0])
     
