@@ -21,7 +21,7 @@ def get_graph(data, fast_partition, k=5, normalize=False):
     # transition matrix
     N, _ = data.shape
     W = np.zeros((N, N))
-    W += 1e-8
+    W += 1#e-8
 
     # transitions to neighbors
     # s - current node
@@ -30,8 +30,8 @@ def get_graph(data, fast_partition, k=5, normalize=False):
         indices = np.argsort(distances[s])  # closest one should be the point itself
         for t in indices[0:k+1]:
             if s != t:
-                W[s,t] = 1
-                W[t,s] = 1
+                W[s,t] = 2
+                W[t,s] = 2
 
     # transitions to successors
     # s - current node
@@ -44,8 +44,8 @@ def get_graph(data, fast_partition, k=5, normalize=False):
             if u >= N:
                 continue
             if fast_partition:
-                W[s,u] = -1
-                W[u,s] = -1
+                W[s,u] = 0#-1
+                W[u,s] = 0#-1
             else:
                 W[s,u] = 1
                 W[u,s] = 1
@@ -66,10 +66,10 @@ if __name__ == '__main__':
     env = EnvCube(step_size=0.2, sigma=0.01)
     #env = EnvCube(step_size=0.1, sigma=0.05)
     print env.get_available_actions()
-    data, actions = env.do_random_steps(num_steps=1000)
+    data, actions = env.do_random_steps(num_steps=2000)
     
     # get eigenvalues
-    W = get_graph(data=data, fast_partition=False, k=15, normalize=True)
+    W = get_graph(data=data, fast_partition=True, k=10, normalize=True)
     E, U = scipy.linalg.eig(a=W)
     #U *= np.sqrt(data.shape[0])
     
