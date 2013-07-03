@@ -1,5 +1,5 @@
 """
-Visualizes the smallest eigenvectors of a graph.
+Visualizes the largest/smallest eigenvectors of a graph.
 """
 
 import numpy as np
@@ -54,13 +54,13 @@ def get_graph(data, fast_partition, k=5, normalize=False):
 if __name__ == '__main__':
 
     # data
-    env = EnvCube(step_size=0.2, sigma=0.01)
-    #env = EnvCube(step_size=0.1, sigma=0.05)
+    #env = EnvCube(step_size=0.2, sigma=0.01)
+    env = EnvCube(step_size=0.1, sigma=0.05)
     print env.get_available_actions()
     data, actions = env.do_random_steps(num_steps=1000)
     
     # get eigenvalues
-    W = get_graph(data=data, fast_partition=False, k=5, normalize=True)
+    W = get_graph(data=data, fast_partition=False, k=10, normalize=True)
     E, U = scipy.linalg.eig(a=W)
     #U *= np.sqrt(data.shape[0])
     
