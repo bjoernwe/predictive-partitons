@@ -45,7 +45,8 @@ class WorldModelTree(object):
         self.actions = None     # either None or a list of actions
         self.random = random.Random()
         #self.random.seed(1)
-        self._min_class_size = 30
+        self._min_class_size = 100
+        self.last_gain = 0
         
         # data of leaf
         self.dat_ref = []    # indices of data belonging to this node
@@ -1100,10 +1101,13 @@ class WorldModelTree(object):
         """
         root = self.root()
         
+        if action not in root.transitions.keys():
+            return None
+        
         if root.actions is not None and action is None:
             probs = {}
             for action in root.transitions.keys():
-                probs[action] = root.transitions[action]
+                probs[action] = np.array(root.transitions[action])
                 probs[action] /= probs[action].sum(axis=1)[:, np.newaxis] # normalize
                 
         else:
@@ -1128,6 +1132,8 @@ class WorldModelTree(object):
         
         # helper variables
         root = self.root()
+        if root.get_number_of_samples() <= 1:
+            return np.ones((1,1))
         probs = self.get_transition_probabilities()
         actions = probs.keys()
         if root.actions is not None and None in actions:
@@ -1396,10 +1402,12 @@ class WorldModelSFA(WorldModelTree):
         
         for _ in range(1):
             mdp_exp = mdp.nodes.PolynomialExpansionNode(degree=2)
+            mdp_pca = mdp.nodes.PCANode(svd=True)
             mdp_sfa = mdp.nodes.SFANode(output_dim=4)
-            self.classifier += mdp.Flow([mdp_exp, mdp_sfa])
+            self.classifier += mdp.Flow([mdp_exp, mdp_pca, mdp_sfa])
         
         mdp_exp = mdp.nodes.PolynomialExpansionNode(degree=2)
+        mdp_pca = mdp.nodes.PCANode(svd=True)
         mdp_sfa = mdp.nodes.SFANode(output_dim=D)
         self.classifier += mdp.Flow([mdp_exp, mdp_sfa])
         
