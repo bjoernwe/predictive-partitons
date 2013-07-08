@@ -20,7 +20,7 @@ def get_graph(data, fast_partition, k=5, normalize=False):
     # transition matrix
     N, _ = data.shape
     W = np.zeros((N, N))
-    #W += 1e-8
+    #W += -1e-8
 
     # transitions to neighbors
     # s - current node
@@ -43,8 +43,8 @@ def get_graph(data, fast_partition, k=5, normalize=False):
             if u >= N:
                 continue
             if fast_partition:
-                W[s,u] = -1
-                W[u,s] = -1
+                W[s,u] += -1
+                W[u,s] += -1
             else:
                 W[s,u] = 1
                 W[u,s] = 1
@@ -65,7 +65,7 @@ if __name__ == '__main__':
     env = EnvCube(step_size=0.2, sigma=0.01)
     #env = EnvCube(step_size=0.1, sigma=0.05)
     print env.get_available_actions()
-    data, actions = env.do_random_steps(num_steps=1000)
+    data, actions = env.do_random_steps(num_steps=2000)
     
     # get eigenvalues
     W = get_graph(data=data, fast_partition=True, k=5, normalize=True)

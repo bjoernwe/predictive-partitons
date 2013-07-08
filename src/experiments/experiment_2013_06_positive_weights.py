@@ -65,7 +65,7 @@ if __name__ == '__main__':
     env = EnvCube(step_size=0.2, sigma=0.01)
     #env = EnvCube(step_size=0.1, sigma=0.05)
     print env.get_available_actions()
-    data, actions = env.do_random_steps(num_steps=1000)
+    data, actions = env.do_random_steps(num_steps=2000)
     
     # get eigenvalues
     W = get_graph(data=data, fast_partition=True, k=5, normalize=True)

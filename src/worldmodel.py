@@ -1286,7 +1286,7 @@ class WorldModelSpectral(WorldModelTree):
         
         # transitions
         W = np.zeros((n_trans_all, n_trans_all))
-        W += 0.001
+        W += 0.00001
         
         # big transition matrix
         # including transitions of the k nearest neighbors
@@ -1302,8 +1302,8 @@ class WorldModelSpectral(WorldModelTree):
                     W[s,t] = 1
                     W[t,s] = 1
                 if fast_partition:
-                    W[s,u] = -1
-                    W[u,s] = -1
+                    W[s,u] += -1
+                    W[u,s] += -1
                 else:
                     W[s,u] = 1
                     W[u,s] = 1
@@ -1340,10 +1340,12 @@ class WorldModelSpectral(WorldModelTree):
         
         # bi-partition
         if fast_partition:
-            idx = np.argsort(abs(E))
+            #idx = np.argsort(abs(E))
+            idx = np.argsort(E)
             col = idx[-1]
         else:
-            idx = np.argsort(abs(E))
+            #idx = np.argsort(abs(E))
+            idx = np.argsort(E)
             col = idx[-2]
         u = np.zeros(n_trans)
         for i in range(n_trans):

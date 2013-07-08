@@ -36,9 +36,9 @@ class VoronoiData(object):
         ### fifty, fifty
         probs = np.zeros((k,k))
         for i in range(k):
-            probs[i,i] = 1
+            #probs[i,i] = 1
             probs[i,(i+1)%k] = .5
-            probs[i,(i+2)%k] = .25
+            #probs[i,(i+2)%k] = .25
             #probs[i,(i+3)%k] = .125
             #probs[i,(i+4)%k] = .0625
         
@@ -104,7 +104,7 @@ class VoronoiData(object):
                 data_list[i] = None
             
         # plot
-        colormap = pyplot.cm.prism
+        colormap = pyplot.cm.get_cmap('prism')
         pyplot.gca().set_color_cycle([colormap(i) for i in np.linspace(0, 0.98, 7)])
         for i, data in enumerate(data_list):
             if data is not None:
@@ -122,13 +122,13 @@ class VoronoiData(object):
 def experiment_plot():
     
     k = 8
-    voronoi = VoronoiData(n=5000, k=k, power=5)
+    voronoi = VoronoiData(n=4000, k=k, power=5)
     #print voronoi.transitions
     #print 'eigenvalues:\n', np.abs(np.linalg.eig(voronoi.transitions)[0])
     
-    model = worldmodel.WorldModelTree()
-    model.add_data(voronoi.data)
-    model.learn(min_gain=0.03, max_costs=0.03)
+    model = worldmodel.WorldModelSpectral()
+    model.add_data(voronoi.data*5)
+    model.learn(min_gain=0.02)
     #model.single_splitting_step()
     #model.single_splitting_step()
     #model.single_splitting_step()
