@@ -5,7 +5,6 @@ Visualizes the largest/smallest eigenvectors of a graph.
 import numpy as np
 import scipy.linalg
 import scipy.spatial
-import scipy.sparse.linalg
 
 from matplotlib import pyplot
 
@@ -49,7 +48,7 @@ def get_graph(data, fast_partition, k=5, normalize=False):
             else:
                 W[s,u] = 1
                 W[u,s] = 1
-            
+                
     # normalize matrix
     if normalize:
         d = np.sum(W, axis=1)
