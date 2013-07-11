@@ -5,16 +5,16 @@ Generates the plots shown at my INI talk.
 from matplotlib import pyplot
 
 import worldmodel
-import experiment_noisy_dim
-import experiment_random_walk_2d
-import experiment_random_walk_swissroll
+from experiment_2013_02_noisy_dim import NoisyDimData
+from experiment_2013_03_random_walk_2d import RandomWalk2DData
+from experiment_2013_03_random_walk_swissroll import RandomSwissRollData
 
             
 if __name__ == '__main__':
 
-    data_generators = [experiment_random_walk_swissroll.RandomSwissRollData,
-                       experiment_noisy_dim.NoisyDimData,
-                       experiment_random_walk_2d.RandomWalk2DData]
+    data_generators = [RandomSwissRollData,
+                       NoisyDimData,
+                       RandomWalk2DData]
     plot_ranges = [[-1, 1], [0, 1], [0, 1]]
     data_sizes = [4000, 4000, 4000]
 

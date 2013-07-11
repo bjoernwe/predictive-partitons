@@ -590,7 +590,7 @@ class WorldModelTree(object):
         if root.actions is None:
             return self._get_transition_refs()
         
-        r1, r2 = self._get_transition_refs(heading_in=heading_in, inside=inside, heading_out=heading_out)
+        _, r2 = self._get_transition_refs(heading_in=heading_in, inside=inside, heading_out=heading_out)
         refs_2 = [r for r in r2 if root.actions[r] == action]
         refs_1 = [r-1 for r in refs_2]
         return [refs_1, refs_2]
@@ -904,14 +904,13 @@ class WorldModelTree(object):
         
         for leaf in self.root().get_leaves():
             print 'testing leaf', leaf.get_leaf_index(), '...'
-            if leaf._reached_min_sample_size(action=action):
-                split = leaf._calculate_best_split(action=action)
-                if split is not None:
-                    print 'best split: leaf', leaf.get_leaf_index(), 'with action', split.action, 'with gain', split.gain
-                    leaf.last_gain = split.gain
-                    if split.gain > best_gain:
-                        best_gain = split.gain
-                        best_split = split
+            split = leaf._calculate_best_split(action=action)
+            if split is not None and leaf._reached_min_sample_size(action=action):
+                print 'best split: leaf', leaf.get_leaf_index(), 'with action', split.action, 'with gain', split.gain
+                leaf.last_gain = split.gain
+                if split.gain > best_gain:
+                    best_gain = split.gain
+                    best_split = split
                 
         if best_split is not None and best_gain >= min_gain:
             print 'decided for leaf', best_split.node.get_leaf_index(), 'with action', best_split.action, 'and gain', best_split.gain
@@ -1093,7 +1092,7 @@ class WorldModelTree(object):
         return stats
     
     
-    def get_transition_probabilities(self, action=None):
+    def get_transition_probabilities(self, action=None, soft=False):
         """
         Returns a dictionary containing for every action a matrix with 
         transition probabilities. If an action is specified only the 
@@ -1108,16 +1107,20 @@ class WorldModelTree(object):
             probs = {}
             for action in root.transitions.keys():
                 probs[action] = np.array(root.transitions[action])
+                if soft:
+                    probs[action] += 1
                 probs[action] /= probs[action].sum(axis=1)[:, np.newaxis] # normalize
                 
         else:
             probs = np.array(root.transitions[action]) 
+            if soft:
+                probs[action] += 1
             probs /= probs.sum(axis=1)[:, np.newaxis]
         
         return probs
     
     
-    def get_graph_cost_matrix(self):
+    def get_graph_cost_matrix(self, soft=False):
         """
         Returns a distance matrix for the learned states that may be useful for
         calculating a shortest path through the state space.
@@ -1134,7 +1137,7 @@ class WorldModelTree(object):
         root = self.root()
         if root.get_number_of_samples() <= 1:
             return np.ones((1,1))
-        probs = self.get_transition_probabilities()
+        probs = self.get_transition_probabilities(soft=soft)
         actions = probs.keys()
         if root.actions is not None and None in actions:
             actions.remove(None)
@@ -1512,7 +1515,7 @@ class WorldModelGraphSFA(WorldModelTree):
         assert self.status == 'leaf'
         
         # get data and graph
-        refs_all, refs_1, W = self._get_transition_graph(action=action, k=10, normalize=False)
+        refs_all, _, W = self._get_transition_graph(action=action, k=10, normalize=False)
         print refs_all
         data = self._get_data_for_refs(refs=refs_all)
         N, D = data.shape
@@ -1761,7 +1764,7 @@ if __name__ == "__main__":
         #tree.single_splitting_step()
         #tree.single_splitting_step()
         #tree.single_splitting_step()
-        tree.learn(min_gain=0.05)
+        tree.learn(min_gain=0.04)
 
         n_trans = np.sum(tree._merge_transition_matrices())
         print 'final number of nodes:', len(tree._nodes()), '\n'

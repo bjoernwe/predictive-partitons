@@ -29,8 +29,8 @@ def get_graph(data, fast_partition, k=5, normalize=False):
         indices = np.argsort(distances[s])  # closest one should be the point itself
         for t in indices[0:k+1]:
             if s != t:
-                W[s,t] = 2
-                W[t,s] = 2
+                W[s,t] += 1
+                W[t,s] += 1
 
     # transitions to successors
     # s - current node
@@ -43,11 +43,11 @@ def get_graph(data, fast_partition, k=5, normalize=False):
             if u >= N:
                 continue
             if fast_partition:
-                W[s,u] = 0
-                W[u,s] = 0
+                W[s,u] += -1
+                W[u,s] += -1
             else:
-                W[s,u] = 2
-                W[u,s] = 2
+                W[s,u] += 1
+                W[u,s] += 1
                 
     # normalize matrix
     if normalize:

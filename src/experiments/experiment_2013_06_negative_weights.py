@@ -73,6 +73,7 @@ if __name__ == '__main__':
     
     # sort eigenvalues
     E = np.real(E)
+    #idx = np.argsort(E)
     idx = np.argsort(np.abs(E))
     
     # plot
