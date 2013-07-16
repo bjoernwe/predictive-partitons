@@ -15,20 +15,19 @@ import worldmodel
 
 def get_graph(model, action, fast_partition, k=5, normalize=False):
     
-    #[refs_1, refs_2] = model._get_transition_refs_for_action(action=action, heading_in=False, inside=True, heading_out=False)
-    [refs_1, refs_2] = model._get_transition_refs(heading_in=False, inside=True, heading_out=False)
+    [refs_1, refs_2] = model._get_transition_refs_for_action(action=action, heading_in=False, inside=True, heading_out=False)
+    #[refs_1, refs_2] = model._get_transition_refs(heading_in=False, inside=True, heading_out=False)
     refs_all = model._get_data_refs()
     data = model._get_data_for_refs(refs_1)
     n_trans = len(refs_1)        
-    n_trans_all = len(refs_all)        
+    N = len(refs_all)        
     
     # pairwise distances
     distances = scipy.spatial.distance.pdist(data)
     distances = scipy.spatial.distance.squareform(distances)
 
     # transition matrix
-    N, _ = data.shape
-    W = np.zeros((n_trans_all, n_trans_all))
+    W = np.zeros((N, N))
     #W += -1e-8
 
     # transitions to neighbors
@@ -79,21 +78,29 @@ if __name__ == '__main__':
     normalize = True
     smallest = False
     laplacian = False
-    plot_sign = False
+    plot_sign = True
     
     # data
-    env = EnvCube(step_size=0.2, sigma=0.01)
-    #env = EnvCube(step_size=0.1, sigma=0.05)
+    #env = EnvCube(step_size=0.2, sigma=0.01)
+    env = EnvCube(step_size=0.1, sigma=0.05)
     print env.get_available_actions()
-    data0, actions = env.do_random_steps(num_steps=steps)
+    data, actions = env.do_random_steps(num_steps=steps)
+    N, D = data.shape
 
     # model
     model = worldmodel.WorldModelTree()
-    model.add_data(x=data0, actions=actions)
-    data = model.get_data()
+    model.add_data(x=data, actions=actions)
+    
+    # graph
+    selected_action = 'D0'
+    W = 3 * get_graph(model=model, action=selected_action, fast_partition=True, k=k, normalize=normalize)
+    for action in model.get_possible_actions(ignore_none=True):
+        if action == selected_action:
+            continue
+        W += get_graph(model=model, action=action, fast_partition=False, k=k, normalize=normalize)
+        
     
     # get eigenvalues
-    W = get_graph(model=model, action=None, fast_partition=fast, k=k, normalize=normalize)
     if laplacian:
         W = np.diag(np.sum(W, axis=1)) - W
     E, U = scipy.linalg.eig(a=W)
@@ -108,7 +115,7 @@ if __name__ == '__main__':
     cm = pyplot.cm.get_cmap('summer')
     for i in range(15):
         if smallest:
-            j = idx[i]    # smallest
+            j = idx[i]      # smallest
         else:
             j = idx[-i-1]   # largest
         pyplot.subplot(3, 5, i+1)
