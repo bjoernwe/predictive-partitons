@@ -1270,7 +1270,7 @@ class WorldModelPCA(WorldModelTree):
 class WorldModelSpectral(WorldModelTree):
 
 
-    def _get_transition_graph(self, action=None, k=10, fast_partition=False, normalize=True):
+    def _get_transition_graph(self, action=None, k=15, fast_partition=False, normalize=True):
         assert self.status == 'leaf'
         assert action in self.get_possible_actions(ignore_none=False)
         
@@ -1290,9 +1290,22 @@ class WorldModelSpectral(WorldModelTree):
         # transitions
         W = np.zeros((n_trans_all, n_trans_all))
         W += 0.00001
+
+        # big transition matrix
+        # adding transitions to the k nearest neighbors
+        for i in range(n_trans):
+            indices = np.argsort(distances[i])  # closest one should be the point itself
+            # index: refs -> refs_all
+            s = refs_all.index(refs_1[i])
+            for j in indices[0:k+1]:
+                # index: refs -> refs_all
+                t = refs_all.index(refs_1[j])
+                if s != t:
+                    W[s,t] = 1
+                    W[t,s] = 1
         
         # big transition matrix
-        # including transitions of the k nearest neighbors
+        # adding transitions of the k nearest neighbors
         for i in range(n_trans):
             indices = np.argsort(distances[i])  # closest one should be the point itself
             # index: refs -> refs_all
@@ -1305,8 +1318,8 @@ class WorldModelSpectral(WorldModelTree):
                     W[s,t] = 1
                     W[t,s] = 1
                 if fast_partition:
-                    W[s,u] += -1
-                    W[u,s] += -1
+                    W[s,u] = -1
+                    W[u,s] = -1
                 else:
                     W[s,u] = 1
                     W[u,s] = 1

@@ -19,7 +19,7 @@ if __name__ == '__main__':
     configs = configs[0:N,0,:]
     
     # initialize model
-    model = worldmodel.WorldModelTree()
+    model = worldmodel.WorldModelSFA()
     model.add_data(data)
     
     # train world model incrementally
