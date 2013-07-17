@@ -1,9 +1,8 @@
 """
 Factorization of actions
 
-Separate graphs are build for each action and afterwards added together. This
-has the drawback that connections are not drawn to the real neighbors but only
-to the ones that belong to the same actions. 
+Builds the graph by iterating through all nodes and setting to connections
+according to the corresponding action. This is the simplest version.
 """
 
 import numpy as np
@@ -14,51 +13,53 @@ from matplotlib import pyplot
 
 from studienprojekt.env_cube import EnvCube
 
-import worldmodel
 
-
-def get_graph(model, action, fast_partition, k=5, normalize=False):
-    
-    [refs_1, refs_2] = model._get_transition_refs_for_action(action=action, heading_in=False, inside=True, heading_out=False)
-    #[refs_1, refs_2] = model._get_transition_refs(heading_in=False, inside=True, heading_out=False)
-    refs_all = model._get_data_refs()
-    data = model._get_data_for_refs(refs_1)
-    n_trans = len(refs_1)        
-    N = len(refs_all)        
+def get_graph(data, actions, fast_action, k=15, normalize=True):
     
     # pairwise distances
     distances = scipy.spatial.distance.pdist(data)
     distances = scipy.spatial.distance.squareform(distances)
 
     # transition matrix
+    N, _ = data.shape
     W = np.zeros((N, N))
     #W += -1e-8
+    
+    # number of actions
+    action_set = set(actions)
+    if None in action_set:
+        action_set.remove(None)
+    n_actions = len(action_set)
+    weight = n_actions - 1
 
     # transitions to neighbors
     # s - current node
     # t - neighbor node
-    for i in range(n_trans):
-        indices = np.argsort(distances[i])  # closest one should be the point itself
-        s = refs_all.index(refs_1[i])
-        for j in indices[0:k+1]:
-            t = refs_all.index(refs_1[j])
+    # u - following node
+    for s in range(N-1):
+        indices = np.argsort(distances[s])  # closest one should be the point itself
+        for t in indices[0:k+1]:
             if s != t:
-                W[s,t] = 1
-                W[t,s] = 1
+                if actions[s] == fast_action:
+                    W[s,t] = weight
+                    W[t,s] = weight
+                else:
+                    W[s,t] = 1
+                    W[t,s] = 1
 
     # transitions to successors
     # s - current node
     # t - neighbor node
     # u - following node
-    for i in range(n_trans):
-        indices = np.argsort(distances[i])  # closest one should be the point itself
-        s = refs_all.index(refs_1[i])
-        for j in indices[0:k+1]:
-            #t = refs_all.index(refs_1[j])
-            u = refs_all.index(refs_2[j])
-            if fast_partition:
-                W[s,u] = -1
-                W[u,s] = -1
+    for s in range(N-1):
+        indices = np.argsort(distances[s])  # closest one should be the point itself
+        for t in indices[0:k+1]:
+            u = t+1
+            if u >= N:
+                continue
+            if actions[u] == fast_action:
+                W[s,u] = -weight
+                W[u,s] = -weight
             else:
                 W[s,u] = 1
                 W[u,s] = 1
@@ -89,22 +90,9 @@ if __name__ == '__main__':
     env = EnvCube(step_size=0.1, sigma=0.05)
     print env.get_available_actions()
     data, actions = env.do_random_steps(num_steps=steps)
-    N, D = data.shape
-
-    # model
-    model = worldmodel.WorldModelTree()
-    model.add_data(x=data, actions=actions)
-    
-    # graph
-    selected_action = 'D0'
-    W = 3 * get_graph(model=model, action=selected_action, fast_partition=True, k=k, normalize=normalize)
-    for action in model.get_possible_actions(ignore_none=True):
-        if action == selected_action:
-            continue
-        W += get_graph(model=model, action=action, fast_partition=False, k=k, normalize=normalize)
-        
     
     # get eigenvalues
+    W = get_graph(data=data, actions=actions, fast_action='D0', k=k, normalize=normalize)
     if laplacian:
         W = np.diag(np.sum(W, axis=1)) - W
     E, U = scipy.linalg.eig(a=W)
@@ -115,6 +103,7 @@ if __name__ == '__main__':
     #idx = np.argsort(np.abs(E))
     
     # plot
+    print 'steps=%d, k=%d, fast=%s,\n normalize=%s, smallest=%s' % (steps, k, fast, normalize, smallest)
     pyplot.figure()
     cm = pyplot.cm.get_cmap('summer')
     for i in range(15):
