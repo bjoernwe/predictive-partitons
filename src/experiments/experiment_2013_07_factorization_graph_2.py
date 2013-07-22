@@ -13,15 +13,21 @@ from matplotlib import pyplot
 
 from studienprojekt.env_cube import EnvCube
 
+import worldmodel
 
-def get_graph(data, actions, fast_action, k=15, normalize=True):
+
+def get_graph(model, fast_action, k=15, normalize=True):
+
+    refs = model._get_data_refs()
+    data = model._get_data_for_refs(refs)
+    actions = model._get_actions_for_refs(refs)
+    N = len(refs)        
     
     # pairwise distances
     distances = scipy.spatial.distance.pdist(data)
     distances = scipy.spatial.distance.squareform(distances)
 
     # transition matrix
-    N, _ = data.shape
     W = np.zeros((N, N))
     #W += -1e-8
     
@@ -91,8 +97,12 @@ if __name__ == '__main__':
     print env.get_available_actions()
     data, actions = env.do_random_steps(num_steps=steps)
     
+    # model
+    model = worldmodel.WorldModelTree()
+    model.add_data(data, actions=actions)
+    
     # get eigenvalues
-    W = get_graph(data=data, actions=actions, fast_action='D0', k=k, normalize=normalize)
+    W = get_graph(model=model, fast_action='D0', k=k, normalize=normalize)
     if laplacian:
         W = np.diag(np.sum(W, axis=1)) - W
     E, U = scipy.linalg.eig(a=W)
