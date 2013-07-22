@@ -42,7 +42,7 @@ def get_graph(model, fast_action, k=15, normalize=True):
     # s - current node
     # t - neighbor node
     # u - following node
-    for s in range(N-1):
+    for s in range(N):
         indices = np.argsort(distances[s])  # closest one should be the point itself
         for t in indices[0:k+1]:
             if s != t:
@@ -84,7 +84,6 @@ if __name__ == '__main__':
 
     # parameters
     steps = 2000
-    fast = True
     k = 15
     normalize = True
     smallest = False
@@ -113,7 +112,7 @@ if __name__ == '__main__':
     #idx = np.argsort(np.abs(E))
     
     # plot
-    print 'steps=%d, k=%d, fast=%s,\n normalize=%s, smallest=%s' % (steps, k, fast, normalize, smallest)
+    print 'steps=%d, k=%d,\n normalize=%s, smallest=%s' % (steps, k, normalize, smallest)
     pyplot.figure()
     cm = pyplot.cm.get_cmap('summer')
     for i in range(15):
