@@ -3,6 +3,7 @@ import math
 import numpy as np
 import random
 import scipy.spatial.distance
+import sklearn.manifold
 import traceback
 
 from matplotlib import pyplot
@@ -388,6 +389,8 @@ class WorldModelTree(object):
         
         root = self.root()
         data = root.get_data()
+        if data.shape[1] > 2:
+            data = sklearn.manifold.Isomap(n_neighbors=10, n_components=2).fit_transform(data)
         K = len(root.get_leaves())
         
         if range_x is None:
@@ -415,6 +418,8 @@ class WorldModelTree(object):
         
         root = self.root()
         data = root.get_data()
+        if data.shape[1] > 2:
+            data = sklearn.manifold.Isomap(n_neighbors=10, n_components=2).fit_transform(data)
         K = len(root.get_leaves())
         
         if range_x is None:
@@ -435,12 +440,12 @@ class WorldModelTree(object):
         return
          
 
-    def plot_tree_data(self, color='state', vmin=None, vmax=None, show_plot=True):
+    def plot_tree_data(self, color='state', vmin=None, vmax=None, ndim=None, show_plot=True):
         """
         Plots all the data that is stored in the tree with color and shape
         according to the learned state.
         """
-
+        
         if color == 'state':
 
             # list of data for the different classes
@@ -449,6 +454,8 @@ class WorldModelTree(object):
             for leaf in all_leaves:
                 data = leaf.get_data()
                 if data is not None:
+                    if ndim is not None and ndim < self.get_input_dim():
+                        data = sklearn.manifold.Isomap(n_neighbors=10, n_components=ndim).fit_transform(data)
                     data_list.append(data)
     
             # plot
@@ -468,12 +475,16 @@ class WorldModelTree(object):
             
             for leaf in leaves:
                 data = leaf.get_data()
+                if ndim is not None and ndim < self.get_input_dim():
+                    data = sklearn.manifold.Isomap(n_neighbors=10, n_components=ndim).fit_transform(data)
                 colors = [leaf.last_gain for _ in range(data.shape[0])]
                 pyplot.scatter(x=data[:,0], y=data[:,1], c=colors, cmap=colormap, edgecolors='none', vmin=vmin, vmax=vmax)
                 
         else:
             
             data = self.root().get_data()
+            if ndim is not None and ndim < self.get_input_dim():
+                data = sklearn.manifold.Isomap(n_neighbors=10, n_components=ndim).fit_transform(data)
             pyplot.plot(data[:,0], data[:,1], '.')
             
         if show_plot:
@@ -597,12 +608,27 @@ class WorldModelTree(object):
         
         
     def _get_data_for_refs(self, refs):
+        """
+        Returns a data matrix for a list of references.
+        """
         root = self.root()
         if len(refs) == 0:
             return None
         data_list = [root.data[t] for t in refs]
         data = np.vstack(data_list)
         return data
+    
+    
+    def _get_actions_for_refs(self, refs):
+        """
+        Returns a list of actions corresponding to the given list of data
+        references.
+        """
+        root = self.root()
+        if len(refs) == 0:
+            return None
+        action_list = [root.actions[t] for t in refs]
+        return action_list
         
                 
     def get_data(self):
@@ -889,7 +915,7 @@ class WorldModelTree(object):
         return best_split
     
     
-    def single_splitting_step(self, min_gain=float('-inf'), action=None):
+    def single_splitting_step(self, action=None, min_gain=float('-inf')):
         """
         Calculates the gain for each state and splits the best one. Can be
         restricted to a given action.
@@ -920,7 +946,7 @@ class WorldModelTree(object):
         return best_gain
     
     
-    def learn(self, min_gain=0.02):
+    def learn(self, action=None, min_gain=0.02):
         """
         Learns the model.
         """
@@ -935,7 +961,7 @@ class WorldModelTree(object):
         #self.single_splitting_step(min_gain=float('-inf'))
         gain = float('inf')
         while gain >= min_gain:
-            gain = self.single_splitting_step(min_gain=min_gain)
+            gain = self.single_splitting_step(action=action, min_gain=min_gain)
             if gain >= min_gain:
                 print 'split with gain', gain, '\n'
             
@@ -1573,92 +1599,120 @@ class WorldModelGraphSFA(WorldModelTree):
         signal = self.classifier.execute(x)[0,0]
         return 0 if signal < .5 else 1
     
+
+class WorldModelFactorize():
+   
+    def __init__(self):
+        self.models = {}
     
     
-class WorldModelFactorize(WorldModelTree):
+    def add_data(self, data, actions):
+        new_action_set = set(actions)
+        known_actions = set(self.models.keys())
+        for action in known_actions.union(new_action_set):
+            # add model if action was not known before
+            if action not in self.models.keys():
+                self.models[action] = WorldModelFactorizeNode()
+            self.models[action].add_data(data, actions=actions)
+        return
     
     
-    def _get_transition_graph(self, action=None, k=15, normalize=True):
-        """
-        Creates a transition graph with all possible nodes but connections only
-        for one given action (and neighbors).
-        """
-        assert self.status == 'leaf'
-        
-        # data and references
-        [refs_1, refs_2] = self._get_transition_refs_for_action(action=action)
-        data = self._get_data_for_refs(refs_1)
-        refs_all = self._get_data_refs()
-        n_trans_all = len(refs_all)
-        n_trans = len(refs_1)        
-        if n_trans <= 0:
-            return [], [], None
+    def learn(self, min_gain=0.02):
+        for action in self.models.keys():
+            self.models[action].learn(action=action, min_gain=min_gain)
+    
+    
+class WorldModelFactorizeNode(WorldModelTree):
+    
+    
+    def _get_transition_graph(self, fast_action, k=15, normalize=True):
+
+        refs = self._get_data_refs()
+        data = self._get_data_for_refs(refs)
+        actions = self._get_actions_for_refs(refs)
+        N = len(refs)        
         
         # pairwise distances
         distances = scipy.spatial.distance.pdist(data)
         distances = scipy.spatial.distance.squareform(distances)
+    
+        # transition matrix
+        W = np.zeros((N, N))
+        #W += 1e-8
         
-        # transitions
-        W = np.zeros((n_trans_all, n_trans_all))
-        W += 0.001
-        
-        # big transition matrix
-        # including transitions of the k nearest neighbors
-        for i in range(n_trans):
-            idx = np.argsort(distances[i])  # closest one should be the point itself
-            # index: refs -> refs_all
-            s = refs_all.index(refs_1[i])
-            for j in idx[0:k+1]:
-                # index: refs -> refs_all
-                t = refs_all.index(refs_2[j])
-                W[s,t] = 1
-
-        # make symmetric        
-        #W = W + W.T
-        P = W + W.T
-        
+        # number of actions
+        action_set = set(actions)
+        if None in action_set:
+            action_set.remove(None)
+        n_actions = len(action_set)
+        weight = n_actions - 1
+    
+        # transitions to neighbors
+        # s - current node
+        # t - neighbor node
+        # u - following node
+        for s in range(N):
+            indices = np.argsort(distances[s])  # closest one should be the point itself
+            for t in indices[0:k+1]:
+                if s != t:
+                    if actions[s] == fast_action:
+                        W[s,t] = weight
+                        W[t,s] = weight
+                    else:
+                        W[s,t] = 1
+                        W[t,s] = 1
+    
+        # transitions to successors
+        # s - current node
+        # t - neighbor node
+        # u - following node
+        for s in range(N-1):
+            indices = np.argsort(distances[s])  # closest one should be the point itself
+            for t in indices[0:k+1]:
+                u = t+1
+                if u >= N:
+                    continue
+                if actions[u] == fast_action:
+                    W[s,u] = -weight
+                    W[u,s] = -weight
+                else:
+                    W[s,u] = 1
+                    W[u,s] = 1
+                    
         # normalize matrix
         if normalize:
-            d = np.sum(P, axis=1)
-            for i in range(n_trans_all):
+            d = np.sum(W, axis=1)
+            for i in range(N):
                 if d[i] > 0:
-                    P[i] = P[i] / d[i]
-            
-        return refs_all, refs_1, P
-    
-    
+                    W[i] = W[i] / d[i]
+                
+        return W
+
+
     def _init_test(self, action, fast_partition=False):
         """
         Initializes the parameters that split the node in two halves.
         """
+        assert self.status == 'leaf'
+        
         if fast_partition:
             return False
+
+        # data        
+        W = self._get_transition_graph(fast_action=action, k=15, normalize=True)
+        refs = self._get_data_refs()
+        data = self._get_data_for_refs(refs=refs)
         
-        N = len(self._get_data_refs())
-        P = np.zeros((N, N))
-        actions = self.get_possible_actions(ignore_none=True)
-        
-        for a in actions:
-            refs_all, refs_1, P_a = self._get_transition_graph(action=a, k=10, normalize=True)
-            if a == action:
-                P += np.eye(N) - P_a 
-            else:
-                P += np.eye(N) + P_a
-                
-        P /= len(actions)
-            
         # second eigenvector
-        E, U = linalg.eigs(np.array(P), k=2, which='LR')
+        E, U = scipy.linalg.eig(a=W)
+        #E, U = linalg.eigs(np.array(W), k=2, which='LR')
+        E, U = np.real(E), np.real(U)
         
         # bi-partition
-        idx = np.argsort(abs(E))
-        col = idx[-2]
-        u = np.zeros(n_trans)
-        for i in range(n_trans):
-            # index: refs -> refs_all
-            row = refs_all.index(refs_1[i])
-            u[i] = U[row,col].real
-        u -= np.mean(u)
+        idx = np.argsort(E)
+        col = idx[-1]
+        u = U[:,col]
+        #u -= np.mean(u)
         #assert -1 in np.sign(u)
         #assert 1 in np.sign(u)
         if -1 not in np.sign(u):
@@ -1668,9 +1722,9 @@ class WorldModelFactorize(WorldModelTree):
         
         # classifier
         labels = map(lambda x: 1 if x > 0 else 0, u)
-        #self.classifier = mdp.nodes.KNNClassifier(k=20)
+        self.classifier = mdp.nodes.KNNClassifier(k=10)
         #self.classifier = mdp.nodes.NearestMeanClassifier()
-        self.classifier = mdp.nodes.LibSVMClassifier(probability=False)
+        #self.classifier = mdp.nodes.LibSVMClassifier(probability=False)
         self.classifier.train(data, np.array(labels, dtype='int'))
         self.classifier.stop_training()
         y = self.classifier.label(data)
@@ -1679,8 +1733,8 @@ class WorldModelFactorize(WorldModelTree):
         if 1 not in y:
             return False
         return True
-    
-    
+
+
     def _test(self, x):
         """
         Tests to which child the data point x belongs
