@@ -681,7 +681,7 @@ class WorldModelTree(object):
         entropy = -np.sum(probs * log_probs)
 
         # normalization?
-        assert(entropy <= np.log2(K))
+        assert(entropy <= np.log2(K) + 1e-8)
         if normalize:
             entropy /= np.log2(K)
 
@@ -965,7 +965,7 @@ class WorldModelTree(object):
             if gain >= min_gain:
                 print 'split with gain', gain, '\n'
             
-        return
+        return gain
     
     
     def _merge_nodes(self, s1, s2):
@@ -1044,7 +1044,8 @@ class WorldModelTree(object):
         raise NotImplementedError("Use subclass like WorldModelSpectral instead.")
 
 
-    def _mutual_information(self, transition_matrix):
+    @classmethod
+    def _mutual_information(cls, transition_matrix):
         """
         Calculates the mutual information between t and t+1 for a model given
         as transition matrix. 
@@ -1053,19 +1054,20 @@ class WorldModelTree(object):
         assert np.sum(P) > 0
         weights = np.sum(P, axis=1)
         mu = weights / np.sum(weights)
-        entropy_mu = self._entropy(dist=mu)
-        entropy = self._matrix_entropy(transitions=transition_matrix)
+        entropy_mu = cls._entropy(dist=mu)
+        entropy = cls._matrix_entropy(transitions=transition_matrix)
         mutual_information = entropy_mu - entropy
         return mutual_information
     
     
-    def _mutual_information_average(self, transition_matrices):
+    @classmethod
+    def _mutual_information_average(cls, transition_matrices):
         """
         Calculates the weighted average of mutual information for several models 
         given as a list of transition matrices.
         """
         weights = [np.sum(P) for P in transition_matrices]
-        list_mi = [weights[i] * self._mutual_information(P) for i, P in enumerate(transition_matrices) if weights[i] > 0]
+        list_mi = [weights[i] * cls._mutual_information(P) for i, P in enumerate(transition_matrices) if weights[i] > 0]
         return np.sum(list_mi) / np.sum(weights)
             
     
@@ -1620,6 +1622,21 @@ class WorldModelFactorize():
     def learn(self, min_gain=0.02):
         for action in self.models.keys():
             self.models[action].learn(action=action, min_gain=min_gain)
+            
+            
+    def single_splitting_step(self, action=None, min_gain=float('-inf')):
+        
+        gain = 0
+        
+        if action is None:
+            actions = self.models.keys()
+        else:
+            actions = [action]
+            
+        for a in actions:
+            gain += self.models[a].single_splitting_step(action=a, min_gain=min_gain)
+            
+        return gain / len(actions)
     
     
 class WorldModelFactorizeNode(WorldModelTree):
@@ -1722,7 +1739,7 @@ class WorldModelFactorizeNode(WorldModelTree):
         
         # classifier
         labels = map(lambda x: 1 if x > 0 else 0, u)
-        self.classifier = mdp.nodes.KNNClassifier(k=10)
+        self.classifier = mdp.nodes.KNNClassifier(k=20)
         #self.classifier = mdp.nodes.NearestMeanClassifier()
         #self.classifier = mdp.nodes.LibSVMClassifier(probability=False)
         self.classifier.train(data, np.array(labels, dtype='int'))

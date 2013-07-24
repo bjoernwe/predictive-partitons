@@ -2,6 +2,7 @@ import numpy as np
 import unittest
 
 import worldmodel
+from numpy.ma.testutils import assert_almost_equal
 
 
 class DataReferencesTest(unittest.TestCase):
@@ -172,6 +173,22 @@ class VectorEntropyTests(unittest.TestCase):
                 e = worldmodel.WorldModelTree._entropy(dist=p, normalize=True)
                 self.assertGreaterEqual(e, 0.)
                 self.assertLessEqual(e, np.log2(l))
+                
+    def testMutualInformation(self):
+        """
+        """
+        # 'useless' Markov Chain
+        S = 10 * np.ones((8, 8))
+        assert_almost_equal(0.0, worldmodel.WorldModelTree._mutual_information(transition_matrix=S))
+        
+        # deterministic Markov Chain
+        T = np.zeros((8, 8))
+        for i in range(8):
+            T[i,(i+1)%8] = 80
+        assert_almost_equal(3.0, worldmodel.WorldModelTree._mutual_information(transition_matrix=T))
+        
+        # test mixture
+        assert_almost_equal(1.5, worldmodel.WorldModelTree._mutual_information_average(transition_matrices=[S, T]))
 
 
 if __name__ == "__main__":
