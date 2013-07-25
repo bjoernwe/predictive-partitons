@@ -2,12 +2,13 @@ import collections
 import math
 import numpy as np
 import random
+import scipy.linalg
+import scipy.sparse.linalg
 import scipy.spatial.distance
 import sklearn.manifold
 import traceback
 
 from matplotlib import pyplot
-from scipy.sparse import linalg
 
 import mdp
 
@@ -1379,7 +1380,7 @@ class WorldModelSpectral(WorldModelTree):
         n_trans = len(refs_1)
         
         # second eigenvector
-        E, U = linalg.eigs(np.array(P), k=2, which='LR')
+        E, U = scipy.sparse.linalg.eigs(np.array(P), k=2, which='LR')
         E, U = np.real(E), np.real(U)
         
         # bi-partition
@@ -1614,7 +1615,7 @@ class WorldModelFactorize():
         for action in known_actions.union(new_action_set):
             # add model if action was not known before
             if action not in self.models.keys():
-                self.models[action] = WorldModelFactorizeNode()
+                self.models[action] = WorldModelFactorizeFastNode()
             self.models[action].add_data(data, actions=actions)
         return
     
@@ -1639,7 +1640,7 @@ class WorldModelFactorize():
         return gain / len(actions)
     
     
-class WorldModelFactorizeNode(WorldModelTree):
+class WorldModelFactorizeFastNode(WorldModelTree):
     
     
     def _get_transition_graph(self, fast_action, k=15, normalize=True):
@@ -1706,6 +1707,41 @@ class WorldModelFactorizeNode(WorldModelTree):
         return W
 
 
+    def _get_knn_graph(self, k=15, normalize=True):
+
+        refs = self._get_data_refs()
+        data = self._get_data_for_refs(refs)
+        N = len(refs)        
+        
+        # pairwise distances
+        distances = scipy.spatial.distance.pdist(data)
+        distances = scipy.spatial.distance.squareform(distances)
+    
+        # transition matrix
+        W = np.zeros((N, N))
+        #W += 1e-8
+        
+        # transitions to neighbors
+        # s - current node
+        # t - neighbor node
+        # u - following node
+        for s in range(N):
+            indices = np.argsort(distances[s])  # closest one should be the point itself
+            for t in indices[0:k+1]:
+                if s != t:
+                    W[s,t] = 1
+                    W[t,s] = 1
+    
+        # normalize matrix
+        if normalize:
+            d = np.sum(W, axis=1)
+            for i in range(N):
+                if d[i] > 0:
+                    W[i] = W[i] / d[i]
+                
+        return W
+
+
     def _init_test(self, action, fast_partition=False):
         """
         Initializes the parameters that split the node in two halves.
@@ -1713,10 +1749,11 @@ class WorldModelFactorizeNode(WorldModelTree):
         assert self.status == 'leaf'
         
         if fast_partition:
-            return False
+            W = self._get_transition_graph(fast_action=action, k=15, normalize=True)
+        else:
+            W = self._get_knn_graph(k=15, normalize=True)
 
         # data        
-        W = self._get_transition_graph(fast_action=action, k=15, normalize=True)
         refs = self._get_data_refs()
         data = self._get_data_for_refs(refs=refs)
         
@@ -1727,7 +1764,10 @@ class WorldModelFactorizeNode(WorldModelTree):
         
         # bi-partition
         idx = np.argsort(E)
-        col = idx[-1]
+        if fast_partition:
+            col = idx[-1]
+        else:
+            col = idx[-1]
         u = U[:,col]
         #u -= np.mean(u)
         #assert -1 in np.sign(u)
