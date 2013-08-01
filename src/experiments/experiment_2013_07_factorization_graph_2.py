@@ -46,12 +46,8 @@ def get_graph(model, fast_action, k=15, normalize=True):
         indices = np.argsort(distances[s])  # closest one should be the point itself
         for t in indices[0:k+1]:
             if s != t:
-                if actions[s] == fast_action:
-                    W[s,t] = weight
-                    W[t,s] = weight
-                else:
-                    W[s,t] = 1
-                    W[t,s] = 1
+                W[s,t] = 1
+                W[t,s] = 1
 
     # transitions to successors
     # s - current node

@@ -622,8 +622,8 @@ class WorldModelTree(object):
     
     def _get_actions_for_refs(self, refs):
         """
-        Returns a list of actions corresponding to the given list of data
-        references.
+        Returns a list of actions that preceeded each of the given data points
+        (given as a list of references).
         """
         root = self.root()
         if len(refs) == 0:
@@ -1526,7 +1526,7 @@ class WorldModelGraphSFA(WorldModelTree):
             s = refs_all.index(refs_1[i])
             for j in indices[0:k+1]:
                 # index: refs -> refs_all
-                t = refs_all.index(refs_1[j])
+                #t = refs_all.index(refs_1[j])
                 u = refs_all.index(refs_2[j])
                 #W[s,t] = 0.1
                 #W[t,s] = 0.1
@@ -1601,9 +1601,14 @@ class WorldModelGraphSFA(WorldModelTree):
             x = np.array(x, ndmin=2)
         signal = self.classifier.execute(x)[0,0]
         return 0 if signal < .5 else 1
+
     
 
 class WorldModelFactorize():
+    """
+    This meta-model organizes one model for each action to allow for different
+    (and hopefully orthogonal) partitions for each action.
+    """
    
     def __init__(self):
         self.models = {}
@@ -1638,10 +1643,13 @@ class WorldModelFactorize():
             gain += self.models[a].single_splitting_step(action=a, min_gain=min_gain)
             
         return gain / len(actions)
+
     
     
 class WorldModelFactorizeFastNode(WorldModelTree):
-    
+    """
+    A model class that is suited to be used by WorldModelFactorize.
+    """
     
     def _get_transition_graph(self, fast_action, k=15, normalize=True):
 
@@ -1674,8 +1682,8 @@ class WorldModelFactorizeFastNode(WorldModelTree):
             for t in indices[0:k+1]:
                 if s != t:
                     if actions[s] == fast_action:
-                        W[s,t] = weight
-                        W[t,s] = weight
+                        W[s,t] = 1#weight
+                        W[t,s] = 1#weight
                     else:
                         W[s,t] = 1
                         W[t,s] = 1
@@ -1683,13 +1691,15 @@ class WorldModelFactorizeFastNode(WorldModelTree):
         # transitions to successors
         # s - current node
         # t - neighbor node
-        # u - following node
-        for s in range(N-1):
+        # u - following node (of neighbor)
+        for s, _ in enumerate(refs):
             indices = np.argsort(distances[s])  # closest one should be the point itself
             for t in indices[0:k+1]:
-                u = t+1
-                if u >= N:
+                ref_t = refs[t]
+                ref_u = ref_t + 1
+                if ref_u not in refs:
                     continue
+                u = refs.index(ref_u)
                 if actions[u] == fast_action:
                     W[s,u] = -weight
                     W[u,s] = -weight
@@ -1707,67 +1717,31 @@ class WorldModelFactorizeFastNode(WorldModelTree):
         return W
 
 
-    def _get_knn_graph(self, k=15, normalize=True):
-
-        refs = self._get_data_refs()
-        data = self._get_data_for_refs(refs)
-        N = len(refs)        
-        
-        # pairwise distances
-        distances = scipy.spatial.distance.pdist(data)
-        distances = scipy.spatial.distance.squareform(distances)
-    
-        # transition matrix
-        W = np.zeros((N, N))
-        #W += 1e-8
-        
-        # transitions to neighbors
-        # s - current node
-        # t - neighbor node
-        # u - following node
-        for s in range(N):
-            indices = np.argsort(distances[s])  # closest one should be the point itself
-            for t in indices[0:k+1]:
-                if s != t:
-                    W[s,t] = 1
-                    W[t,s] = 1
-    
-        # normalize matrix
-        if normalize:
-            d = np.sum(W, axis=1)
-            for i in range(N):
-                if d[i] > 0:
-                    W[i] = W[i] / d[i]
-                
-        return W
-
-
     def _init_test(self, action, fast_partition=False):
         """
         Initializes the parameters that split the node in two halves.
         """
         assert self.status == 'leaf'
         
-        if fast_partition:
             W = self._get_transition_graph(fast_action=action, k=15, normalize=True)
         else:
-            W = self._get_knn_graph(k=15, normalize=True)
+            return False
+            
+        # laplacian
+        W = np.diag(np.sum(W, axis=1)) - W
 
         # data        
         refs = self._get_data_refs()
         data = self._get_data_for_refs(refs=refs)
         
         # second eigenvector
-        E, U = scipy.linalg.eig(a=W)
+        E, U = scipy.linalg.eig(a=(W+W.T))
         #E, U = linalg.eigs(np.array(W), k=2, which='LR')
         E, U = np.real(E), np.real(U)
         
         # bi-partition
         idx = np.argsort(E)
-        if fast_partition:
-            col = idx[-1]
-        else:
-            col = idx[-1]
+        col = idx[0]
         u = U[:,col]
         #u -= np.mean(u)
         #assert -1 in np.sign(u)

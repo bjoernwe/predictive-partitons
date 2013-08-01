@@ -1,3 +1,7 @@
+"""
+Plots different models that are only split with respect to one specific action.
+"""
+
 from matplotlib import pyplot as plt
 
 import worldmodel
