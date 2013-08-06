@@ -20,19 +20,19 @@ class DataReferencesTest(unittest.TestCase):
         data[3] = [-3.0,  1]
         actions = [None, 0, 1, 0]
         # add data to model
-        model = worldmodel.WorldModelPCA()
+        model = worldmodel.WorldModel(method='pca')
         model.add_data(x=data, actions=actions)
         # transitions in one single state
-        self.assertEqual(model._get_transition_refs(heading_in=False, inside=False, heading_out=False), [[], []])
-        self.assertEqual(model._get_transition_refs(heading_in=True, inside=False, heading_out=False), [[], []])
-        self.assertEqual(model._get_transition_refs(heading_in=False, inside=True, heading_out=False), [[0, 1, 2], [1, 2, 3]])
-        self.assertEqual(model._get_transition_refs(heading_in=False, inside=False, heading_out=True), [[], []])
+        self.assertEqual(model.tree._get_transition_refs(heading_in=False, inside=False, heading_out=False), [[], []])
+        self.assertEqual(model.tree._get_transition_refs(heading_in=True, inside=False, heading_out=False), [[], []])
+        self.assertEqual(model.tree._get_transition_refs(heading_in=False, inside=True, heading_out=False), [[0, 1, 2], [1, 2, 3]])
+        self.assertEqual(model.tree._get_transition_refs(heading_in=False, inside=False, heading_out=True), [[], []])
         # more data and split node
         for _ in range(99):
             model.add_data(data, actions=actions)
         model.single_splitting_step()
         # test again with two states
-        leaf1, _ = model.get_leaves()
+        leaf1, _ = model.tree.get_leaves()
         refs1, refs2 = leaf1._get_transition_refs(heading_in=True, inside=False, heading_out=False)
         self.assertEqual([refs1[:2], refs2[:2]], [[3, 7], [4, 8]])
         refs1, refs2 = leaf1._get_transition_refs(heading_in=False, inside=True, heading_out=False)
@@ -81,9 +81,9 @@ class TrivialTransitionsTest(unittest.TestCase):
 
     def testTrivialTransMatrix(self):
         data = worldmodel.problemChain(n=1000, seed=0)
-        tree = worldmodel.WorldModelTree()
-        tree.add_data(data)
-        trans = tree._merge_transition_matrices()
+        model = worldmodel.WorldModel()
+        model.add_data(data)
+        trans = model._merge_transition_matrices()
         self.assertEqual(trans.shape, (1,1))
         self.assertEqual(trans[0,0], data.shape[0]-1) # n of transitions
 
@@ -95,22 +95,17 @@ class TrivialEntropyTests(unittest.TestCase):
         self.data = worldmodel.problemChain(n=1000, seed=0)
 
     def testTrivialEntropy(self):
-        tree = worldmodel.WorldModelTree()
-        tree.add_data(self.data)
-        entropy = tree.entropy()
+        model = worldmodel.WorldModel()
+        model.add_data(self.data)
+        transitions = model._merge_transition_matrices()
+        entropy = model._matrix_entropy(transitions=transitions, normalize=False)
         self.assertEqual(entropy, 1.0)
 
     def testTrivialTransEntropy(self):
-        tree = worldmodel.WorldModelTree()
+        tree = worldmodel.WorldModel()
         tree.add_data(self.data)
         transitions = tree._merge_transition_matrices()
-        entropy = worldmodel.WorldModelTree._matrix_entropy(transitions=transitions)
-        self.assertEqual(entropy, 1.0)
-
-    def testTrivialLeafEntropy(self):
-        tree = worldmodel.WorldModelTree()
-        tree.add_data(self.data)
-        entropy = tree.entropy()
+        entropy = worldmodel.WorldModel._matrix_entropy(transitions=transitions)
         self.assertEqual(entropy, 1.0)
 
 
@@ -120,39 +115,39 @@ class VectorEntropyTests(unittest.TestCase):
     def testZeroEntropy(self):
         for i in range(10):
             zeros = np.zeros(i)
-            entropy = worldmodel.WorldModelTree._entropy(dist=zeros, normalize=True, ignore_empty_classes=True)
+            entropy = worldmodel.WorldModel._entropy(dist=zeros, normalize=True, ignore_empty_classes=True)
             self.assertEqual(entropy, 1.0)
         for i in range(2,10):
             zeros = np.zeros(i)
-            entropy = worldmodel.WorldModelTree._entropy(dist=zeros, normalize=False, ignore_empty_classes=True)
+            entropy = worldmodel.WorldModel._entropy(dist=zeros, normalize=False, ignore_empty_classes=True)
             self.assertEqual(entropy, np.log2(i))
 
     def testOneEntropy(self):
         for i in range(2,10):
             ones = np.ones(i)
-            entropy = worldmodel.WorldModelTree._entropy(dist=ones, normalize=True)
+            entropy = worldmodel.WorldModel._entropy(dist=ones, normalize=True)
             self.assertEqual(entropy, 1.0)
         for i in range(2,10):
             ones = np.ones(i)
-            entropy = worldmodel.WorldModelTree._entropy(dist=ones, normalize=False)
+            entropy = worldmodel.WorldModel._entropy(dist=ones, normalize=False)
             self.assertEqual(entropy, np.log2(i))
 
     def testCustomEntropy(self):
 
         # normalized
-        entropy = worldmodel.WorldModelTree._entropy(dist=np.array(range(2)), normalize=True)
+        entropy = worldmodel.WorldModel._entropy(dist=np.array(range(2)), normalize=True)
         self.assertEqual(entropy, 0.0)
-        entropy = worldmodel.WorldModelTree._entropy(dist=np.array(range(3)), normalize=True)
+        entropy = worldmodel.WorldModel._entropy(dist=np.array(range(3)), normalize=True)
         self.assertEqual(entropy, 0.5793801642856950)
-        entropy = worldmodel.WorldModelTree._entropy(dist=np.array(range(4)), normalize=True)
+        entropy = worldmodel.WorldModel._entropy(dist=np.array(range(4)), normalize=True)
         self.assertEqual(entropy, 0.72957395851362239)
 
         # not normalized
-        entropy = worldmodel.WorldModelTree._entropy(dist=np.array(range(2)), normalize=False)
+        entropy = worldmodel.WorldModel._entropy(dist=np.array(range(2)), normalize=False)
         self.assertEqual(entropy, 0.0)
-        entropy = worldmodel.WorldModelTree._entropy(dist=np.array(range(3)), normalize=False)
+        entropy = worldmodel.WorldModel._entropy(dist=np.array(range(3)), normalize=False)
         self.assertEqual(entropy, 0.91829583405448956)
-        entropy = worldmodel.WorldModelTree._entropy(dist=np.array(range(4)), normalize=False)
+        entropy = worldmodel.WorldModel._entropy(dist=np.array(range(4)), normalize=False)
         self.assertEqual(entropy, 1.4591479170272448)
 
     def testRandomEntropy(self):
@@ -163,14 +158,14 @@ class VectorEntropyTests(unittest.TestCase):
         for l in range(10):
             for _ in range(1000):
                 p = l * np.random.random(l)
-                e = worldmodel.WorldModelTree._entropy(dist=p, normalize=True)
+                e = worldmodel.WorldModel._entropy(dist=p, normalize=True)
                 self.assertGreaterEqual(e, 0.)
                 self.assertLessEqual(e, 1.)
 
         for l in range(2, 10):
             for _ in range(1000):
                 p = l * np.random.random(l)
-                e = worldmodel.WorldModelTree._entropy(dist=p, normalize=True)
+                e = worldmodel.WorldModel._entropy(dist=p, normalize=True)
                 self.assertGreaterEqual(e, 0.)
                 self.assertLessEqual(e, np.log2(l))
                 
@@ -179,16 +174,16 @@ class VectorEntropyTests(unittest.TestCase):
         """
         # 'useless' Markov Chain
         S = 10 * np.ones((8, 8))
-        assert_almost_equal(0.0, worldmodel.WorldModelTree._mutual_information(transition_matrix=S))
+        assert_almost_equal(0.0, worldmodel.WorldModel._mutual_information(transition_matrix=S))
         
         # deterministic Markov Chain
         T = np.zeros((8, 8))
         for i in range(8):
             T[i,(i+1)%8] = 80
-        assert_almost_equal(3.0, worldmodel.WorldModelTree._mutual_information(transition_matrix=T))
+        assert_almost_equal(3.0, worldmodel.WorldModel._mutual_information(transition_matrix=T))
         
         # test mixture
-        assert_almost_equal(1.5, worldmodel.WorldModelTree._mutual_information_average(transition_matrices=[S, T]))
+        assert_almost_equal(1.5, worldmodel.WorldModel._mutual_information_average(transition_matrices=[S, T]))
 
 
 if __name__ == "__main__":

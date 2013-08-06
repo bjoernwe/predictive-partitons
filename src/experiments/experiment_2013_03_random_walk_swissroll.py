@@ -58,7 +58,7 @@ if __name__ == '__main__':
 
     # train model
     data = RandomSwissRollData(n=1000)
-    model = worldmodel.WorldModelSpectral()
+    model = worldmodel.WorldModel(method='spectral')
     model.add_data(x=data.data, actions=data.actions)
     model.learn(min_gain=0.02)
     
@@ -67,7 +67,6 @@ if __name__ == '__main__':
     data.plot(show_plot=False)
     pyplot.subplot(1, 2, 2)
     model.plot_states(show_plot=False)
-    model.plot_states(show_plot=False)
-    model.plot_tree_data(color='state', show_plot=False)
+    model.plot_data(color='state', show_plot=False)
     pyplot.show()
     

@@ -21,7 +21,7 @@ if __name__ == '__main__':
     cm = pyplot.cm.get_cmap('summer')
     pyplot.subplot(2, 3, 1)
     pyplot.imshow(-env.Z.T, interpolation='none', origin='lower', extent=[0, maze_size+1, 0, maze_size+1], cmap=cm)
-    model.models.values()[0].plot_tree_data(color='none', show_plot=False)
+    model.models.values()[0].plot_data(color='none', show_plot=False)
     for i, (a, m) in enumerate(model.models.items()):
         pyplot.subplot(2, 3, i+2+(i/2))
         pyplot.imshow(-env.Z.T, interpolation='none', origin='lower', extent=[0, maze_size+1, 0, maze_size+1], cmap=cm)

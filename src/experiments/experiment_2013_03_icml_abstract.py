@@ -6,16 +6,16 @@ learning.
 from matplotlib import pyplot
 
 import worldmodel
-import experiment_noisy_dim
-import experiment_random_walk_2d
-import experiment_random_walk_swissroll
+import experiment_2013_02_noisy_dim
+import experiment_2013_03_random_walk_2d
+import experiment_2013_03_random_walk_swissroll
 
             
 if __name__ == '__main__':
 
-    data_generators = [experiment_random_walk_swissroll.RandomSwissRollData,
-                       experiment_noisy_dim.NoisyDimData,
-                       experiment_random_walk_2d.RandomWalk2DData]
+    data_generators = [experiment_2013_03_random_walk_swissroll.RandomSwissRollData,
+                       experiment_2013_02_noisy_dim.NoisyDimData,
+                       experiment_2013_03_random_walk_2d.RandomWalk2DData]
     plot_ranges = [[-1, 1], [0, 1], [0, 1]]
     data_sizes = [4000, 4000, 4000]
     titles = ['(a)', '(b)', '(c)']
@@ -24,7 +24,7 @@ if __name__ == '__main__':
         
         # train model
         data = generator(n=data_sizes[i])
-        model = worldmodel.WorldModelSpectral()
+        model = worldmodel.WorldModel(method='spectral')
         model.add_data(x=data.data, actions=data.actions)
         model.learn(min_gain=0.02)
         
@@ -32,7 +32,7 @@ if __name__ == '__main__':
         pyplot.subplot(1, 3, i+1)
         model.plot_state_borders(show_plot=False)
         if i == 0:
-            model.plot_tree_data(color='none', show_plot=False)
+            model.plot_data(color='none', show_plot=False)
         pyplot.xlabel(titles[i])
         
     pyplot.show()

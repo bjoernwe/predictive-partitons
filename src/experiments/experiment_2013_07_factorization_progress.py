@@ -20,7 +20,7 @@ if __name__ == '__main__':
     for i in range(4):
         model.single_splitting_step(action=None, min_gain=0.0)
         for j, (a, m) in enumerate(model.models.items()):
-            mi = worldmodel.WorldModelTree._mutual_information(m.transitions[a])
+            mi = worldmodel.WorldModel._mutual_information(m.transitions[a])
             pyplot.subplot(4, 4, (4*i)+(j+1))
             pyplot.title(mi)
             m.plot_states(show_plot=False)

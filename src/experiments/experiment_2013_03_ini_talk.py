@@ -22,7 +22,7 @@ if __name__ == '__main__':
         
         # train model
         data = generator(n=data_sizes[i], seed=1)
-        model = worldmodel.WorldModelSpectral()
+        model = worldmodel.WorldModel(method='spectral')
         model.add_data(x=data.data, actions=data.actions)
         model.learn(min_gain=0.02)
         
@@ -33,7 +33,7 @@ if __name__ == '__main__':
         pyplot.ylabel('feature 2')
         #if i == 0:
         pyplot.figure()
-        model.plot_tree_data(color='none', show_plot=False)
+        model.plot_data(color='none', show_plot=False)
         pyplot.xlabel('feature 1')
         pyplot.ylabel('feature 2')
         
