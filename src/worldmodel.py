@@ -21,6 +21,7 @@ Stats = collections.namedtuple('Stats', ['n_states',
                                          'mutual_information'])
 
 SplitResult = collections.namedtuple('SplitResult', ['node',
+                                                     'index',
                                                      'action',
                                                      'gain',
                                                      'split_labels',
@@ -144,11 +145,14 @@ class WorldModel(object):
         if len(self.stats) == 0:
             self.stats.append(self._calc_stats(transitions=self.transitions))
 
-        # split as long as it's interesting            
-        gain = float('inf')
-        while gain >= min_gain:
-            gain = self.single_splitting_step(action=action, min_gain=min_gain)
-            if gain >= min_gain:
+        # split as long as it's interesting
+        gain = 0
+        while True:
+            split = self.single_splitting_step(action=action, min_gain=min_gain)
+            if split is None or split.gain < min_gain:
+                break
+            else:
+                gain = split.gain
                 print 'split with gain', gain, '\n'
             
         return gain
@@ -180,7 +184,7 @@ class WorldModel(object):
             best_split.node._apply_split(split_result=best_split)
             self.stats.append(self._calc_stats(transitions=self.transitions))
             
-        return best_gain
+        return best_split
     
     
     def classify(self, x):
@@ -414,6 +418,80 @@ class WorldModel(object):
         list_mi = [weights[i] * cls._mutual_information(P) for i, P in enumerate(transition_matrices) if weights[i] > 0]
         return np.sum(list_mi) / np.sum(weights)
             
+
+    def get_transition_probabilities(self, action=None, soft=False):
+        """
+        Returns a dictionary containing for every action a matrix with 
+        transition probabilities. If an action is specified only the 
+        corresponding transition matrix is returned.
+        """
+        if action not in self.transitions.keys():
+            return None
+         
+        if self.actions is not None and action is None:
+            probs = {}
+            for action in self.transitions.keys():
+                probs[action] = np.array(self.transitions[action])
+                if soft:
+                    probs[action] += 1
+                probs[action] /= probs[action].sum(axis=1)[:, np.newaxis] # normalize
+                 
+        else:
+            probs = np.array(self.transitions[action]) 
+            if soft:
+                probs[action] += 1
+            probs /= probs.sum(axis=1)[:, np.newaxis]
+         
+        return probs
+
+    
+    def get_graph_cost_matrix(self, soft=False):
+        """
+        Returns a distance matrix for the learned states that may be useful for
+        calculating a shortest path through the state space.
+         
+        The distances are calculated like this: first, we are considering the 
+        probability of moving from one state to another after selecting the best 
+        action for that transition. For that probability we then calculate the 
+        (negative) logarithm. The Dijkstra algorithm for instance works by 
+        summing up distances which would results in the (log-) product of our 
+        probability values.
+        """
+         
+        # helper variables
+        if self.get_number_of_samples() <= 1:
+            return np.ones((1,1))
+        probs = self.get_transition_probabilities(soft=soft)
+        actions = probs.keys()
+        if self.actions is not None and None in actions:
+            actions.remove(None)
+        num_actions = len(actions)
+        num_states = self.get_number_of_states()
+         
+        # tensor that holds all transition matrices
+        T = np.zeros((num_actions, num_states, num_states))
+        for i, action in enumerate(actions):
+            T[i] = probs[action]
+             
+        # from transition probabilities to affinity
+        A = T.max(axis=0)
+        A = -np.log(A)
+        return A
+
+
+    def get_state_means(self):
+        """
+        Returns a matrix with mean values for every state.
+        """
+        K = self.get_number_of_states()
+        D = self.get_input_dim()
+        means = np.zeros((K, D))
+         
+        for i, state in enumerate(self.tree.get_leaves()):
+            means[i] = state.get_data().mean(axis=0)
+             
+        return means
+
     
     def plot_data(self, color='state', vmin=None, vmax=None, ndim=None, show_plot=True):
         """
@@ -528,6 +606,13 @@ class WorldModel(object):
         return
          
 
+    def get_last_gains(self):
+        """
+        Returns a list containing the last gain of each leaf.
+        """
+        return [leaf.last_gain for leaf in self.tree.get_leaves()]
+        
+        
 
 class WorldModelTree(object):
     """
@@ -796,7 +881,8 @@ class WorldModelTree(object):
                         gain = new_mutual_information - old_mutual_information
                         if gain > best_gain:
                             best_gain = gain
-                            best_split = SplitResult(node = self, 
+                            best_split = SplitResult(node = self,
+                                                     index = self.get_leaf_index(), 
                                                      action = action, 
                                                      gain = gain, 
                                                      split_labels = new_labels, 
@@ -904,9 +990,9 @@ class WorldModelTree(object):
                 return False
             
         return True
-        
     
         
+    
 # class WorldModelTreeOld(object):
 # 
 #     symbols = ['o', '^', 'd', 's', '*']

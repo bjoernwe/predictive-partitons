@@ -21,7 +21,7 @@ class DataReferencesTest(unittest.TestCase):
         actions = [None, 0, 1, 0]
         # add data to model
         model = worldmodel.WorldModel(method='pca')
-        model.add_data(x=data, actions=actions)
+        model.add_data(data=data, actions=actions)
         # transitions in one single state
         self.assertEqual(model.tree._get_transition_refs(heading_in=False, inside=False, heading_out=False), [[], []])
         self.assertEqual(model.tree._get_transition_refs(heading_in=True, inside=False, heading_out=False), [[], []])
