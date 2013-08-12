@@ -68,13 +68,14 @@ def plot_value_function(world_model, Q):
 if __name__ == '__main__':
     
     maze = env_maze.EnvMaze(seed=0)
-    data, actions, _ = maze.do_random_steps(num_steps=3000)
+    data, actions, _ = maze.do_random_steps(num_steps=2000)
 
     world_model = worldmodel.WorldModel()
     world_model.add_data(data=data, actions=actions)
     world_model.learn()
     
     alpha = 0.5
+    epsilon = 0.1
     gamma = 0.9
     min_change = 0.01
     N = world_model.get_number_of_states()
@@ -92,10 +93,20 @@ if __name__ == '__main__':
     
     for _ in range(1000):
         
-        # do step
-        s = model.get_current_state()[0,0]
-        t, a, r = model.do_action(action=None)
-        t = t[0,0]
+        # get current state
+        maze_state = maze.get_current_state()
+        s = world_model.classify(maze_state)
+        
+        # epsilon-greedy action selection
+        if np.random.random() < epsilon:
+            new_maze_state, a, _ = maze.do_action(action=None)
+        else:
+            a = max(maze.get_available_actions(), key=lambda x: Q[x][s])
+            new_maze_state, a, _ = maze.do_action(action=a)
+            
+        # update model with that transition
+        t = world_model.classify(new_maze_state)
+        r = model.add_transition(target_state=t, action=a, previous_state=s)
         
         # update Q value
         max_q_t = max([Q[b][t] for b in model.get_available_actions()])
@@ -107,7 +118,6 @@ if __name__ == '__main__':
         #
         
         queue = PriorityQueue()
-        
         if abs(p) > min_change:
             queue.add(p, s)
             
@@ -125,25 +135,22 @@ if __name__ == '__main__':
             for s in range(N):
                 
                 # any action leading from state s to t?
-                best_action = None
-                best_action_prob = 0.0
-                for a in model.get_available_actions():
-                    
-                    # find greedy action to updated state t
-                    if T[a][s,t] > best_action_prob:
-                        best_action_prob = T[a][s,t]
-                        best_action = a
-                        
+                P = model.get_transition_probabilities()
+                greedy_action = max(model.get_available_actions(), key=lambda x: P[x][s,t])
+                
                 # perform greedy action and update Q
-                if best_action_prob > 0.01:
+                if P[greedy_action][s,t] > 0.01:
+                    
                     # simulate action
                     model.set_state(new_state=np.array([[s]]))
-                    t, a, r = model.do_action(action=best_action)
+                    t, a, r = model.do_action(action=greedy_action)
                     t = t[0,0]
+                    
                     # update Q value
                     max_q_t = max([Q[b][t] for b in model.get_available_actions()])
                     p = (r + gamma * max_q_t - Q[a][s])
                     Q[a][s] += alpha * p
+                    
                     # add s to queue if changed enough
                     if abs(p) > min_change:
                         queue.add(p, s)
