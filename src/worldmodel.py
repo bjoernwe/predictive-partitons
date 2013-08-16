@@ -35,10 +35,13 @@ class WorldModel(object):
         
         # data storage
         self.data = None        # global data storage
-        self.transitions = None
+        #self.transitions = None
         self.actions = None     # either None or a list of actions
         self.stats = []
         self._min_class_size = 100
+        
+        self.transitions = {}
+        self.transitions[None] = np.array([[0]])
         
         # root node of tree
         assert method in ['factorize' ,'pca', 'spectral']
@@ -132,7 +135,8 @@ class WorldModel(object):
             if self.actions is not None:
                 action = self.actions[i+1]
             self.transitions[action][source, target] += 1
-
+            
+        assert np.sum(self._merge_transition_matrices(transitions=self.transitions)) == N-1
         return
 
 
@@ -165,7 +169,9 @@ class WorldModel(object):
         
         TODO: only re-calculate states with some change
         """
-        
+        if self.data is None:
+            return None
+                
         best_gain = float('-inf')
         best_split = None
         
@@ -341,10 +347,10 @@ class WorldModel(object):
 
         for i in range(K):
             row = transitions[i]
-            row_entropies[i] = cls._entropy(dist=row, normalize=normalize, ignore_empty_classes=True)
+            row_entropies[i] = cls._entropy(dist=row, normalize=normalize, ignore_empty_classes=False)
 
         # weighted average
-        weights = np.sum(transitions, axis=1)
+        weights = np.sum(transitions, axis=1, dtype=np.float32)
         weights /= np.sum(weights)
         entropy = np.sum(weights * row_entropies)
         return entropy
@@ -378,7 +384,7 @@ class WorldModel(object):
                 return np.log2(K)
 
         # the actual calculation
-        probs = np.array(dist, dtype=np.float64) / trans_sum
+        probs = np.array(dist, dtype=np.float32) / trans_sum
         log_probs = np.zeros_like(probs)
         log_probs[probs > 0.] = np.log2( probs[probs > 0.] )
         entropy = -np.sum(probs * log_probs)
@@ -400,7 +406,7 @@ class WorldModel(object):
         """
         P = transition_matrix
         assert np.sum(P) > 0
-        weights = np.sum(P, axis=1)
+        weights = np.sum(P, axis=1, dtype=np.float32)
         mu = weights / np.sum(weights)
         entropy_mu = cls._entropy(dist=mu)
         entropy = cls._matrix_entropy(transitions=transition_matrix)
@@ -418,6 +424,19 @@ class WorldModel(object):
         list_mi = [weights[i] * cls._mutual_information(P) for i, P in enumerate(transition_matrices) if weights[i] > 0]
         return np.sum(list_mi) / np.sum(weights)
             
+            
+    def get_transitions(self, copy=False):
+        """
+        Returns the (copied) dictionary of transition matrices. 
+        """
+        if not copy:
+            return self.transitions
+        else:
+            trans = {}
+            for a, T in self.transitions.iteritems():
+                trans[a] = np.array(T, copy=True)
+            return trans
+        
 
     def get_transition_probabilities(self, action=None, soft=False):
         """
@@ -431,13 +450,13 @@ class WorldModel(object):
         if self.actions is not None and action is None:
             probs = {}
             for action in self.transitions.keys():
-                probs[action] = np.array(self.transitions[action])
+                probs[action] = np.array(self.transitions[action], dtype=np.float32)
                 if soft:
                     probs[action] += 1
                 probs[action] /= probs[action].sum(axis=1)[:, np.newaxis] # normalize
                  
         else:
-            probs = np.array(self.transitions[action]) 
+            probs = np.array(self.transitions[action], dtype=np.float32) 
             if soft:
                 probs[action] += 1
             probs /= probs.sum(axis=1)[:, np.newaxis]
@@ -850,7 +869,6 @@ class WorldModelTree(object):
         
         TODO: cache result!
         """
-        
         best_gain = float('-Inf')
         best_split = None
         
@@ -863,13 +881,13 @@ class WorldModelTree(object):
             else:
                 action_list = [action]
         
-        for action in action_list:
-            if self.model.transitions[action].sum() < self.model._min_class_size:
+        for a in action_list:
+            if self.model.transitions[a].sum() < self.model._min_class_size:
                 continue
-            print 'testing leaf', self.get_leaf_index(), 'with action', action
+            print 'testing leaf', self.get_leaf_index(), 'with action', a
             for fast_partition in [False, True]:
                 try:
-                    if self._init_test(action=action, fast_partition=fast_partition):
+                    if self._init_test(action=a, fast_partition=fast_partition):
                         new_labels, new_data = self._relabel_data()
                         if new_labels is None:
                             print 'USELESS SPLIT'
@@ -883,7 +901,7 @@ class WorldModelTree(object):
                             best_gain = gain
                             best_split = SplitResult(node = self,
                                                      index = self.get_leaf_index(), 
-                                                     action = action, 
+                                                     action = a, 
                                                      gain = gain, 
                                                      split_labels = new_labels, 
                                                      split_data_refs = new_data,
@@ -895,7 +913,7 @@ class WorldModelTree(object):
                     print 'Error calculating splitting gain'
                     print e
                     print traceback.print_exc()
-
+                    
         return best_split
     
     

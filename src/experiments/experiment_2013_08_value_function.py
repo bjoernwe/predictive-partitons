@@ -43,6 +43,7 @@ def QtoV(Q):
     """
     Calculates a value function from Q (assuming greed strategy).
     """
+    N = Q.itervalues().next().shape[0]
     V = np.zeros(N)
     for a in Q.keys():
         V = np.maximum(V, Q[a])
@@ -67,8 +68,9 @@ def plot_value_function(world_model, Q):
 
 if __name__ == '__main__':
     
+    model = None
     maze = env_maze.EnvMaze(seed=0)
-    data, actions, _ = maze.do_random_steps(num_steps=2000)
+    data, actions, _ = maze.do_random_steps(num_steps=1000)
 
     world_model = worldmodel.WorldModel()
     world_model.add_data(data=data, actions=actions)
@@ -81,43 +83,74 @@ if __name__ == '__main__':
     N = world_model.get_number_of_states()
     Q = {}
     
-    T = world_model.transitions
-    state_rewards = world_model.get_last_gains()
-    s = world_model.classify(maze.get_current_state())
-    model = env_model.EnvModel(transitions=T, state_rewards=state_rewards, init_state=s)
-    print state_rewards
+    #T = world_model.transitions
+    #state_rewards = world_model.get_last_gains()
+    #s = world_model.classify(maze.get_current_state())
+    #model = env_model.EnvModel(transitions=T, state_rewards=state_rewards, init_state=s)
+    #print state_rewards
 
     # initialize Q
-    for action in model.get_available_actions():
+    for action in maze.get_available_actions():
         Q[action] = np.zeros(N)
     
-    for _ in range(1000):
-        
+    for i in range(1000):
+
         # get current state
         maze_state = maze.get_current_state()
         s = world_model.classify(maze_state)
+        
+        # init priority queue
+        queue = PriorityQueue()
+        
+        # learn
+        if (i%100) == 0:
+            
+            split = world_model.single_splitting_step()
+            if split is not None:
+                # split value function
+                for action in maze.get_available_actions():
+                    Q[action] = np.insert(Q[action], split.index, values=Q[action][split.index,:], axis=0)
+                    Q[action] = np.insert(Q[action], split.index, values=Q[action][:,split.index], axis=1)
+                queue.add(np.float('inf'), split.index)
+                queue.add(np.float('inf'), split.index+1)
+                
+            # (re-)build model for new partition
+            if split is not None or model is None:
+                N = world_model.get_number_of_states()
+                T = world_model.get_transitions(copy=True)
+                state_rewards = world_model.get_last_gains()
+                maze_state = maze.get_current_state()
+                s = world_model.classify(maze_state)
+                model = env_model.EnvModel(transitions=T, state_rewards=state_rewards, init_state=s)
         
         # epsilon-greedy action selection
         if np.random.random() < epsilon:
             new_maze_state, a, _ = maze.do_action(action=None)
         else:
-            a = max(maze.get_available_actions(), key=lambda x: Q[x][s])
+            print Q
+            print s
+            action_values = np.array([Q[a][s] for a in maze.get_available_actions()])
+            action_sum = np.sum(action_values)
+            if action_sum > 0:
+                action_values /= action_sum
+            else:
+                action_values = np.ones(N) / N
+        #    a = max(maze.get_available_actions(), key=lambda x: Q[x][s])
             new_maze_state, a, _ = maze.do_action(action=a)
             
-        # update model with that transition
+        # inform models about the transition
+        world_model.add_data(new_maze_state, actions=[a])
         t = world_model.classify(new_maze_state)
         r = model.add_transition(target_state=t, action=a, previous_state=s)
         
         # update Q value
-        max_q_t = max([Q[b][t] for b in model.get_available_actions()])
+        max_q_t = max([Q[b][t] for b in maze.get_available_actions()])
         p = (r + gamma * max_q_t - Q[a][s])
         Q[a][s] += alpha * p
 
         #        
         # prioritized sweep
         #
-        
-        queue = PriorityQueue()
         if abs(p) > min_change:
             queue.add(p, s)
             
@@ -132,11 +165,15 @@ if __name__ == '__main__':
             
             # do a sample backup for every potential predecessor
             t = s
-            for s in range(N):
+            for s in range(world_model.get_number_of_states()):
                 
                 # any action leading from state s to t?
                 P = model.get_transition_probabilities()
-                greedy_action = max(model.get_available_actions(), key=lambda x: P[x][s,t])
+                print maze.get_available_actions()
+                print P
+                print s
+                print t
+                greedy_action = max(maze.get_available_actions(), key=lambda x: P[x][s,t])
                 
                 # perform greedy action and update Q
                 if P[greedy_action][s,t] > 0.01:
@@ -147,7 +184,7 @@ if __name__ == '__main__':
                     t = t[0,0]
                     
                     # update Q value
-                    max_q_t = max([Q[b][t] for b in model.get_available_actions()])
+                    max_q_t = max([Q[b][t] for b in maze.get_available_actions()])
                     p = (r + gamma * max_q_t - Q[a][s])
                     Q[a][s] += alpha * p
                     

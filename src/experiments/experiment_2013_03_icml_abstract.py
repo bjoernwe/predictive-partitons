@@ -25,7 +25,7 @@ if __name__ == '__main__':
         # train model
         data = generator(n=data_sizes[i])
         model = worldmodel.WorldModel(method='spectral')
-        model.add_data(x=data.data, actions=data.actions)
+        model.add_data(data=data.data, actions=data.actions)
         model.learn(min_gain=0.02)
         
         # plot data and result
