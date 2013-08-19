@@ -70,7 +70,7 @@ if __name__ == '__main__':
     
     model = None
     maze = env_maze.EnvMaze(seed=0)
-    data, actions, _ = maze.do_random_steps(num_steps=1000)
+    data, actions, _ = maze.do_random_steps(num_steps=100)
 
     world_model = worldmodel.WorldModel()
     world_model.add_data(data=data, actions=actions)
@@ -93,7 +93,7 @@ if __name__ == '__main__':
     for action in maze.get_available_actions():
         Q[action] = np.zeros(N)
     
-    for i in range(1000):
+    for i in range(2000):
 
         # get current state
         maze_state = maze.get_current_state()
@@ -108,11 +108,12 @@ if __name__ == '__main__':
             split = world_model.single_splitting_step()
             if split is not None:
                 # split value function
+                index = split.node.children[0].get_leaf_index()
+                print index
                 for action in maze.get_available_actions():
-                    Q[action] = np.insert(Q[action], split.index, values=Q[action][split.index,:], axis=0)
-                    Q[action] = np.insert(Q[action], split.index, values=Q[action][:,split.index], axis=1)
-                queue.add(np.float('inf'), split.index)
-                queue.add(np.float('inf'), split.index+1)
+                    Q[action] = np.insert(Q[action], index, values=Q[action][index], axis=0)
+                queue.add(np.float('inf'), index)
+                queue.add(np.float('inf'), index+1)
                 
             # (re-)build model for new partition
             if split is not None or model is None:
@@ -155,6 +156,7 @@ if __name__ == '__main__':
             queue.add(p, s)
             
         # process queue for max. 1000 steps
+        P = model.get_transition_probabilities()
         for _ in range(1000):
             
             if queue.is_empty():
@@ -168,11 +170,6 @@ if __name__ == '__main__':
             for s in range(world_model.get_number_of_states()):
                 
                 # any action leading from state s to t?
-                P = model.get_transition_probabilities()
-                print maze.get_available_actions()
-                print P
-                print s
-                print t
                 greedy_action = max(maze.get_available_actions(), key=lambda x: P[x][s,t])
                 
                 # perform greedy action and update Q

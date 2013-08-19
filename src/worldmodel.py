@@ -21,12 +21,8 @@ Stats = collections.namedtuple('Stats', ['n_states',
                                          'mutual_information'])
 
 SplitResult = collections.namedtuple('SplitResult', ['node',
-                                                     'index',
                                                      'action',
                                                      'gain',
-                                                     'split_labels',
-                                                     'split_data_refs',
-                                                     'split_transitions',
                                                      'classifier'])
 
 class WorldModel(object):
@@ -117,6 +113,7 @@ class WorldModel(object):
             state = self.labels[i]
             leaf  = all_leaves[state]
             leaf.dat_ref.append(i)
+            leaf.cached_split = {}  # reset cache because of new data
                 
         # create global transition matrices (for each action)
         K = len(all_leaves)
@@ -241,7 +238,6 @@ class WorldModel(object):
 
         # check
         transitions = self._merge_transition_matrices()
-        #print np.sum(transitions), '==', N-1
         assert np.sum(transitions) == N-1
         
         for action in self.transitions.keys():
@@ -257,10 +253,11 @@ class WorldModel(object):
         In special cases it might be necessary to have a split index1 -> index1 & index2.
         """
         N = len(new_labels)
+        S = np.sum(self.transitions[action])
         
         assert self.tree.get_leaves()[index1].status == 'leaf'
-        #print  max(new_labels),   root.transitions[action].shape[0]
         assert max(new_labels) == self.transitions[action].shape[0]
+        
         if index2 is None:
             index2 = index1
             assert self.tree.get_leaves()[index1].status == 'leaf'
@@ -283,7 +280,9 @@ class WorldModel(object):
                     new_source = new_labels[i]
                     new_target = new_labels[i+1]
                     new_trans[new_source, new_target] += 1
-        
+
+        assert np.sum(self.transitions[action]) == S
+        assert np.sum(new_trans) == S        
         return new_trans
     
     
@@ -300,7 +299,7 @@ class WorldModel(object):
         entropy_normalized = self._matrix_entropy(transitions=P, normalize=True)
         
         # norm of Q
-        weights = np.sum(P, axis=1)
+        weights = np.sum(P, axis=1, dtype=np.float)
         probs = P / weights[:,np.newaxis]
         mu = weights / np.sum(weights)
         norm = np.sum( ( probs**2 * mu[:,np.newaxis] ) / mu[np.newaxis,:] )
@@ -322,6 +321,8 @@ class WorldModel(object):
         """
         Merges the transition matrices of each action to a single one.
         """
+
+		# TODO we do not want the None-transitions, do we?
         
         if transitions is None:
             transitions = self.transitions
@@ -329,10 +330,11 @@ class WorldModel(object):
             return None
         K = transitions.itervalues().next().shape[0]
         
-        P = np.zeros((K,K))
+        P = np.zeros((K,K), dtype=np.int)
         for action in self.transitions.keys():
             P += self.transitions[action]
-            
+
+        assert np.sum(P) == len(self.labels)-1
         return P
     
     
@@ -648,6 +650,7 @@ class WorldModelTree(object):
         self.children = []
         self.last_gain = 0
         self.dat_ref = []   # indices of data belonging to this node
+        self.cached_split = None
         self.parents = []
         if parents is not None:
             self.parents = parents 
@@ -869,6 +872,10 @@ class WorldModelTree(object):
         
         TODO: cache result!
         """
+        # return cached result
+        if self.cached_split is not None and self.cached_split.has_key(action):
+            return self.cached_split[action]
+        
         best_gain = float('-Inf')
         best_split = None
         
@@ -888,25 +895,22 @@ class WorldModelTree(object):
             for fast_partition in [False, True]:
                 try:
                     if self._init_test(action=a, fast_partition=fast_partition):
-                        new_labels, new_data = self._relabel_data()
-                        if new_labels is None:
+                        new_local_transitons = self._calc_local_transition_matrix(action=a)
+                        if new_local_transitons is None:
                             print 'USELESS SPLIT'
-                            #assert False
                             continue
-                        split_transition_matrices = self.model._split_transition_matrices(new_labels=new_labels, index1=self.get_leaf_index())
-                        new_mutual_information = self.model._mutual_information_average(transition_matrices=split_transition_matrices.values())
-                        old_mutual_information = self.model._mutual_information_average(transition_matrices=self.model.transitions.values()) # TODO cache
-                        gain = new_mutual_information - old_mutual_information
+                        gain = self.model._mutual_information(transition_matrix=new_local_transitons)
                         if gain > best_gain:
+                            self.last_gain = gain
                             best_gain = gain
                             best_split = SplitResult(node = self,
-                                                     index = self.get_leaf_index(), 
                                                      action = a, 
                                                      gain = gain, 
-                                                     split_labels = new_labels, 
-                                                     split_data_refs = new_data,
-                                                     split_transitions = split_transition_matrices, 
                                                      classifier = self.classifier)
+                            # cache split
+                            self.cached_split = {}
+                            self.cached_split[None] = best_split
+                            self.cached_split[action] = best_split
                     else:
                         print 'init_test failed'
                 except Exception as e:
@@ -919,22 +923,24 @@ class WorldModelTree(object):
     
     def _apply_split(self, split_result):
         """
-        Splits all leaves belonging to that node.
+        Splits the node.
         """
         
         print 'splitting...'
         assert self.status == 'leaf'
-
+        
         # copy split result
         self.classifier = split_result.classifier
-        self.model.transitions = split_result.split_transitions
-        self.model.labels = split_result.split_labels
+        new_labels, new_data_refs = self._relabel_data()
+        self.model.transitions = self.model._split_transition_matrices(new_labels=new_labels, 
+                                                                       index1=self.get_leaf_index())
+        self.model.labels = new_labels
         
         # create new leaves
         child0 = self.__class__(model=self.model, parents = [self])
         child1 = self.__class__(model=self.model, parents = [self])
-        child0.dat_ref = split_result.split_data_refs[0]
-        child1.dat_ref = split_result.split_data_refs[1]
+        child0.dat_ref = new_data_refs[0]
+        child1.dat_ref = new_data_refs[1]
         
         # initialize last_gain with values of parent
         child0.last_gain = split_result.gain
@@ -1009,6 +1015,25 @@ class WorldModelTree(object):
             
         return True
     
+    
+    def _calc_local_transition_matrix(self, action):
+        """
+        Calculates a (2x2-) transition matrix for the bi-partition induced by
+        this node (call _init_test() before!).  
+        """
+        N = len(self.dat_ref)
+        trans = np.zeros((2,2))
+        child_indices = [self._test(self.model.data[ref]) for ref in self.dat_ref]
+        for i in range(N-1):
+            if self.model.actions is None or self.model.actions[self.dat_ref[i+1]] == action:
+                c1 = child_indices[i]
+                c2 = child_indices[i+1]
+                trans[c1,c2] += 1
+        if np.sum(trans[0]) == 0:
+            return None
+        if np.sum(trans[1]) == 0:
+            return None
+        return trans
         
     
 # class WorldModelTreeOld(object):
@@ -2850,10 +2875,12 @@ if __name__ == "__main__":
         #tree.single_splitting_step()
         #tree.single_splitting_step()
         #tree.single_splitting_step()
-        model.learn(min_gain=0.04)
+        model.learn(min_gain=0.01)
 
+        print model.transitions
         n_trans = np.sum(model._merge_transition_matrices())
         print 'final number of nodes:', len(model.tree._get_nodes()), '\n'
+        print n_trans, '==', n-1
         assert(n_trans == n-1)
 
         # plot tree and stats
