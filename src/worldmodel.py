@@ -406,6 +406,8 @@ class WorldModel(object):
         Calculates the mutual information between t and t+1 for a model given
         as transition matrix. 
         """
+        if transition_matrix is None:
+            return None
         P = transition_matrix
         assert np.sum(P) > 0
         weights = np.sum(P, axis=1, dtype=np.float32)
@@ -869,16 +871,13 @@ class WorldModelTree(object):
         Calculates the gain in mutual information if this node would be split.
         
         Calculations can be restricted to a given action.
-        
-        TODO: cache result!
         """
+        
         # return cached result
         if self.cached_split is not None and self.cached_split.has_key(action):
             return self.cached_split[action]
         
-        best_gain = float('-Inf')
-        best_split = None
-        
+        # prepare action list
         if self.model.actions is None:
             action_list = [None]
         else:
@@ -888,18 +887,26 @@ class WorldModelTree(object):
             else:
                 action_list = [action]
         
+        best_gain = float('-Inf')
+        best_split = None
+        
         for a in action_list:
+            
             if self.model.transitions[a].sum() < self.model._min_class_size:
                 continue
+            
             print 'testing leaf', self.get_leaf_index(), 'with action', a
             for fast_partition in [False, True]:
+                
                 try:
+                    
                     if self._init_test(action=a, fast_partition=fast_partition):
-                        new_local_transitons = self._calc_local_transition_matrix(action=a)
-                        if new_local_transitons is None:
+                        
+                        gain = self._calc_local_gain(action=a)
+                        if gain is None:
                             print 'USELESS SPLIT'
                             continue
-                        gain = self.model._mutual_information(transition_matrix=new_local_transitons)
+                            
                         if gain > best_gain:
                             self.last_gain = gain
                             best_gain = gain
@@ -913,6 +920,7 @@ class WorldModelTree(object):
                             self.cached_split[action] = best_split
                     else:
                         print 'init_test failed'
+                        
                 except Exception as e:
                     print 'Error calculating splitting gain'
                     print e
@@ -942,16 +950,19 @@ class WorldModelTree(object):
         child0.dat_ref = new_data_refs[0]
         child1.dat_ref = new_data_refs[1]
         
-        # initialize last_gain with values of parent
-        child0.last_gain = split_result.gain
-        child1.last_gain = split_result.gain
-        
         # create list of children
         self.children = []
         self.children.append(child0)
         self.children.append(child1)
-        self.status = 'split'
-            
+        self.status = 'split'   # make it official!
+
+        # initialize gain values
+        split0 = child0._calculate_best_split()
+        split1 = child1._calculate_best_split()
+        if split0 is not None:
+            child0.last_gain = split0.gain
+        if split1 is not None:
+            child1.last_gain = split1.gain
         return
     
     
@@ -1014,6 +1025,14 @@ class WorldModelTree(object):
                 return False
             
         return True
+
+
+    def _calc_local_gain(self, action):
+        """
+        Calculates the mutual entropy for a bipartition of that node (call 
+        _init_test() before).
+        """
+        return self.model._mutual_information(self._calc_local_transition_matrix(action))
     
     
     def _calc_local_transition_matrix(self, action):
