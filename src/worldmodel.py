@@ -140,8 +140,6 @@ class WorldModel(object):
                 state = self.labels[i]
                 leaf  = all_leaves[state]
                 leaf.dat_ref.append(i)
-                # TODO don't delete splits for all actions!
-                leaf.split_cache = {}  # reset cache because of new data
                     
             # create global transition matrices (for each action)
             K = len(all_leaves)
@@ -166,7 +164,8 @@ class WorldModel(object):
                     if leaf.split_cache.has_key(action):
                         leaf.split_cache.pop(action)
                         leaf.split_cache.pop(None)
-                        leaf.split_cache[None] = max(leaf.split_cache.values(), key=lambda s: s.gain)
+                        if len(leaf.split_cache.keys()) > 0:
+                            leaf.split_cache[None] = max(leaf.split_cache.values(), key=lambda s: s.gain)
             
         assert np.sum(self._merge_transition_matrices(transitions=self.transitions)) == N-1
         return
