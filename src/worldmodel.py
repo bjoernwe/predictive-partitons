@@ -113,7 +113,8 @@ class WorldModel(object):
             state = self.labels[i]
             leaf  = all_leaves[state]
             leaf.dat_ref.append(i)
-            leaf.cached_split = {}  # reset cache because of new data
+            # TODO don't delete splits for all actions!
+            leaf.split_cache = {}  # reset cache because of new data
                 
         # create global transition matrices (for each action)
         K = len(all_leaves)
@@ -177,7 +178,6 @@ class WorldModel(object):
             split = leaf._calculate_best_split(action=action)
             if split is not None and leaf._reached_min_sample_size(action=action):
                 print 'best split: leaf', leaf.get_leaf_index(), 'with action', split.action, 'with gain', split.gain
-                leaf.last_gain = split.gain
                 if split.gain > best_gain:
                     best_gain = split.gain
                     best_split = split
@@ -546,16 +546,17 @@ class WorldModel(object):
             
             leaves = self.tree.get_leaves()
             if vmin is None:
-                vmin = min([leaf.last_gain for leaf in leaves])
+                vmin = min([leaf.get_gain() for leaf in leaves])
             if vmax is None:
-                vmax = max([leaf.last_gain for leaf in leaves])
+                vmax = max([leaf.get_gain() for leaf in leaves])
             colormap = pyplot.cm.get_cmap('summer')
             
             for leaf in leaves:
                 data = leaf.get_data()
                 if ndim is not None and ndim < self.get_input_dim():
                     data = sklearn.manifold.Isomap(n_neighbors=10, n_components=ndim).fit_transform(data)
-                colors = [leaf.last_gain for _ in range(data.shape[0])]
+                gain = leaf.get_gain()
+                colors = [gain for _ in range(data.shape[0])]
                 pyplot.scatter(x=data[:,0], y=data[:,1], c=colors, cmap=colormap, edgecolors='none', vmin=vmin, vmax=vmax)
                 
         else:
@@ -629,11 +630,24 @@ class WorldModel(object):
         return
          
 
-    def get_last_gains(self):
+    def plot_stats(self, show_plot=True):
         """
-        Returns a list containing the last gain of each leaf.
+        Plots how the models benchmark values have developed during training.
         """
-        return [leaf.last_gain for leaf in self.tree.get_leaves()]
+        stats = np.vstack(self.stats)
+        pyplot.plot(stats)
+        pyplot.legend(list(self.stats[0]._fields)[0:], loc=2)
+         
+        if show_plot:
+            pyplot.show()
+        return
+    
+    
+    def get_gains(self):
+        """
+        Returns a list containing the last calculated gain of each leaf.
+        """
+        return [leaf.get_gain() for leaf in self.tree.get_leaves()]
         
         
 
@@ -650,9 +664,8 @@ class WorldModelTree(object):
         self.model = model
         self.status = 'leaf'
         self.children = []
-        self.last_gain = 0
         self.dat_ref = []   # indices of data belonging to this node
-        self.cached_split = None
+        self.split_cache = None
         self.parents = []
         if parents is not None:
             self.parents = parents 
@@ -737,6 +750,15 @@ class WorldModelTree(object):
             len(new_dat_ref[1]) == 0):
             return None, None
         return new_labels, new_dat_ref
+
+
+    def get_gain(self):
+        if self.split_cache is None or not self.split_cache.has_key(None):
+            self._calculate_best_split(action=None)
+        if self.split_cache is not None and self.split_cache.has_key(None):
+            return self.split_cache[None].gain
+        else:
+            return 0.0 
 
 
     def get_data(self):
@@ -874,9 +896,10 @@ class WorldModelTree(object):
         """
         
         # return cached result
-        if self.cached_split is not None and self.cached_split.has_key(action):
-            return self.cached_split[action]
-        
+        if self.split_cache is not None and self.split_cache.has_key(action):
+            return self.split_cache[action]
+        self.split_cache = {}
+
         # prepare action list
         if self.model.actions is None:
             action_list = [None]
@@ -888,14 +911,12 @@ class WorldModelTree(object):
                 action_list = [action]
         
         best_gain = float('-Inf')
-        best_split = None
         
         for a in action_list:
             
-            if self.model.transitions[a].sum() < self.model._min_class_size:
-                continue
-            
             print 'testing leaf', self.get_leaf_index(), 'with action', a
+            best_gain_for_action = float('-Inf')
+            
             for fast_partition in [False, True]:
                 
                 try:
@@ -906,18 +927,19 @@ class WorldModelTree(object):
                         if gain is None:
                             print 'USELESS SPLIT'
                             continue
+                        
+                        split = SplitResult(node = self,
+                                            action = a, 
+                                            gain = gain, 
+                                            classifier = self.classifier)
                             
                         if gain > best_gain:
-                            self.last_gain = gain
                             best_gain = gain
-                            best_split = SplitResult(node = self,
-                                                     action = a, 
-                                                     gain = gain, 
-                                                     classifier = self.classifier)
-                            # cache split
-                            self.cached_split = {}
-                            self.cached_split[None] = best_split
-                            self.cached_split[action] = best_split
+                            self.split_cache[None] = split                         
+                        if gain > best_gain_for_action:
+                            best_gain_for_action = gain
+                            self.split_cache[a] = split
+                        
                     else:
                         print 'init_test failed'
                         
@@ -926,7 +948,7 @@ class WorldModelTree(object):
                     print e
                     print traceback.print_exc()
                     
-        return best_split
+        return self.split_cache[None] if self.split_cache.has_key(None) else None
     
     
     def _apply_split(self, split_result):
@@ -938,6 +960,7 @@ class WorldModelTree(object):
         assert self.status == 'leaf'
         
         # copy split result
+        self.split_gain = split_result.gain
         self.classifier = split_result.classifier
         new_labels, new_data_refs = self._relabel_data()
         self.model.transitions = self.model._split_transition_matrices(new_labels=new_labels, 
@@ -956,13 +979,10 @@ class WorldModelTree(object):
         self.children.append(child1)
         self.status = 'split'   # make it official!
 
-        # initialize gain values
-        split0 = child0._calculate_best_split()
-        split1 = child1._calculate_best_split()
-        if split0 is not None:
-            child0.last_gain = split0.gain
-        if split1 is not None:
-            child1.last_gain = split1.gain
+        # initialize a first split
+        child0._calculate_best_split()
+        child1._calculate_best_split()
+        self.split_cache = None
         return
     
     
@@ -2438,9 +2458,9 @@ class WorldModelSpectral(WorldModelTree):
         
         # classifier
         labels = map(lambda x: 1 if x > 0 else 0, u)
-        #self.classifier = mdp.nodes.KNNClassifier(k=20)
+        self.classifier = mdp.nodes.KNNClassifier(k=20)
         #self.classifier = mdp.nodes.NearestMeanClassifier()
-        self.classifier = mdp.nodes.LibSVMClassifier(probability=False)
+        #self.classifier = mdp.nodes.LibSVMClassifier(probability=False)
         self.classifier.train(data, np.array(labels, dtype='int'))
         self.classifier.stop_training()
         y = self.classifier.label(data)

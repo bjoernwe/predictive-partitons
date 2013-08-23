@@ -68,12 +68,12 @@ def plot_value_function(world_model, Q):
 
 if __name__ == '__main__':
     
-    model = None
-    maze = env_maze.EnvMaze(seed=0)
-    data, actions, _ = maze.do_random_steps(num_steps=100)
+    model_intern = None
+    model_extern = env_maze.EnvMaze(seed=0)
+    data, data_actions, _ = model_extern.do_random_steps(num_steps=1000)
 
     world_model = worldmodel.WorldModel()
-    world_model.add_data(data=data, actions=actions)
+    world_model.add_data(data=data, actions=data_actions)
     world_model.learn()
     
     alpha = 0.5
@@ -85,18 +85,18 @@ if __name__ == '__main__':
     
     #T = world_model.transitions
     #state_rewards = world_model.get_last_gains()
-    #s = world_model.classify(maze.get_current_state())
-    #model = env_model.EnvModel(transitions=T, state_rewards=state_rewards, init_state=s)
+    #s = world_model.classify(model_extern.get_current_state())
+    #model_intern = env_model.EnvModel(transitions=T, state_rewards=state_rewards, init_state=s)
     #print state_rewards
 
     # initialize Q
-    for action in maze.get_available_actions():
+    for action in model_extern.get_available_actions():
         Q[action] = np.zeros(N)
     
     for i in range(2000):
 
         # get current state
-        maze_state = maze.get_current_state()
+        maze_state = model_extern.get_current_state()
         s = world_model.classify(maze_state)
         
         # init priority queue
@@ -110,44 +110,44 @@ if __name__ == '__main__':
                 # split value function
                 index = split.node.children[0].get_leaf_index()
                 print index
-                for action in maze.get_available_actions():
+                for action in model_extern.get_available_actions():
                     Q[action] = np.insert(Q[action], index, values=Q[action][index], axis=0)
                 queue.add(np.float('inf'), index)
                 queue.add(np.float('inf'), index+1)
                 
-            # (re-)build model for new partition
-            if split is not None or model is None:
+            # (re-)build model_intern for new partition
+            if split is not None or model_intern is None:
                 N = world_model.get_number_of_states()
                 T = world_model.get_transitions(copy=True)
-                state_rewards = world_model.get_last_gains()
-                maze_state = maze.get_current_state()
+                state_rewards = world_model.get_gains()
+                maze_state = model_extern.get_current_state()
                 s = world_model.classify(maze_state)
-                model = env_model.EnvModel(transitions=T, state_rewards=state_rewards, init_state=s)
+                model_intern = env_model.EnvModel(transitions=T, state_rewards=state_rewards, init_state=s)
+                P = model_intern.get_transition_probabilities()
         
         # epsilon-greedy action selection
         if np.random.random() < epsilon:
-            new_maze_state, a, _ = maze.do_action(action=None)
+            new_maze_state, action, _ = model_extern.do_action(action=None)
         else:
-            print Q
-            print s
-            action_values = np.array([Q[a][s] for a in maze.get_available_actions()])
+            action_values = np.array([Q[a][s] for a in model_extern.get_available_actions()])
             action_sum = np.sum(action_values)
             if action_sum > 0:
                 action_values /= action_sum
             else:
                 action_values = np.ones(N) / N
-        #    a = max(maze.get_available_actions(), key=lambda x: Q[x][s])
-            new_maze_state, a, _ = maze.do_action(action=a)
+            selected_action_index = action_values.cumsum().searchsorted(np.random.random()*np.sum(action_values))
+            selected_action = model_extern.get_available_actions()[selected_action_index]
+            new_maze_state, action, _ = model_extern.do_action(action=selected_action)
             
         # inform models about the transition
-        world_model.add_data(new_maze_state, actions=[a])
+        world_model.add_data(new_maze_state, actions=[action])
         t = world_model.classify(new_maze_state)
-        r = model.add_transition(target_state=t, action=a, previous_state=s)
+        r = model_intern.add_transition(target_state=t, action=action, previous_state=s)
         
         # update Q value
-        max_q_t = max([Q[b][t] for b in maze.get_available_actions()])
-        p = (r + gamma * max_q_t - Q[a][s])
-        Q[a][s] += alpha * p
+        max_q_t = max([Q[b][t] for b in model_extern.get_available_actions()])
+        p = (r + gamma * max_q_t - Q[action][s])
+        Q[action][s] += alpha * p
 
         #        
         # prioritized sweep
@@ -156,7 +156,6 @@ if __name__ == '__main__':
             queue.add(p, s)
             
         # process queue for max. 1000 steps
-        P = model.get_transition_probabilities()
         for _ in range(1000):
             
             if queue.is_empty():
@@ -170,18 +169,18 @@ if __name__ == '__main__':
             for s in range(world_model.get_number_of_states()):
                 
                 # any action leading from state s to t?
-                greedy_action = max(maze.get_available_actions(), key=lambda x: P[x][s,t])
+                greedy_action = max(model_extern.get_available_actions(), key=lambda x: P[x][s,t])
                 
                 # perform greedy action and update Q
                 if P[greedy_action][s,t] > 0.01:
                     
                     # simulate action
-                    model.set_state(new_state=np.array([[s]]))
-                    t, a, r = model.do_action(action=greedy_action)
+                    model_intern.set_state(new_state=np.array([[s]]))
+                    t, a, r = model_intern.do_action(action=greedy_action)
                     t = t[0,0]
                     
                     # update Q value
-                    max_q_t = max([Q[b][t] for b in maze.get_available_actions()])
+                    max_q_t = max([Q[b][t] for b in model_extern.get_available_actions()])
                     p = (r + gamma * max_q_t - Q[a][s])
                     Q[a][s] += alpha * p
                     
@@ -191,11 +190,16 @@ if __name__ == '__main__':
 
     print QtoV(Q)
 
+    
+    print model_intern.gain_trend
+    
     # plot
-    pyplot.subplot(1, 2, 1)            
+    pyplot.subplot(2, 2, 1)            
     world_model.plot_data(color='last_gain', show_plot=False)
     pyplot.colorbar()
-    pyplot.subplot(1, 2, 2)
+    pyplot.subplot(2, 2, 2)
     plot_value_function(world_model, Q)
+    pyplot.subplot(2, 1, 2)
+    world_model.plot_stats(show_plot=False)
     pyplot.show()
     
