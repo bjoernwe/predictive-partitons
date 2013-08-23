@@ -166,7 +166,7 @@ class WorldModel(object):
                     if leaf.split_cache.has_key(action):
                         leaf.split_cache.pop(action)
                         leaf.split_cache.pop(None)
-                        leaf.split_cache[None] = max(leaf.split_cache.values())
+                        leaf.split_cache[None] = max(leaf.split_cache.values(), key=lambda s: s.gain)
             
         assert np.sum(self._merge_transition_matrices(transitions=self.transitions)) == N-1
         return
