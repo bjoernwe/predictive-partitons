@@ -106,33 +106,67 @@ class WorldModel(object):
         assert actions is None or self.data.shape[0] == len(self.actions)
         assert self.data.shape[0] == self.labels.shape[0]
 
-        # add references to data in all leaves
-        all_leaves = self.tree.get_leaves()
-        N = self.data.shape[0]
-        for i in range(first_data, N):
-            state = self.labels[i]
-            leaf  = all_leaves[state]
-            leaf.dat_ref.append(i)
-            # TODO don't delete splits for all actions!
-            leaf.split_cache = {}  # reset cache because of new data
-                
-        # create global transition matrices (for each action)
-        K = len(all_leaves)
-        if self.transitions is None:
-            self.transitions = {}
-        action_set = [None] if self.actions is None else set(actions).union([None])
-        for action in action_set:
-            if action not in self.transitions.keys():
-                self.transitions[action] = np.zeros((K,K))
+        if self.actions is None:
             
-        # update transition matrices
-        for i in range(first_source, N-1):
-            source = self.labels[i]
-            target = self.labels[i+1]
-            action = None
-            if self.actions is not None:
+            # add references to data in all leaves
+            all_leaves = self.tree.get_leaves()
+            N = self.data.shape[0]
+            for i in range(first_data, N):
+                state = self.labels[i]
+                leaf  = all_leaves[state]
+                leaf.dat_ref.append(i)
+                # reset cache because of new data
+                leaf.split_cache = {}
+                    
+            # create global transition matrices (for each action)
+            K = len(all_leaves)
+            if self.transitions is None:
+                self.transitions = {}
+            if None not in self.transitions.keys():
+                self.transitions[None] = np.zeros((K,K))
+                
+            # update transition matrices
+            for i in range(first_source, N-1):
+                source = self.labels[i]
+                target = self.labels[i+1]
+                self.transitions[None][source, target] += 1
+            
+        else:
+
+            # add references to data in all leaves
+            all_leaves = self.tree.get_leaves()
+            N = self.data.shape[0]
+            for i in range(first_data, N):
+                state = self.labels[i]
+                leaf  = all_leaves[state]
+                leaf.dat_ref.append(i)
+                # TODO don't delete splits for all actions!
+                leaf.split_cache = {}  # reset cache because of new data
+                    
+            # create global transition matrices (for each action)
+            K = len(all_leaves)
+            if self.transitions is None:
+                self.transitions = {}
+            action_set = set(actions).union([None])
+            for action in action_set:
+                if action not in self.transitions.keys():
+                    self.transitions[action] = np.zeros((K,K))
+                
+            # update transition matrices
+            for i in range(first_source, N-1):
+                source = self.labels[i]
+                target = self.labels[i+1]
                 action = self.actions[i+1]
-            self.transitions[action][source, target] += 1
+                self.transitions[action][source, target] += 1
+                # reset cache for that action
+                if source == target:
+                    state = self.labels[i]
+                    leaf  = all_leaves[state]
+                    #leaf.split_cache = {}
+                    if leaf.split_cache.has_key(action):
+                        leaf.split_cache.pop(action)
+                        leaf.split_cache.pop(None)
+                        leaf.split_cache[None] = max(leaf.split_cache.values())
             
         assert np.sum(self._merge_transition_matrices(transitions=self.transitions)) == N-1
         return
