@@ -161,7 +161,7 @@ class WorldModel(object):
                     state = self.labels[i]
                     leaf  = all_leaves[state]
                     #leaf.split_cache = {}
-                    if leaf.split_cache.has_key(action):
+                    if leaf.split_cache is not None and leaf.split_cache.has_key(action):
                         leaf.split_cache.pop(action)
                         leaf.split_cache.pop(None)
                         if len(leaf.split_cache.keys()) > 0:
@@ -197,8 +197,6 @@ class WorldModel(object):
         """
         Calculates the gain for each state and splits the best one. Can be
         restricted to a given action.
-        
-        TODO: only re-calculate states with some change
         """
         if self.data is None:
             return None
@@ -490,7 +488,9 @@ class WorldModel(object):
                 probs[action] = np.array(self.transitions[action], dtype=np.float32)
                 if soft:
                     probs[action] += 1
-                probs[action] /= probs[action].sum(axis=1)[:, np.newaxis] # normalize
+                prob_sum = probs[action].sum(axis=1, dtype=np.float)
+                prob_sum[prob_sum==0] = np.float('inf')
+                probs[action] /= prob_sum[:, np.newaxis] # normalize
                  
         else:
             probs = np.array(self.transitions[action], dtype=np.float32) 
