@@ -61,7 +61,7 @@ def plot_value_function(world_model, Q, action=None):
     colormap = pyplot.cm.get_cmap('summer')
     for i, leaf in enumerate(world_model.tree.get_leaves()):
         assert i == leaf.get_leaf_index()
-        data = leaf.get_data()
+        data = leaf.get_data()[-100:]
         colors = [V[i] for _ in range(data.shape[0])]
         pyplot.scatter(x=data[:,0], y=data[:,1], c=colors, cmap=colormap, vmin=min(V), vmax=max(V), edgecolors='none')
     pyplot.colorbar()
@@ -156,23 +156,21 @@ if __name__ == '__main__':
     # parameters for Q learning
     alpha = 0.5
     epsilon = 0.1
-    gamma = 0.9
+    gamma = 0.8
     min_change = 0.01
     N = world_model.get_number_of_states()
     Q = QFunction(number_of_states=N, actions=model_extern.get_available_actions())
     
     # explore!
-    for i in range(1000):
+    pyplot.ion()
+    for t in range(10000):
 
         # get current state
         maze_state = model_extern.get_current_state()
         s = world_model.classify(maze_state)
         
-        # init priority queue
-        queue = PriorityQueue()
-        
         # learn
-        if (i%100) == 0:
+        if (t%100) == 0:
             
             split = world_model.single_splitting_step()
             
@@ -185,9 +183,19 @@ if __name__ == '__main__':
             if split is not None or model_intern is None:
                 N = world_model.get_number_of_states()
                 state_rewards = world_model.get_gains()
-                maze_state = model_extern.get_current_state()
+                #maze_state = model_extern.get_current_state()
                 s = world_model.classify(maze_state)
                 model_intern = env_model.EnvModel(worldmodel=world_model, state_rewards=state_rewards, init_state=s)
+                
+            # plot
+            pyplot.clf()
+            pyplot.subplot(1, 2, 1)
+            world_model.plot_data(color='last_gain', show_plot=False)
+            pyplot.colorbar()
+            pyplot.subplot(1, 2, 2)
+            plot_value_function(world_model=world_model, Q=Q)
+            pyplot.scatter(x=maze_state[0], y=maze_state[1], s=100)
+            pyplot.draw()
         
         # epsilon-greedy action selection
         if np.random.random() < epsilon:
@@ -195,6 +203,7 @@ if __name__ == '__main__':
         else:
             action_values = Q.get_action_values(state=s)
             action_sum = np.sum(action_values)
+            action_sum = action_sum**2
             if action_sum > 0:
                 action_values /= action_sum
             else:
@@ -216,9 +225,9 @@ if __name__ == '__main__':
     print QtoV(Q)
 
     # plot
-    for i, a in enumerate(model_extern.get_available_actions()):
-        pyplot.subplot(2, 2, i+1)
-        plot_value_function(world_model=world_model, Q=Q, action=a)
-        pyplot.title(a)
+#     for i, a in enumerate(model_extern.get_available_actions()):
+#         pyplot.subplot(2, 2, i+1)
+#         plot_value_function(world_model=world_model, Q=Q, action=a)
+#         pyplot.title(a)
     pyplot.show()
     
