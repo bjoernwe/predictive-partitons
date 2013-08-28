@@ -6,6 +6,7 @@ import worldmodel
 
 from studienprojekt import env_maze
 from studienprojekt import env_model
+from ImImagePlugin import number
 
 
 class PriorityQueue(object):
@@ -70,8 +71,12 @@ def plot_value_function(world_model, Q, action=None):
 
 class QFunction(dict):
     
-    def __init__(self, number_of_states, actions, **kwargs):
+    def __init__(self, number_of_states, actions, alpha=.5, gamma=.8, min_change=.01, **kwargs):
         super(QFunction, self).__init__(**kwargs)
+        self.alpha = alpha
+        self.gamma = gamma
+        self.min_change = min_change
+        self.number_of_states = number_of_states
         self.actions = actions
         for action in self.actions:
             self[action] = np.zeros(number_of_states)
@@ -80,17 +85,23 @@ class QFunction(dict):
     def split_state(self, index):
         for action in self.actions:
             self[action] = np.insert(Q[action], index, values=Q[action][index], axis=0)
+        self.number_of_states += 1
+        return
 
             
     def get_action_values(self, state):
         return np.array([self[a][state] for a in self.actions])
+    
+    
+    def get_max_action_value(self, state):
+        return np.max(self.get_action_values(state=state))
 
     
-    def update_reward(self, state, action, next_state, reward, model=None):
+    def update_reward_sample(self, state, action, next_state, reward, model=None):
         
         max_q = max([Q[a][next_state] for a in self.actions])
-        p = (reward + gamma * max_q - self[action][state])
-        self[action][state] += alpha * p
+        p = (reward + self.gamma * max_q - self[action][state])
+        self[action][state] += self.alpha * p
 
         #        
         # prioritized sweep
@@ -99,7 +110,7 @@ class QFunction(dict):
 
             # add last change to prioritized queue
             queue = PriorityQueue()
-            if abs(p) > min_change:
+            if abs(p) > self.min_change:
                 queue.add(p, state)
                 
             P = model.get_transition_probabilities()
@@ -132,11 +143,63 @@ class QFunction(dict):
                             
                             # update Q value
                             max_q = max([Q[b][t] for b in self.actions])
-                            p = (r + gamma * max_q - Q[a][s])
-                            Q[a][s] += alpha * p
+                            p = (r + self.gamma * max_q - Q[a][s])
+                            Q[a][s] += self.alpha * p
                             
                             # add s to queue if changed enough
-                            if abs(p) > min_change:
+                            if abs(p) > self.min_change:
+                                queue.add(p, s)
+
+
+    def update_reward_full(self, state, action, model=None):
+        
+        N = self.number_of_states
+        P = model.get_transition_probabilities()
+        R = model.get_reward_structure()
+        
+        # do a full backup
+        s = state
+        a = action
+        new_value = np.sum([P[a][s,t] * (R[a][s,t] + self.gamma * self.get_max_action_value(t)) for t in range(N)])
+        p = new_value - self[a][s]
+        self[a][s] = new_value 
+                
+        #        
+        # prioritized sweep
+        #
+        if model is not None:
+
+            # add last change to prioritized queue
+            queue = PriorityQueue()
+            if abs(p) > self.min_change:
+                queue.add(p, state)
+                
+            # process queue for max. 1000 steps
+            for _ in range(100):
+                
+                if queue.is_empty():
+                    break
+                
+                # get Q value that changed most
+                _, next_state = queue.pop()
+                
+                # do a full backup for every potential predecessor (every 
+                # state and action leading to s)
+                for s in range(N):
+                    
+                    if s == next_state:
+                        continue
+                    
+                    for a in self.actions: 
+                    
+                        if P[a][s,next_state] > 0.01:
+
+                            new_value = np.sum([P[a][s,t] * (R[a][s,t] + self.gamma * self.get_max_action_value(t)) for t in range(N)])
+                            p = new_value - self[a][s]
+                            self[a][s] = new_value 
+                            
+                            # add s to queue if changed enough
+                            if abs(p) > self.min_change:
                                 queue.add(p, s)
 
         
@@ -154,10 +217,7 @@ if __name__ == '__main__':
     world_model.learn()
     
     # parameters for Q learning
-    alpha = 0.5
     epsilon = 0.1
-    gamma = 0.8
-    min_change = 0.01
     N = world_model.get_number_of_states()
     Q = QFunction(number_of_states=N, actions=model_extern.get_available_actions())
     
@@ -183,9 +243,8 @@ if __name__ == '__main__':
             if split is not None or model_intern is None:
                 N = world_model.get_number_of_states()
                 state_rewards = world_model.get_gains()
-                #maze_state = model_extern.get_current_state()
                 s = world_model.classify(maze_state)
-                model_intern = env_model.EnvModel(worldmodel=world_model, state_rewards=state_rewards, init_state=s)
+                model_intern = env_model.EnvModelIntrinsic(worldmodel=world_model, init_state=s)
                 
             # plot
             pyplot.clf()
@@ -219,7 +278,8 @@ if __name__ == '__main__':
         t = world_model.classify(new_maze_state)
         r = model_intern.set_state(new_state=t)
         
-        Q.update_reward(state=s, action=action, next_state=t, reward=r, model=model_intern)
+        #Q.update_reward_sample(state=s, action=action, next_state=t, reward=r, model=model_intern)
+        Q.update_reward_full(state=s, action=action, model=model_intern)
 
         
     print QtoV(Q)
