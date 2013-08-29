@@ -33,11 +33,12 @@ class WorldModel(object):
         self.data = None        # global data storage
         #self.transitions = None
         self.actions = None     # either None or a list of actions
+        self.rewards = None
         self.stats = []
         self._min_class_size = 100
         
         self.transitions = {}
-        self.transitions[None] = np.array([[0]])
+        self.transitions[None] = np.array([[0]], dtype=np.int)
         
         # root node of tree
         assert method in ['factorize' ,'pca', 'spectral']
@@ -57,16 +58,19 @@ class WorldModel(object):
             self.random.seed(seed)
 
 
-    def add_data(self, data, actions=None):
+    def add_data(self, data, actions=None, rewards=None):
         """
-        Adds a matrix x of new observations to the node. The data is
-        interpreted as one observation following the previous one. This is
-        important to calculate the transition probabilities.
+        Adds a matrix of new observations to the node. The data is interpreted 
+        as one observation following the previous one. This is important to 
+        calculate the transition probabilities.
         
-        The actions are a interpreted as actions that *preceded* each step. If
-        you don't know the action that preceded the first data point, it's okay
-        to leave the list of actions shorter by one. The missing action will be 
+        The actions are interpreted as actions that *preceded* each step. If you 
+        don't know the action that preceded the first data point, it's okay to 
+        leave the list of actions shorter by one. The missing action will be 
         filled with 'None' and the transaction ignored during most calculations.
+        
+        Like actions, rewards at every time step are the ones that preceded the
+        state.
         
         If there has been data before, the new data is appended.
         """
@@ -74,13 +78,16 @@ class WorldModel(object):
         # check for dimensionality of x
         data = np.atleast_2d(data)
 
-        # initialize actions
+        # initialize actions and rewards
         n = data.shape[0]
-        #if actions is None:
-        #    actions = [None for _ in range(n)]
+
         if actions and len(actions) < n:
             actions = [None] + actions
         assert actions is None or len(actions) == n
+        
+        if rewards is not None and len(rewards) < n:
+            rewards = [None] + rewards
+        assert rewards is None or len(rewards) == n
 
         # calculate labels for new data
         labels = np.empty(n, dtype=int)
@@ -94,6 +101,7 @@ class WorldModel(object):
             self.data = data
             self.labels = labels
             self.actions = actions
+            self.rewards = rewards
         else:
             first_data = self.data.shape[0]
             first_source = first_data - 1
@@ -101,6 +109,8 @@ class WorldModel(object):
             self.labels = np.hstack([self.labels, labels])
             if self.actions is not None:
                 self.actions = self.actions + actions
+            if self.rewards is not None:
+                self.rewards = self.rewards + rewards
             
         # same number of actions and data points
         assert actions is None or self.data.shape[0] == len(self.actions)
@@ -148,7 +158,7 @@ class WorldModel(object):
             action_set = set(actions).union([None])
             for action in action_set:
                 if action not in self.transitions.keys():
-                    self.transitions[action] = np.zeros((K,K))
+                    self.transitions[action] = np.zeros((K,K), dtype=int)
                 
             # update transition matrices
             for i in range(first_source, N-1):
@@ -256,6 +266,30 @@ class WorldModel(object):
         Returns the input dimensionality of the model.
         """
         return self.data.shape[1]
+    
+    
+    def _get_data_for_refs(self, refs):
+        """
+        Returns a data matrix for a list of references.
+        """
+        if len(refs) == 0:
+            return None
+        data_list = [self.data[t] for t in refs]
+        data = np.vstack(data_list)
+        return data
+    
+    
+    def _get_rewards_for_refs(self, refs):
+        """
+        Returns a vector of reward values for a list of references. As with
+        add_data, each reward is the one the preceded the data point (state).
+        """
+        if len(refs) == 0:
+            return None
+        if self.rewards is None:
+            return None
+        reward_list = [self.rewards[t] for t in refs if self.rewards[t] is not None]
+        return np.array(reward_list)
     
     
     def _split_transition_matrices(self, new_labels, index1, index2=None):
@@ -865,17 +899,6 @@ class WorldModelTree(object):
             raise RuntimeError('Should not happen!')
         
         
-    def _get_data_for_refs(self, refs):
-        """
-        Returns a data matrix for a list of references.
-        """
-        if len(refs) == 0:
-            return None
-        data_list = [self.model.data[t] for t in refs]
-        data = np.vstack(data_list)
-        return data
-    
-    
     def get_leaf_index(self):
         """
         Returns an integer class label for a leaf-node. If the node isn't a 
@@ -1054,9 +1077,45 @@ class WorldModelTree(object):
         transition.
         """
         if self.model.actions is None:
-            return self._get_transition_refs()
+            return self._get_transition_refs(heading_in=heading_in, inside=inside, heading_out=heading_out)
         
         _, r2 = self._get_transition_refs(heading_in=heading_in, inside=inside, heading_out=heading_out)
+        refs_2 = [r for r in r2 if self.model.actions[r] == action]
+        refs_1 = [r-1 for r in refs_2]
+        return [refs_1, refs_2]
+    
+    
+    def _get_transitions_to_target(self, target_node):
+        """
+        Returns references for all transitions between the current node and the
+        specified target node.
+        """
+        all_refs_1 = self._get_data_refs()
+        all_refs_2 = target_node._get_data_refs()
+        refs_1 = []
+        refs_2 = []
+        if len(refs_1) < len(refs_2):
+            for r in refs_1:
+                if (r+1) in all_refs_2:
+                    refs_1.append(r)
+                    refs_2.append(r+1)
+        else:
+            for r in refs_2:
+                if (r-1) in all_refs_1:
+                    refs_1.append(r-1)
+                    refs_2.append(r)
+        return [refs_1, refs_2]
+    
+    
+    def _get_transitions_to_target_for_action(self, target_node, action):
+        """
+        Returns references for all transitions of one action between the current 
+        node and the specified target node.
+        """
+        if self.model.actions is None:
+            return self._get_transitions_to_target(target_node=target_node)
+        
+        _, r2 = self._get_transitions_to_target(target_node=target_node)
         refs_2 = [r for r in r2 if self.model.actions[r] == action]
         refs_1 = [r-1 for r in refs_2]
         return [refs_1, refs_2]
@@ -2389,7 +2448,7 @@ class WorldModelSpectral(WorldModelTree):
         
         # data and references
         [refs_1, refs_2] = self._get_transition_refs_for_action(action=action, heading_in=False, inside=True, heading_out=False)
-        data = self._get_data_for_refs(refs_1)
+        data = self.model._get_data_for_refs(refs_1)
         refs_all = list(set(refs_1 + refs_2))
         n_trans_all = len(refs_all)
         n_trans = len(refs_1)        
@@ -2460,7 +2519,7 @@ class WorldModelSpectral(WorldModelTree):
 
         # data        
         refs_all, refs_1, P = self._get_transition_graph(action=action, k=15, fast_partition=fast_partition, normalize=True)
-        data = self._get_data_for_refs(refs=refs_1)
+        data = self.model._get_data_for_refs(refs=refs_1)
         n_trans = len(refs_1)
         
         # second eigenvector

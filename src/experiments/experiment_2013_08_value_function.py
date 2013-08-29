@@ -113,8 +113,6 @@ class QFunction(dict):
             if abs(p) > self.min_change:
                 queue.add(p, state)
                 
-            P = model.get_transition_probabilities()
-                
             # process queue for max. 1000 steps
             for _ in range(100):
                 
@@ -134,7 +132,7 @@ class QFunction(dict):
                     
                     for a in self.actions: 
                     
-                        if P[a][s,next_state] > 0.01:
+                        if model.P[a][s,next_state] > 0.01:
                             
                             # simulate action
                             model.set_state(new_state=np.array([[s]]))
@@ -154,8 +152,8 @@ class QFunction(dict):
     def update_reward_full(self, state, action, model=None):
         
         N = self.number_of_states
-        P = model.get_transition_probabilities()
-        R = model.get_reward_structure()
+        P = model.P
+        R = model.R
         
         # do a full backup
         s = state
@@ -245,6 +243,7 @@ if __name__ == '__main__':
                 state_rewards = world_model.get_gains()
                 s = world_model.classify(maze_state)
                 model_intern = env_model.EnvModelIntrinsic(worldmodel=world_model, init_state=s)
+                #model_intern = env_model.EnvModelExtrinsic(worldmodel=world_model, init_state=s)
                 
             # plot
             pyplot.clf()
@@ -266,7 +265,8 @@ if __name__ == '__main__':
             if action_sum > 0:
                 action_values /= action_sum
             else:
-                action_values = np.ones(N) / N
+                A = len(action_values)
+                action_values = np.ones(A) / A
             selected_action_index = action_values.cumsum().searchsorted(np.random.random()*np.sum(action_values))
             selected_action = model_extern.get_available_actions()[selected_action_index]
             
@@ -276,7 +276,7 @@ if __name__ == '__main__':
         # inform models about the transition
         world_model.add_data(new_maze_state, actions=[action])
         t = world_model.classify(new_maze_state)
-        r = model_intern.set_state(new_state=t)
+        r = model_intern.set_state(new_state=t, action=action)
         
         #Q.update_reward_sample(state=s, action=action, next_state=t, reward=r, model=model_intern)
         Q.update_reward_full(state=s, action=action, model=model_intern)
@@ -289,5 +289,6 @@ if __name__ == '__main__':
 #         pyplot.subplot(2, 2, i+1)
 #         plot_value_function(world_model=world_model, Q=Q, action=a)
 #         pyplot.title(a)
+    pyplot.ioff()
     pyplot.show()
     
