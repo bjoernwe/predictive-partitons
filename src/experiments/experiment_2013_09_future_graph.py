@@ -1,6 +1,7 @@
 """
-This experiment shows how different graphs are suited to partition different
-types of data (fast changes vs. slow changes). 
+We construct a graph that is intended to bind together points that have a
+similar future. We see from the plots that this way no distinction is necessary
+between fast and slow changing data.
 """
 
 import numpy as np
@@ -21,25 +22,29 @@ def get_graph(data, fast_partition, k=5, normalize=False):
     W = np.zeros((N, N))
     W += 0.001
 
-    # big transition matrix
     # including transitions of the k nearest neighbors
+    # i - current state
+    # j - neighbor state
     for i in range(N-1):
         indices = np.argsort(distances[i])  # closest one should be the point itself
-        # index: refs -> refs_all
-        s = i
         for j in indices[0:k+1]:
-            # index: refs -> refs_all
-            t = j
-            u = i+1
+            if i != j:
+                W[i,j] = 1
+                W[j,i] = 1
+            
+    # including transitions to points with similar future
+    # i - current state
+    # j - successor state
+    # t - neighbor of j
+    # s - predecessors of t (points with similar future as i)
+    for i in range(N-1):
+        j = i+1
+        indices = np.argsort(distances[j])  # closest one should be the point itself
+        for t in indices[0:k+1]:
+            s = t-1
             if s != t:
-                W[s,t] = 1
-                W[t,s] = 1
-            if fast_partition:
-                W[s,u] = -1
-                W[u,s] = -1
-            else:
-                W[s,u] = 1
-                W[u,s] = 1
+                W[i,s] = 1
+                W[s,i] = 1
             
     # normalize matrix
     if normalize:
@@ -88,10 +93,10 @@ if __name__ == '__main__':
                 pyplot.scatter(x=data[:,0], y=data[:,1], s=100, c=U[:,1], edgecolor='None')
             
             # plot spectral
-            pyplot.figure(1)
-            pyplot.subplot(2, 2, 2*i+j+1)
-            pyplot.title('data fast: %s / partition fast: %s' % (fast_data, fast_partition))
-            pyplot.scatter(x=U[:,0], y=U[:,1], s=100)
+            #pyplot.figure(1)
+            #pyplot.subplot(2, 2, 2*i+j+1)
+            #pyplot.title('data fast: %s / partition fast: %s' % (fast_data, fast_partition))
+            #pyplot.scatter(x=U[:,0], y=U[:,1], s=100)
             
     # show plot
     pyplot.show()
