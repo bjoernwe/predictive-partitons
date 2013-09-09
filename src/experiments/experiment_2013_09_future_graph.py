@@ -11,7 +11,7 @@ from matplotlib import pyplot
 from scipy.sparse import linalg
 
 
-def get_graph(data, fast_partition, k=5, normalize=False):
+def get_graph(data, k=5, normalize=False):
     
     # pairwise distances
     distances = scipy.spatial.distance.pdist(data)
@@ -60,44 +60,33 @@ if __name__ == '__main__':
 
     # parameters
     k = 10    
-    N = 1000
+    N = 2000
     
     for i, fast_data in enumerate([False, True]):
         
-        for j, fast_partition in enumerate([False, True]): 
-
-            # data    
-            mean = np.array([2, 0])
-            data = np.zeros((N, 2))
-            for l in range(N):
-                if fast_data:
-                    mean *= -1
-                else:
-                    if l == (N//4):
-                        mean *= -1
-                data[l] = np.random.randn(2) + mean
-    
-            # graph & eigenvectors
-            W = get_graph(data, fast_partition=fast_partition, k=k, normalize=True)
-            E, U = linalg.eigs(W, k=2, which='LR')
-            E, U = np.real(E), np.real(U)
-            print E
-    
-            # plot data and eigenvector
-            pyplot.figure(0)
-            pyplot.subplot(2, 2, 2*i+j+1)
-            pyplot.title('data fast: %s / partition fast: %s' % (fast_data, fast_partition))
-            if fast_partition:
-                pyplot.scatter(x=data[:,0], y=data[:,1], s=100, c=U[:,0], edgecolor='None')
+        # data    
+        mean = np.array([2, 0])
+        data = np.zeros((N, 2))
+        for l in range(N):
+            if fast_data:
+                mean *= -1
             else:
-                pyplot.scatter(x=data[:,0], y=data[:,1], s=100, c=U[:,1], edgecolor='None')
-            
-            # plot spectral
-            #pyplot.figure(1)
-            #pyplot.subplot(2, 2, 2*i+j+1)
-            #pyplot.title('data fast: %s / partition fast: %s' % (fast_data, fast_partition))
-            #pyplot.scatter(x=U[:,0], y=U[:,1], s=100)
-            
+                if l == (N//4):
+                    mean *= -1
+            data[l] = np.random.randn(2) + mean
+
+        # graph & eigenvectors
+        W = get_graph(data, k=k, normalize=True)
+        E, U = linalg.eigs(W, k=2, which='LR')
+        E, U = np.real(E), np.real(U)
+        print E
+
+        # plot data and eigenvector
+        pyplot.figure(0)
+        pyplot.subplot(1, 2, i+1)
+        pyplot.title('data fast: %s' % (fast_data))
+        pyplot.scatter(x=data[:,0], y=data[:,1], s=100, c=U[:,1], edgecolor='None')
+        
     # show plot
     pyplot.show()
     
