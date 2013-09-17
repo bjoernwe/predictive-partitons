@@ -61,8 +61,8 @@ if __name__ == '__main__':
 
     # train model
     data = NoisyDimData(n=4000)
-    model = worldmodel.WorldModelSpectral()
-    model.add_data(x=data.data, actions=None)
+    model = worldmodel.WorldModel(method='spectral')
+    model.add_data(data=data.data, actions=None)
     model.learn(min_gain=0.02)
     
     # plot data and result

@@ -35,13 +35,13 @@ class WorldModel(object):
         self.actions = None     # either None or a list of actions
         self.rewards = None
         self.stats = []
-        self._min_class_size = 100
+        self._min_class_size = 50
         
         self.transitions = {}
         self.transitions[None] = np.array([[0]], dtype=np.int)
         
         # root node of tree
-        assert method in ['factorize' ,'pca', 'spectral']
+        assert method in ['factorize' ,'pca', 'spectral', 'sfa', 'future']
         self.method = method
         if method == 'factorize':
             self.tree = WorldModelPCA(model=self)
@@ -49,6 +49,10 @@ class WorldModel(object):
             self.tree = WorldModelPCA(model=self)
         elif method == 'spectral':
             self.tree = WorldModelSpectral(model=self)
+        elif method == 'sfa':
+            self.tree = WorldModelSFA(model=self)
+        elif method == 'future':
+            self.tree = WorldModelFutureGraph(model=self)
         else:
             print 'Should not happen!'
         
@@ -126,7 +130,7 @@ class WorldModel(object):
                 leaf  = all_leaves[state]
                 leaf.dat_ref.append(i)
                 # reset cache because of new data
-                leaf.split_cache = {}
+                leaf.split_cache = None
                     
             # create global transition matrices (for each action)
             K = len(all_leaves)
@@ -170,12 +174,9 @@ class WorldModel(object):
                 if source == target:
                     state = self.labels[i]
                     leaf  = all_leaves[state]
-                    #leaf.split_cache = {}
+                    #leaf.split_cache = None
                     if leaf.split_cache is not None and leaf.split_cache.has_key(action):
                         leaf.split_cache.pop(action)
-                        leaf.split_cache.pop(None)
-                        if len(leaf.split_cache.keys()) > 0:
-                            leaf.split_cache[None] = max(leaf.split_cache.values(), key=lambda s: s.gain)
             
         assert np.sum(self._merge_transition_matrices(transitions=self.transitions)) == N-1
         return
@@ -217,7 +218,7 @@ class WorldModel(object):
         for leaf in self.tree.get_leaves():
             print 'testing leaf', leaf.get_leaf_index(), '...'
             split = leaf._calculate_best_split(action=action)
-            if split is not None and leaf._reached_min_sample_size(action=action):
+            if split is not None and leaf._reached_min_sample_size(action=split.action):
                 print 'best split: leaf', leaf.get_leaf_index(), 'with action', split.action, 'with gain', split.gain
                 if split.gain > best_gain:
                     best_gain = split.gain
@@ -279,6 +280,19 @@ class WorldModel(object):
         return data
     
     
+    def _get_actions_for_refs(self, refs):
+        """
+        Returns a vector of actions for a list of references. As with
+        add_data, each action is the one the preceded the data point (state).
+        """
+        if len(refs) == 0:
+            return None
+        if self.actions is None:
+            return None
+        action_list = [self.actions[t] for t in refs]
+        return action_list
+    
+    
     def _get_rewards_for_refs(self, refs):
         """
         Returns a vector of reward values for a list of references. As with
@@ -288,7 +302,7 @@ class WorldModel(object):
             return None
         if self.rewards is None:
             return None
-        reward_list = [self.rewards[t] for t in refs if self.rewards[t] is not None]
+        reward_list = [self.rewards[t] for t in refs]# if self.rewards[t] is not None]
         return np.array(reward_list)
     
     
@@ -457,7 +471,7 @@ class WorldModel(object):
         entropy = -np.sum(probs * log_probs)
 
         # normalization?
-        assert(entropy <= np.log2(K) + 1e-8)
+        assert(entropy <= np.log2(K) + 1e-7)
         if normalize:
             entropy /= np.log2(K)
 
@@ -736,6 +750,10 @@ class WorldModelTree(object):
         self.parents = []
         if parents is not None:
             self.parents = parents 
+        self.applied_split = SplitResult(node = None,
+                                         action = None,
+                                         gain = 0.0,
+                                         classifier = None)
 
 
     def _init_test(self, action, fast_partition=False):
@@ -819,13 +837,22 @@ class WorldModelTree(object):
         return new_labels, new_dat_ref
 
 
-    def get_gain(self):
-        if self.split_cache is None or not self.split_cache.has_key(None):
-            self._calculate_best_split(action=None)
-        if self.split_cache is not None and self.split_cache.has_key(None):
-            return self.split_cache[None].gain
+    def get_gain(self, recalc=False, include_parents=True):
+        """
+        Returns the best gain value from the split-chache. With 'recalc' gains
+        may be calculated if cache is empty. If no gain values are available,
+        the last value from the parent node will be returned.
+        """
+        if recalc:
+            if self.split_cache is None or len(self.split_cache) == 0:
+                self._calculate_best_split(action=None)
+        if self.split_cache is not None and len(self.split_cache) > 0:
+            return max(self.split_cache.values(), key=lambda s: s.gain).gain
         else:
-            return 0.0 
+            if self.parents is not None and len(self.parents) > 0 and self.parents[0].applied_split is not None:
+                return self.parents[0].applied_split.gain
+            else:
+                return 0.0
 
 
     def get_data(self):
@@ -952,8 +979,12 @@ class WorldModelTree(object):
         """
         
         # return cached result
-        if self.split_cache is not None and self.split_cache.has_key(action):
-            return self.split_cache[action]
+        if self.split_cache is not None:
+            if action is None:
+                if len(self.split_cache) > 0:
+                    return max(self.split_cache.values(), key=lambda s: s.gain)
+            else:
+                return self.split_cache[action]
         self.split_cache = {}
 
         # prepare action list
@@ -966,14 +997,12 @@ class WorldModelTree(object):
             else:
                 action_list = [action]
         
-        best_gain = float('-Inf')
-        
         for a in action_list:
             
             print 'testing leaf', self.get_leaf_index(), 'with action', a
-            best_gain_for_action = float('-Inf')
             
-            for fast_partition in [False, True]:
+            #for fast_partition in [False, True]:
+            for fast_partition in [False]:
                 
                 try:
                     
@@ -984,16 +1013,11 @@ class WorldModelTree(object):
                             print 'USELESS SPLIT'
                             continue
                         
-                        split = SplitResult(node = self,
-                                            action = a, 
-                                            gain = gain, 
-                                            classifier = self.classifier)
-                            
-                        if gain > best_gain:
-                            best_gain = gain
-                            self.split_cache[None] = split                         
-                        if gain > best_gain_for_action:
-                            best_gain_for_action = gain
+                        if not self.split_cache.has_key(a) or gain > self.split_cache[a].gain:
+                            split = SplitResult(node = self,
+                                                action = a, 
+                                                gain = gain, 
+                                                classifier = self.classifier)
                             self.split_cache[a] = split
                         
                     else:
@@ -1004,7 +1028,14 @@ class WorldModelTree(object):
                     print e
                     print traceback.print_exc()
                     
-        return self.split_cache[None] if self.split_cache.has_key(None) else None
+        # return split
+        if self.split_cache is not None:
+            if action is None:
+                if len(self.split_cache) > 0:
+                    return max(self.split_cache.values(), key=lambda s: s.gain)
+            else:
+                return self.split_cache[action]
+        return None
     
     
     def _apply_split(self, split_result):
@@ -1014,6 +1045,7 @@ class WorldModelTree(object):
         
         print 'splitting...'
         assert self.status == 'leaf'
+        assert split_result.classifier is not None
         
         # copy split result
         self.split_gain = split_result.gain
@@ -1022,6 +1054,7 @@ class WorldModelTree(object):
         self.model.transitions = self.model._split_transition_matrices(new_labels=new_labels, 
                                                                        index1=self.get_leaf_index())
         self.model.labels = new_labels
+        self.applied_split = split_result
         
         # create new leaves
         child0 = self.__class__(model=self.model, parents = [self])
@@ -2519,6 +2552,146 @@ class WorldModelSpectral(WorldModelTree):
 
         # data        
         refs_all, refs_1, P = self._get_transition_graph(action=action, k=15, fast_partition=fast_partition, normalize=True)
+        if len(refs_1) < 50:
+            return False
+        data = self.model._get_data_for_refs(refs=refs_1)
+        n_trans = len(refs_1)
+        
+        # second eigenvector
+        E, U = scipy.sparse.linalg.eigs(np.array(P), k=2, which='LR')
+        E, U = np.real(E), np.real(U)
+        
+        # bi-partition
+        if fast_partition:
+            #idx = np.argsort(abs(E))
+            idx = np.argsort(E)
+            col = idx[-1]
+        else:
+            #idx = np.argsort(abs(E))
+            idx = np.argsort(E)
+            col = idx[-2]
+        u = np.zeros(n_trans)
+        for i in range(n_trans):
+            # index: refs -> refs_all
+            row = refs_all.index(refs_1[i])
+            u[i] = U[row,col].real
+        u -= np.mean(u)
+        #assert -1 in np.sign(u)
+        #assert 1 in np.sign(u)
+        if -1 not in np.sign(u):
+            return False
+        if 1 not in np.sign(u):
+            return False
+        
+        # classifier
+        labels = map(lambda x: 1 if x > 0 else 0, u)
+        self.classifier = mdp.nodes.KNNClassifier(k=20)
+        #self.classifier = mdp.nodes.NearestMeanClassifier()
+        #self.classifier = mdp.nodes.LibSVMClassifier(probability=False)
+        self.classifier.train(data, np.array(labels, dtype='int'))
+        self.classifier.stop_training()
+        y = self.classifier.label(data)
+        if 0 not in y:
+            return False
+        if 1 not in y:
+            return False
+        return True
+
+
+    def _test(self, x):
+        """
+        Tests to which child the data point x belongs
+        """
+        if x.ndim < 2:
+            x = np.array(x, ndmin=2)
+        return int(self.classifier.label(x)[0])
+    
+    
+    
+class WorldModelFutureGraph(WorldModelTree):
+    
+    
+    def __init__(self, **kwargs):
+        super(WorldModelFutureGraph, self).__init__(**kwargs)
+
+
+    def _get_transition_graph(self, action=None, k=15, fast_partition=False, normalize=True):
+        assert self.status == 'leaf'
+        assert action in self.model.get_possible_actions(ignore_none=False)
+        
+        # data and references
+        [refs_1, refs_2] = self._get_transition_refs(heading_in=False, inside=True, heading_out=False)
+        refs_all = list(set(refs_1 + refs_2))
+        n_trans_all = len(refs_all)
+        n_trans = len(refs_1)        
+        if n_trans <= 0:
+            return [], [], None
+        
+        # transitions
+        W = np.zeros((n_trans_all, n_trans_all))
+        W += 0.00001
+
+        # pairwise distances
+        data = self.model._get_data_for_refs(refs_1)
+        distances = scipy.spatial.distance.pdist(data)
+        distances = scipy.spatial.distance.squareform(distances)
+        
+        # big transition matrix
+        # adding transitions to the k nearest neighbors
+        for i in range(n_trans):
+            indices = np.argsort(distances[i])  # closest one should be the point itself
+            # index: refs -> refs_all
+            s = refs_all.index(refs_1[i])
+            for j in indices[0:k+1]:
+                # index: refs -> refs_all
+                t = refs_all.index(refs_1[j])
+                if s != t:
+                    W[s,t] = 1
+                    W[t,s] = 1
+                    
+        # pairwise distances
+        data = self.model._get_data_for_refs(refs_2)
+        distances = scipy.spatial.distance.pdist(data)
+        distances = scipy.spatial.distance.squareform(distances)
+        
+        # big transition matrix
+        # adding transitions to k points with most similar future
+        for i in range(n_trans):
+            # index: refs -> refs_all
+            s = refs_all.index(refs_1[i])
+            indices = np.argsort(distances[i])  # closest one should be the point itself
+            for j in indices[0:k+1]:
+                # index: refs -> refs_all
+                u = refs_all.index(refs_1[j])
+                if s != u:
+                    W[s,u] = 1
+                    W[u,s] = 1
+
+        # make symmetric        
+        #W = W + W.T
+        #P = W + W.T
+        P = W
+        
+        # normalize matrix
+        if normalize:
+            d = np.sum(P, axis=1)
+            for i in range(n_trans_all):
+                if d[i] > 0:
+                    P[i] = P[i] / d[i]
+            
+        return refs_all, refs_1, P
+
+
+    def _init_test(self, action, fast_partition=False):
+        """
+        Initializes the parameters that split the node in two halves.
+        """
+        assert self.status == 'leaf'
+
+        # data
+        if len(self._get_data_refs()) < 50:
+            return False        
+        refs_all, refs_1, P = self._get_transition_graph(action=action, k=15, fast_partition=fast_partition, normalize=True)
         data = self.model._get_data_for_refs(refs=refs_1)
         n_trans = len(refs_1)
         
@@ -2584,22 +2757,26 @@ class WorldModelSFA(WorldModelTree):
         # data
         refs_1, refs_2 = self._get_transition_refs_for_action(action=action, heading_in=False, inside=True, heading_out=False)
         refs = np.sort(list(set(refs_1 + refs_2)))
-        data = self._get_data_for_refs(refs=refs)
-        _, D = data.shape
+        data = self.model._get_data_for_refs(refs=refs)
+        N, D = data.shape
+        if N < 20:
+            return False
         
         # SFA
         self.classifier = mdp.Flow([])
         
-        for _ in range(1):
+        for _ in range(0):
+            mdp_whi = mdp.nodes.WhiteningNode(reduce=True)
             mdp_exp = mdp.nodes.PolynomialExpansionNode(degree=2)
-            mdp_pca = mdp.nodes.PCANode(svd=True)
+            mdp_pca = mdp.nodes.PCANode(reduce=True)
             mdp_sfa = mdp.nodes.SFANode(output_dim=4)
-            self.classifier += mdp.Flow([mdp_exp, mdp_pca, mdp_sfa])
+            self.classifier += mdp.Flow([mdp_whi, mdp_exp, mdp_pca, mdp_sfa])
         
+        mdp_whi = mdp.nodes.WhiteningNode(reduce=True)
         mdp_exp = mdp.nodes.PolynomialExpansionNode(degree=2)
-        mdp_pca = mdp.nodes.PCANode(svd=True)
-        mdp_sfa = mdp.nodes.SFANode(output_dim=D)
-        self.classifier += mdp.Flow([mdp_exp, mdp_sfa])
+        mdp_pca = mdp.nodes.PCANode(reduce=True)
+        mdp_sfa = mdp.nodes.SFANode(output_dim=1)
+        self.classifier += mdp.Flow([mdp_whi, mdp_exp, mdp_sfa])
         
         self.classifier.train(data)
         
@@ -2998,7 +3175,7 @@ if __name__ == "__main__":
         n = 1000
         data = problem(n=n, seed=None)
 
-        model = WorldModel()
+        model = WorldModel(method='future')
         model.add_data(data)
 
         #print tree.transitions

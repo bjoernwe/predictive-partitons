@@ -18,7 +18,7 @@ import worldmodel
 
 def get_graph(model, fast_action, k=15, normalize=True):
 
-    refs = model._get_data_refs()
+    refs = model.tree._get_data_refs()
     data = model._get_data_for_refs(refs)
     actions = model._get_actions_for_refs(refs)
     N = len(refs)        
@@ -90,10 +90,10 @@ if __name__ == '__main__':
     #env = EnvCube(step_size=0.2, sigma=0.01)
     env = EnvCube(step_size=0.1, sigma=0.05)
     print env.get_available_actions()
-    data, actions = env.do_random_steps(num_steps=steps)
+    data, actions, _ = env.do_random_steps(num_steps=steps)
     
     # model
-    model = worldmodel.WorldModelTree()
+    model = worldmodel.WorldModel(method='spectral')
     model.add_data(data, actions=actions)
     
     # get eigenvalues

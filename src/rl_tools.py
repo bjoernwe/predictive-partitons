@@ -226,12 +226,12 @@ class RLExploration(object):
                 # plot
                 if live_plot:
                     pyplot.clf()
-                    pyplot.subplot(1, 2, 1)
+                    #pyplot.subplot(1, 2, 1)
                     self.world_model.plot_data(color='last_gain', show_plot=False)
                     pyplot.colorbar()
-                    pyplot.subplot(1, 2, 2)
-                    plot_value_function(world_model=self.world_model, Q=self.Q)
-                    pyplot.scatter(x=maze_state[0], y=maze_state[1], s=100)
+                    #pyplot.subplot(1, 2, 2)
+                    #plot_data_with_value(world_model=self.world_model, Q=self.Q)
+                    #pyplot.scatter(x=maze_state[0], y=maze_state[1], s=100)
                     pyplot.draw()
             
             # epsilon-greedy action selection
@@ -274,7 +274,7 @@ def QtoV(Q):
         
 
         
-def plot_value_function(world_model, Q, action=None):
+def plot_data_with_value(world_model, Q, action=None):
     """
     Plots data of worldmodel colored with value function from Q.
     """

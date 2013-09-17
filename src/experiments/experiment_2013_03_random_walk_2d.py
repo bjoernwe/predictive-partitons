@@ -60,7 +60,7 @@ if __name__ == '__main__':
 
     # train model
     data = RandomWalk2DData(n=4000)
-    model = worldmodel.WorldModel()
+    model = worldmodel.WorldModel(method='future')
     model.add_data(data=data.data, actions=data.actions)
     model.learn(min_gain=0.02)
     
