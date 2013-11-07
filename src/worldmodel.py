@@ -41,10 +41,10 @@ class WorldModel(object):
         self.transitions[None] = np.array([[0]], dtype=np.int)
         
         # root node of tree
-        assert method in ['factorize' ,'pca', 'spectral', 'sfa', 'future']
+        assert method in ['naive', 'pca', 'spectral', 'sfa', 'future']
         self.method = method
-        if method == 'factorize':
-            self.tree = WorldModelPCA(model=self)
+        if method == 'naive':
+            self.tree = WorldModelTrivial(model=self)
         elif method == 'pca':
             self.tree = WorldModelPCA(model=self)
         elif method == 'spectral':
@@ -189,7 +189,7 @@ class WorldModel(object):
         
         # init stats
         if len(self.stats) == 0:
-            self.stats.append(self._calc_stats(transitions=self.transitions))
+            self.update_stats()
 
         # split as long as it's interesting
         gain = 0
@@ -227,7 +227,7 @@ class WorldModel(object):
         if best_split is not None and best_gain >= min_gain:
             print 'decided for leaf', best_split.node.get_leaf_index(), 'with action', best_split.action, 'and gain', best_split.gain
             best_split.node._apply_split(split_result=best_split)
-            self.stats.append(self._calc_stats(transitions=self.transitions))
+            self.update_stats()
             
         return best_split
     
@@ -335,7 +335,7 @@ class WorldModel(object):
         S = np.sum(self.transitions[action])
         
         assert self.tree.get_leaves()[index1].status == 'leaf'
-        assert max(new_labels) == self.transitions[action].shape[0]
+        #assert max(new_labels) == self.transitions[action].shape[0]
         
         if index2 is None:
             index2 = index1
@@ -396,6 +396,15 @@ class WorldModel(object):
         return stats
     
     
+    def update_stats(self):
+        """
+        Adds a new entry to the list of stats
+        """
+        # udpate stats
+        self.stats.append(self._calc_stats(transitions=self.transitions))
+        return
+    
+    
     def _merge_transition_matrices(self, transitions=None):
         """
         Merges the transition matrices of each action to a single one.
@@ -426,13 +435,17 @@ class WorldModel(object):
         K = transitions.shape[0]
         row_entropies = np.zeros(K)
 
-        for i in range(K):
-            row = transitions[i]
-            row_entropies[i] = cls._entropy(dist=row, normalize=normalize, ignore_empty_classes=False)
-
-        # weighted average
+        # weights
         weights = np.sum(transitions, axis=1, dtype=np.float32)
         weights /= np.sum(weights)
+        
+        # row entropies
+        for i in range(K):
+            if weights[i] > 0:
+                row = transitions[i]
+                row_entropies[i] = cls._entropy(dist=row, normalize=normalize, ignore_empty_classes=False)
+
+        # weighted average
         entropy = np.sum(weights * row_entropies)
         return entropy
     
@@ -646,7 +659,7 @@ class WorldModel(object):
             if ndim is not None and ndim < self.get_input_dim():
                 data = np.array(data)
                 data = sklearn.manifold.Isomap(n_neighbors=10, n_components=ndim).fit_transform(data)
-            pyplot.plot(data[:,0], data[:,1], '.')
+            pyplot.plot(data[:,0], data[:,1], '.', color='silver')
             
         if show_plot:
             pyplot.show()
@@ -831,9 +844,9 @@ class WorldModelTree(object):
         # does the split really split the data in two?
         #assert len(new_dat_ref[0]) > 0
         #assert len(new_dat_ref[1]) > 0
-        if (len(new_dat_ref[0]) == 0 or
-            len(new_dat_ref[1]) == 0):
-            return None, None
+        #if (len(new_dat_ref[0]) == 0 or
+        #    len(new_dat_ref[1]) == 0):
+        #    return None, None
         return new_labels, new_dat_ref
 
 
@@ -971,7 +984,7 @@ class WorldModelTree(object):
         return nodes
 
 
-    def _calculate_best_split(self, action=None):
+    def _calculate_best_split(self, action=None, allow_useless_split=False):
         """
         Calculates the gain in mutual information if this node would be split.
         
@@ -1010,8 +1023,11 @@ class WorldModelTree(object):
                         
                         gain = self._calc_local_gain(action=a)
                         if gain is None:
-                            print 'USELESS SPLIT'
-                            continue
+                            if allow_useless_split:
+                                gain = 0
+                            else:
+                                print 'USELESS SPLIT'
+                                continue
                         
                         if not self.split_cache.has_key(a) or gain > self.split_cache[a].gain:
                             split = SplitResult(node = self,
@@ -1038,10 +1054,13 @@ class WorldModelTree(object):
         return None
     
     
-    def _apply_split(self, split_result):
+    def _apply_split(self, split_result=None, allow_useless_split=False):
         """
         Splits the node.
         """
+        # get default split
+        if split_result is None:
+            split_result = self._calculate_best_split(action=None, allow_useless_split=allow_useless_split)
         
         print 'splitting...'
         assert self.status == 'leaf'
@@ -1067,7 +1086,7 @@ class WorldModelTree(object):
         self.children.append(child0)
         self.children.append(child1)
         self.status = 'split'   # make it official!
-
+        
         # initialize a first split
         child0._calculate_best_split()
         child1._calculate_best_split()
@@ -2431,6 +2450,64 @@ class WorldModelTree(object):
 
 
 
+class WorldModelTrivial(WorldModelTree):
+    """
+    Partitions the feature space into regular (hyper-) cubes.
+    """
+    
+    def __init__(self, model, parents=None):
+        super(WorldModelTrivial, self).__init__(model=model, parents=parents)
+        self.mins = None
+        self.maxs = None    
+
+    
+    def _init_test(self, action, fast_partition=False):
+        """
+        Initializes the parameters that split the node in two halves.
+        """
+        assert self.status == 'leaf'
+        
+        # init borders
+        D = self.model.get_input_dim()
+        if self.mins is None:
+            if len(self.parents) > 0:
+                # calculate borders from parent
+                parent = self.parents[0]
+                self.mins = np.array(parent.mins)
+                self.maxs = np.array(parent.maxs)
+                dim = parent.classifier[0]
+                cut = parent.classifier[1]
+                # are we the first or the second child?
+                assert self in parent.children
+                if self is parent.children[0]:
+                    self.maxs[dim] = cut
+                else:
+                    self.mins[dim] = cut
+            else: 
+                # top node
+                self.mins = np.zeros(D)
+                self.maxs = np.ones(D) 
+
+        # classifier
+        diffs = self.maxs - self.mins
+        dim = np.argmax(diffs)
+        cut = self.mins[dim] + (self.maxs[dim] - self.mins[dim]) / 2.
+        self.classifier = (dim, cut)
+        return True
+
+
+    def _test(self, x):
+        """
+        Tests to which child the data point x belongs
+        """
+        dim = self.classifier[0]
+        cut = self.classifier[1]
+        if x[dim] > cut:
+            return 1
+        return 0
+        
+        
+    
 class WorldModelPCA(WorldModelTree):    
 
     
@@ -2475,7 +2552,7 @@ class WorldModelSpectral(WorldModelTree):
         super(WorldModelSpectral, self).__init__(**kwargs)
 
 
-    def _get_transition_graph(self, action=None, k=15, fast_partition=False, normalize=True):
+    def _get_transition_graph(self, action=None, k=10, fast_partition=False, normalize=True):
         assert self.status == 'leaf'
         assert action in self.model.get_possible_actions(ignore_none=False)
         
@@ -2552,7 +2629,7 @@ class WorldModelSpectral(WorldModelTree):
 
         # data        
         refs_all, refs_1, P = self._get_transition_graph(action=action, k=15, fast_partition=fast_partition, normalize=True)
-        if len(refs_1) < 50:
+        if len(refs_1) < self.model._min_class_size:
             return False
         data = self.model._get_data_for_refs(refs=refs_1)
         n_trans = len(refs_1)
@@ -2585,7 +2662,7 @@ class WorldModelSpectral(WorldModelTree):
         
         # classifier
         labels = map(lambda x: 1 if x > 0 else 0, u)
-        self.classifier = mdp.nodes.KNNClassifier(k=20)
+        self.classifier = mdp.nodes.KNNClassifier(k=40)
         #self.classifier = mdp.nodes.NearestMeanClassifier()
         #self.classifier = mdp.nodes.LibSVMClassifier(probability=False)
         self.classifier.train(data, np.array(labels, dtype='int'))
@@ -3175,7 +3252,7 @@ if __name__ == "__main__":
         n = 1000
         data = problem(n=n, seed=None)
 
-        model = WorldModel(method='future')
+        model = WorldModel(method='spectral')
         model.add_data(data)
 
         #print tree.transitions
