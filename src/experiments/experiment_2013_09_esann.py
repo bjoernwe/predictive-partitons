@@ -27,8 +27,6 @@ if __name__ == '__main__':
     
     for i, data in enumerate(data_list):
         
-        pyplot.figure()
-            
         for j, method in enumerate(['naive', 'spectral']):
         
             model = worldmodel.WorldModel(method=method)
@@ -45,13 +43,14 @@ if __name__ == '__main__':
                     model.update_stats()
 
                 # plot
-                pyplot.subplot(2, 2, j+1)
-                model.plot_data(color='silver', show_plot=False)
+                pyplot.subplot(2, 4, i+1)
+                #model.plot_data(color='silver', show_plot=False)
                 model.plot_state_borders(show_plot=False, resolution=100)
-                pyplot.subplot(2, 1, 2)
+                pyplot.subplot(2, 2, 3)
                 list_mi = [s.mutual_information for s in model.stats]
                 list_n = [s.n_states for s in model.stats]
                 pyplot.plot(list_n, list_mi, '^-')
+                pyplot.legend(['naive', 'predictive'], loc='lower right')
                     
             else:
                 
@@ -59,18 +58,18 @@ if __name__ == '__main__':
                     model.single_splitting_step(min_gain=0.0)
                     # plot data and borders
                     if k == 7:
-                        pyplot.subplot(2, 2, j+1)
-                        model.plot_data(color='none', show_plot=False)
+                        pyplot.subplot(2, 4, i+3)
+                        #model.plot_data(color='none', show_plot=False)
                         model.plot_state_borders(show_plot=False, resolution=100)
                         
                 # plot statistics
-                pyplot.subplot(2, 1, 2)
+                pyplot.subplot(2, 2, 4)
                 list_mi = [s.mutual_information for s in model.stats]
                 list_n = [s.n_states for s in model.stats]
                 pyplot.plot(list_n, list_mi, 'o-')
+                pyplot.legend(['naive', 'predictive'], loc='lower right')
                          
             # plot
-            pyplot.legend(['naive', 'predictive'], loc='lower right')
             #pyplot.subplot(2, 1, 2)
             #list_mi = [s.mutual_information for s in model.stats]
             #list_n = [s.n_states for s in model.stats]
