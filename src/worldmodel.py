@@ -379,8 +379,14 @@ class WorldModel(object):
         
         # norm of Q
         weights = np.sum(P, axis=1, dtype=np.float)
-        probs = P / weights[:,np.newaxis]
-        mu = weights / np.sum(weights)
+        probs = np.zeros_like(P)
+        for i in range(K):
+            if weights[i] > 0:
+                probs[i] = P[i] / weights[i]
+        if np.sum(weights) > 0:
+            mu = weights / np.sum(weights)
+        else:
+            mu = np.zeros_like(weights)
         norm = np.sum( ( probs**2 * mu[:,np.newaxis] ) / mu[np.newaxis,:] )
         
         # mutual information
@@ -761,6 +767,7 @@ class WorldModelTree(object):
         self.dat_ref = []   # indices of data belonging to this node
         self.split_cache = None
         self.parents = []
+        self.number_of_leaves = len(self.get_root().get_leaves())
         if parents is not None:
             self.parents = parents 
         self.applied_split = SplitResult(node = None,
@@ -1174,6 +1181,7 @@ class WorldModelTree(object):
         
         
     def _reached_min_sample_size(self, action=None):
+        # TODO doesn't work for data without actions, does it?
         
         if action is None:
             action_list = self.model.transitions.keys()
@@ -2571,7 +2579,7 @@ class WorldModelSpectral(WorldModelTree):
         
         # transitions
         W = np.zeros((n_trans_all, n_trans_all))
-        W += 0.00001
+        W += 0.000001
 
         # big transition matrix
         # adding transitions to the k nearest neighbors
@@ -2634,19 +2642,35 @@ class WorldModelSpectral(WorldModelTree):
         data = self.model._get_data_for_refs(refs=refs_1)
         n_trans = len(refs_1)
         
+        # stationary distribution
+        #E, U = scipy.sparse.linalg.eigs(np.array(P.T), k=1, which='LR')
+        E, U = scipy.linalg.eig(a=np.array(P), left=True, right=False)
+        E, U = (E.real, U.real)
+        np.testing.assert_almost_equal(E[0], 1.)
+        np.testing.assert_almost_equal(np.linalg.norm(U[:,0]), 1.)
+        pi = U[:,0]
+        pi /= np.sum(pi)
+        D = np.diag(pi)
+        Dinv = np.diag(1./pi)
+        
         # second eigenvector
-        E, U = scipy.sparse.linalg.eigs(np.array(P), k=2, which='LR')
+        Q = Dinv.dot(P.T.dot(D))
+        #E, U = scipy.sparse.linalg.eigsh((Q + Q.T)/2., M=D, k=2, which='LM')
+        #E, U = scipy.sparse.linalg.eigs((Q + Q.T)/2., M=D, k=2, which='LM')
+        E, U = scipy.linalg.eigh(a=(P + Q)/2.)
         E, U = np.real(E), np.real(U)
         
         # bi-partition
         if fast_partition:
+            assert False # we shouldn't be here
             #idx = np.argsort(abs(E))
             idx = np.argsort(E)
             col = idx[-1]
         else:
-            #idx = np.argsort(abs(E))
             idx = np.argsort(E)
+            #idx = np.argsort(np.abs(E))
             col = idx[-2]
+            #np.testing.assert_almost_equal(E[idx[-1]], 1., decimal=2)
         u = np.zeros(n_trans)
         for i in range(n_trans):
             # index: refs -> refs_all
@@ -2662,7 +2686,7 @@ class WorldModelSpectral(WorldModelTree):
         
         # classifier
         labels = map(lambda x: 1 if x > 0 else 0, u)
-        self.classifier = mdp.nodes.KNNClassifier(k=40)
+        self.classifier = mdp.nodes.KNNClassifier(k=30)
         #self.classifier = mdp.nodes.NearestMeanClassifier()
         #self.classifier = mdp.nodes.LibSVMClassifier(probability=False)
         self.classifier.train(data, np.array(labels, dtype='int'))
@@ -3249,7 +3273,7 @@ if __name__ == "__main__":
     for p, problem in enumerate(problems):
 
         # create data
-        n = 1000
+        n = 2000
         data = problem(n=n, seed=None)
 
         model = WorldModel(method='spectral')
