@@ -1,5 +1,5 @@
 """
-Generates the plots shown at my INI talk.
+Generates data for the ESANN paper.
 """
 
 import cPickle as pickle
@@ -16,7 +16,7 @@ if __name__ == '__main__':
     #
     # parameters
     #
-    resolution = 100
+    resolution = 1000
     data_all = 5000
     data_training = 5000
     plot = False
@@ -82,7 +82,7 @@ if __name__ == '__main__':
         model.add_data(data=data_list[0].data[:data_training], actions=data.actions)
         model.update_stats()
     
-        for i in range(4**2-1):
+        for i in range(24-1):
             model.single_splitting_step(min_gain=float('-inf'))
             # plot data and borders
             #if i == 7:
@@ -145,7 +145,7 @@ if __name__ == '__main__':
         model.add_data(data=data_list[1].data[:data_training], actions=data.actions)
         model.update_stats()
      
-        for _ in range(4**2-1):
+        for _ in range(16-1):
             model.single_splitting_step(min_gain=float('-inf'))
             # plot data and borders
             if plot:
@@ -170,6 +170,6 @@ if __name__ == '__main__':
             pyplot.show()
     
         # save results
-        pickle.dump(models, open('experiment_2013_09_esann_models_%d.dump' % seed, 'wb') )
-        pickle.dump(data_list, open('experiment_2013_09_esann_data_%d.dump' % seed, 'wb') )
+        #pickle.dump(models, open('experiment_2013_09_esann_models_%d.dump' % seed, 'wb') )
+        #pickle.dump(data_list, open('experiment_2013_09_esann_data_%d.dump' % seed, 'wb') )
         

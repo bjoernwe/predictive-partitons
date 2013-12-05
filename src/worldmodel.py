@@ -2635,8 +2635,10 @@ class WorldModelSpectral(WorldModelTree):
         """
         assert self.status == 'leaf'
 
+#        for j, k in enumerate([2, 5, 10, 30]):
+
         # data        
-        refs_all, refs_1, P = self._get_transition_graph(action=action, k=15, fast_partition=fast_partition, normalize=True)
+        refs_all, refs_1, P = self._get_transition_graph(action=action, k=5, fast_partition=fast_partition, normalize=True)
         if len(refs_1) < self.model._min_class_size:
             return False
         data = self.model._get_data_for_refs(refs=refs_1)
@@ -2646,9 +2648,9 @@ class WorldModelSpectral(WorldModelTree):
         #E, U = scipy.sparse.linalg.eigs(np.array(P.T), k=1, which='LR')
         E, U = scipy.linalg.eig(a=np.array(P), left=True, right=False)
         E, U = (E.real, U.real)
-        np.testing.assert_almost_equal(E[0], 1.)
-        np.testing.assert_almost_equal(np.linalg.norm(U[:,0]), 1.)
-        pi = U[:,0]
+        idx = np.argsort(np.abs(E))
+        np.testing.assert_almost_equal(E[idx[-1]], 1.)
+        pi = U[:,idx[-1]]
         pi /= np.sum(pi)
         D = np.diag(pi)
         Dinv = np.diag(1./pi)
@@ -2657,8 +2659,11 @@ class WorldModelSpectral(WorldModelTree):
         Q = Dinv.dot(P.T.dot(D))
         #E, U = scipy.sparse.linalg.eigsh((Q + Q.T)/2., M=D, k=2, which='LM')
         #E, U = scipy.sparse.linalg.eigs((Q + Q.T)/2., M=D, k=2, which='LM')
-        E, U = scipy.linalg.eigh(a=(P + Q)/2.)
-        E, U = np.real(E), np.real(U)
+        E, U = scipy.linalg.eig(a=(P + Q)/2.)
+        np.testing.assert_almost_equal(np.max(np.abs(E.imag)), 0.)
+        E, U = (E.real, U.real)
+        idx = np.argsort(E)
+        np.testing.assert_almost_equal(E[idx[-1]], 1.)
         
         # bi-partition
         if fast_partition:
@@ -2667,7 +2672,7 @@ class WorldModelSpectral(WorldModelTree):
             idx = np.argsort(E)
             col = idx[-1]
         else:
-            idx = np.argsort(E)
+            #idx = np.argsort(E)
             #idx = np.argsort(np.abs(E))
             col = idx[-2]
             #np.testing.assert_almost_equal(E[idx[-1]], 1., decimal=2)
@@ -2676,7 +2681,21 @@ class WorldModelSpectral(WorldModelTree):
             # index: refs -> refs_all
             row = refs_all.index(refs_1[i])
             u[i] = U[row,col].real
-        u -= np.mean(u)
+        #u -= np.mean(u)
+            
+#             data += 0.01 * np.random.randn(n_trans, 2)
+#             print E[idx[-1]]
+#             print E[idx[-2]]
+#             print E[idx[-3]]
+#             
+#             colormap = pyplot.cm.get_cmap('summer')
+#             pyplot.subplot(2, 4, j+1)
+#             pyplot.scatter(x=data[:,0], y=data[:,1], c=u, edgecolors='none', vmin=-.05, vmax=.05)
+#             pyplot.subplot(2, 4, j+5)
+#             pyplot.scatter(x=data[:,0], y=data[:,1], c=np.sign(u), cmap=colormap, edgecolors='none')#, vmin=vmin, vmax=vmax)
+#         pyplot.show()
+            
+            
         #assert -1 in np.sign(u)
         #assert 1 in np.sign(u)
         if -1 not in np.sign(u):
@@ -2686,7 +2705,7 @@ class WorldModelSpectral(WorldModelTree):
         
         # classifier
         labels = map(lambda x: 1 if x > 0 else 0, u)
-        self.classifier = mdp.nodes.KNNClassifier(k=30)
+        self.classifier = mdp.nodes.KNNClassifier(k=50)
         #self.classifier = mdp.nodes.NearestMeanClassifier()
         #self.classifier = mdp.nodes.LibSVMClassifier(probability=False)
         self.classifier.train(data, np.array(labels, dtype='int'))
