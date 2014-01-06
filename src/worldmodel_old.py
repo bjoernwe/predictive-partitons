@@ -3295,7 +3295,7 @@ if __name__ == "__main__":
         n = 2000
         data = problem(n=n, seed=None)
 
-        model = WorldModel(method='spectral')
+        model = WorldModel(method='sfa')
         model.add_data(data)
 
         #print tree.transitions
