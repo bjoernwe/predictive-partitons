@@ -70,7 +70,7 @@ class VectorEntropyTests(unittest.TestCase):
                 
     def testEntropyRate(self):
         """
-        Tests a few handcrafted entropy rates.
+        Tests a few hand-crafted entropy rates.
         """
         
         # zeros
@@ -100,25 +100,25 @@ class VectorEntropyTests(unittest.TestCase):
         
         P = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])        
         self.failUnlessAlmostEqual(entropy_utils.entropy_rate(P, mu=None, normalize=False), 1.5436952667895776, 6)
-                
-#     def testMutualInformation(self):
-#         """
-#         """
-#         # 'useless' Markov Chain
-#         S = 10 * np.ones((8, 8))
-#         assert_almost_equal(0.0, worldmodel.WorldModel._mutual_information(transition_matrix=S))
-#         
-#         # deterministic Markov Chain
-#         T = np.zeros((8, 8))
-#         for i in range(8):
-#             T[i,(i+1)%8] = 80
-#         assert_almost_equal(3.0, worldmodel.WorldModel._mutual_information(transition_matrix=T))
-#         
-#         # test mixture
-#         assert_almost_equal(1.5, worldmodel.WorldModel._mutual_information_average(transition_matrices=[S, T]))
+        
+        return
+        
 
+    def testMutualInformation(self):                
+        """
+        Calculates Mutual Information for some hand-crafted matrixes.
+        """
+        
+        # zero entropy
+        P = np.eye(4) 
+        self.failUnlessAlmostEqual(entropy_utils.mutual_information(P), 2)
+        P = np.array([[1, 2], [3, 4]])
+        self.failUnlessAlmostEqual(entropy_utils.mutual_information(P), 0.0065989113844819869)
+        P = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])        
+        self.failUnlessAlmostEqual(entropy_utils.mutual_information(P), 0.012238804751254495)
+        
+        return
 
 
 if __name__ == "__main__":
-    #import sys;sys.argv = ['', 'Test.testName']
     unittest.main()

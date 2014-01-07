@@ -11,7 +11,7 @@ def entropy(x, normalize=False, ignore_empty_classes=True):
 
     # invalid input?
     assert x.ndim == 1
-    assert True not in list(x < -0.)
+    assert True not in list(x < -1e-6)
     assert float("nan") not in x
     assert float("inf") not in x
 
@@ -89,39 +89,39 @@ def entropy_rate(P, mu=None, normalize=False):
     return h
 
 
-# def mutual_information(P, mu=None):
-#     """
-#     Calculates the mutual information between t and t+1 for a model given
-#     as transition matrix P. 
-#     """
-#     
-#     # valid inuput?
-#     if P is None:
-#         return None
-#     assert P.ndim == 2
-#     assert np.sum(P) > 0
-#     
-#     # dimensionality
-#     N, M = P.shape
-#     assert N == M
-#     
-#     # prepare stationary distribution mu
-#     if mu is None:
-#         mu = np.ones(N) / N
-#     else:
-#         assert mu.ndim == 1
-#         assert True not in list(mu < -0.)
-#         assert float("nan") not in mu
-#         assert float("inf") not in mu
-#         mu_sum = np.sum(mu)
-#         assert mu_sum >= 0
-#         mu /= np.sum(mu_sum)
-#         
-#     # the actual calculation
-#     h_mu = entropy(mu)
-#     h_p = entropy_rate(P, mu=mu)
-#     mi = h_mu - h_p
-#     return mi
+def mutual_information(P):
+    """
+    Calculates the mutual information between t and t+1 for a model given
+    as transition matrix P.
+    """
+     
+    # valid inuput?
+    if P is None:
+        return None
+    assert P.ndim == 2
+    N, M = P.shape
+    assert N == M
+     
+    # prepare stationary distribution mu
+    Q = P + 1e-6
+    d = np.sum(Q, axis=1)
+    Q = Q / d[:,np.newaxis]
+    if N <= 2:
+        E, U = scipy.linalg.eig(Q.T)
+        idx = np.argsort(E.real)
+        assert abs(E[idx[-1]].real - 1) < 1e-6
+        mu = U[:,idx[-1]].real
+    else:
+        E, U = scipy.sparse.linalg.eigs(Q.T, k=1, which='LR')
+        assert abs(E[0].real - 1) < 1e-6
+        mu = U[:,0].real
+    mu /= np.sum(mu)
+         
+    # the actual calculation
+    h_mu = entropy(mu)
+    h_p = entropy_rate(P, mu=mu)
+    mi = h_mu - h_p
+    return mi
 
     
 
