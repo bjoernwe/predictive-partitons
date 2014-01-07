@@ -213,7 +213,7 @@ class RLExploration(object):
                 
                 # split value function
                 if split is not None:
-                    index = split.node.children[0].get_leaf_index()
+                    index = split.node._children[0].get_leaf_index()
                     self.Q.split_state(index=index)
                     
                 # (re-)build model_intern for new partition

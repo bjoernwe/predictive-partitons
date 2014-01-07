@@ -361,7 +361,7 @@ class WorldModel(object):
                     new_trans[new_source, new_target] += 1
 
         assert np.sum(self.transitions[action]) == S
-        assert np.sum(new_trans) == S        
+        assert np.sum(new_trans) == S
         return new_trans
     
     
@@ -763,7 +763,7 @@ class WorldModelTree(object):
         # family relations of node
         self.model = model
         self.status = 'leaf'
-        self.children = []
+        self._children = []
         self.dat_ref = []   # indices of data belonging to this node
         self.split_cache = None
         self.parents = []
@@ -816,9 +816,9 @@ class WorldModelTree(object):
                 return self.get_leaf_index()
             elif status == 'split':
                 child_index = int(self._test(x))
-                return self.children[child_index].classify(x)
+                return self._children[child_index].classify(x)
             elif status == 'merged':
-                return self.children[0].classify(x)
+                return self._children[0].classify(x)
             else:
                 raise RuntimeError('Should not happen!')
             
@@ -904,7 +904,7 @@ class WorldModelTree(object):
               self.status == 'merged'):
             
             data_refs_set = set([])
-            for child in self.children:
+            for child in self._children:
                 data_refs_set = data_refs_set.union(child._get_data_refs())
             
             data_refs = list(data_refs_set)
@@ -935,7 +935,7 @@ class WorldModelTree(object):
               self.status == 'merged'):
             
             data_refs_set = set([])
-            for child in self.children:
+            for child in self._children:
                 data_refs_set = data_refs_set.union(child._get_data_refs())
             
             data_refs = list(data_refs_set)
@@ -973,7 +973,7 @@ class WorldModelTree(object):
         elif (self.status == 'split' or
               self.status == 'merged'):
             children = []
-            for child in self.children:
+            for child in self._children:
                 for new_child in child.get_leaves():
                     if new_child not in children:
                         children += [new_child]
@@ -985,7 +985,7 @@ class WorldModelTree(object):
         Returns a list of all nodes.
         """
         nodes = set([self])
-        for child in self.children:
+        for child in self._children:
             nodes.add(child)
             nodes = nodes.union(child._get_nodes())
         return nodes
@@ -1088,10 +1088,10 @@ class WorldModelTree(object):
         child0.dat_ref = new_data_refs[0]
         child1.dat_ref = new_data_refs[1]
         
-        # create list of children
-        self.children = []
-        self.children.append(child0)
-        self.children.append(child1)
+        # create list of _children
+        self._children = []
+        self._children.append(child0)
+        self._children.append(child1)
         self.status = 'split'   # make it official!
         
         # initialize a first split
@@ -1235,7 +1235,7 @@ class WorldModelTree(object):
 #         
 #         # family relations of node
 #         self.status = 'leaf'
-#         self.children = []
+#         self._children = []
 #         self.parents = []
 #         if parents is not None:
 #             self.parents = parents 
@@ -1280,9 +1280,9 @@ class WorldModelTree(object):
 #                 return self.get_leaf_index()
 #             elif status == 'split':
 #                 child_index = int(self._test(x))
-#                 return self.children[child_index].classify(x)
+#                 return self._children[child_index].classify(x)
 #             elif status == 'merged':
-#                 return self.children[0].classify(x)
+#                 return self._children[0].classify(x)
 #             else:
 #                 raise RuntimeError('Should not happen!')
 #             
@@ -1534,12 +1534,12 @@ class WorldModelTree(object):
 #             return [self]
 #         elif (self.status == 'split' or
 #               self.status == 'merged'):
-#             children = []
-#             for child in self.children:
+#             _children = []
+#             for child in self._children:
 #                 for new_child in child.get_leaves():
-#                     if new_child not in children:
-#                         children += [new_child]
-#             return children
+#                     if new_child not in _children:
+#                         _children += [new_child]
+#             return _children
 #         
 #         
 #     def _nodes(self):
@@ -1547,7 +1547,7 @@ class WorldModelTree(object):
 #         Returns a list of all nodes.
 #         """
 #         nodes = set([self])
-#         for child in self.children:
+#         for child in self._children:
 #             nodes.add(child)
 #             nodes = nodes.union(child._nodes())
 #         return nodes
@@ -1720,7 +1720,7 @@ class WorldModelTree(object):
 #               self.status == 'merged'):
 #             
 #             data_refs_set = set([])
-#             for child in self.children:
+#             for child in self._children:
 #                 data_refs_set = data_refs_set.union(child._get_data_refs())
 #             
 #             data_refs = list(data_refs_set)
@@ -1752,7 +1752,7 @@ class WorldModelTree(object):
 #               self.status == 'merged'):
 #             
 #             data_refs_set = set([])
-#             for child in self.children:
+#             for child in self._children:
 #                 data_refs_set = data_refs_set.union(child._get_data_refs())
 #             
 #             data_refs = list(data_refs_set)
@@ -1966,8 +1966,8 @@ class WorldModelTree(object):
 # #            self.parents = []
 # #            parent1.status = 'leaf'
 # #            parent2.status = 'leaf'
-# #            parent1.children = []
-# #            parent2.children = []
+# #            parent1._children = []
+# #            parent2._children = []
 # #            label1 = parent1.class_label()
 # #            label2 = parent2.class_label()
 # #
@@ -2014,10 +2014,10 @@ class WorldModelTree(object):
 # #            child0.dat_ref = new_dat_ref[0]
 # #            child1.dat_ref = new_dat_ref[1]
 # #    
-# #            # create list of children
-# #            self.children = []
-# #            self.children.append(child0)
-# #            self.children.append(child1)
+# #            # create list of _children
+# #            self._children = []
+# #            self._children.append(child0)
+# #            self._children.append(child1)
 # #            self.status = 'split'
 # #            
 # #        return
@@ -2047,10 +2047,10 @@ class WorldModelTree(object):
 #         child0.last_gain = split_result.gain
 #         child1.last_gain = split_result.gain
 #         
-#         # create list of children
-#         self.children = []
-#         self.children.append(child0)
-#         self.children.append(child1)
+#         # create list of _children
+#         self._children = []
+#         self._children.append(child0)
+#         self._children.append(child1)
 #         self.status = 'split'
 #             
 #         return
@@ -2196,7 +2196,7 @@ class WorldModelTree(object):
 #             # merge data references and set new status
 #             parent = leaf1.parents[0]
 #             parent.dat_ref = leaf1.dat_ref + leaf2.dat_ref
-#             parent.children = []
+#             parent._children = []
 #             parent.status = 'leaf'
 #             print 'TRIVIAL MERGE'
 # 
@@ -2210,8 +2210,8 @@ class WorldModelTree(object):
 #             child.dat_ref = parent1.dat_ref + parent2.dat_ref
 #             parent1.dat_ref = []
 #             parent2.dat_ref = []
-#             parent1.children = [child]
-#             parent2.children = [child]
+#             parent1._children = [child]
+#             parent2._children = [child]
 #             parent1.status = 'merged'
 #             parent2.status = 'merged'
 #             
@@ -2486,8 +2486,8 @@ class WorldModelTrivial(WorldModelTree):
                 dim = parent.classifier[0]
                 cut = parent.classifier[1]
                 # are we the first or the second child?
-                assert self in parent.children
-                if self is parent.children[0]:
+                assert self in parent._children
+                if self is parent._children[0]:
                     self.maxs[dim] = cut
                 else:
                     self.mins[dim] = cut

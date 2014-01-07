@@ -1,6 +1,7 @@
 import unittest
 
 import tree
+import worldmodel_tree
 
 
 class Test(unittest.TestCase):
@@ -10,6 +11,7 @@ class Test(unittest.TestCase):
         
         # set up an empty tree
         self.tree = tree.Tree()
+        #self.tree = worldmodel_tree.WorldmodelTree(model=self)
         
         # root is a leaf
         self.failUnless(self.tree.is_leaf())
@@ -31,87 +33,85 @@ class Test(unittest.TestCase):
 
     def testAddingRemoving(self):
         
-        for i in range(2):
-
-            # add new leaf
-            new_leaf = self.tree.add_leaf()
-            
-            # tree is not the new leaf
-            self.failIf(self.tree is new_leaf)
-            
-            # tree is not a leaf anymore
-            self.failIf(self.tree.is_leaf())
-            
-            # new leaf is a leaf
-            self.failUnless(new_leaf.is_leaf())
-            
-            # right number of leaves 
-            self.failUnless(self.tree.get_number_of_leaves() == i+1)
-            
-            # root did not change
-            self.failUnless(new_leaf.get_root() is self.tree)
-            
-        # add a third leaf leaf
-        new_leaf = self.tree.add_leaf()
-
-        # no third leaf        
-        self.failUnless(new_leaf is None)
-
-        # number if leaves still two
+        # add new leaf
+        new_leaf_1, new_leaf_2 = self.tree.split()
+        self.failIf(new_leaf_1 is None)
+        self.failIf(new_leaf_2 is None)
+        
+        # tree is not the new leaf
+        self.failIf(self.tree is new_leaf_1)
+        self.failIf(self.tree is new_leaf_2)
+        
+        # tree is not a leaf anymore
+        self.failIf(self.tree.is_leaf())
+        
+        # new leaf is a leaf
+        self.failUnless(new_leaf_1.is_leaf())
+        self.failUnless(new_leaf_2.is_leaf())
+        
+        # right number of leaves 
         self.failUnless(self.tree.get_number_of_leaves() == 2)
-
-        # take newest leaf
-        leaf2 = self.tree.get_leaves()[-1]
-
-        # add two more leaves        
-        for i in range(2):
-
-            # add new leaf
-            new_leaf = leaf2.add_leaf()
-            
-            # tree is not a leaf anymore
-            self.failIf(leaf2.is_leaf())
-            
-            # new leaf is a leaf
-            self.failUnless(new_leaf.is_leaf())
-            
-            # root did not change
-            self.failUnless(new_leaf.get_root() is self.tree)
         
-            # right number of leaves
-            self.failUnless(leaf2.get_root().get_number_of_leaves() == i+2)
+        # root did not change
+        self.failUnless(new_leaf_1.get_root() is self.tree)
+        self.failUnless(new_leaf_2.get_root() is self.tree)
             
-        # keep a list of leaves
-        leaves = self.tree.get_leaves()
+        # add a new leafs
+        new_leaf_3, new_leaf_4 = new_leaf_2.split()
+        self.failIf(new_leaf_3 is None)
+        self.failIf(new_leaf_4 is None)
+
+        # tree is not the new leaf
+        self.failIf(self.tree is new_leaf_3)
+        self.failIf(self.tree is new_leaf_4)
+        
+        # every leaf in place?
+        self.failIf(self.tree.is_leaf())
+        self.failUnless(new_leaf_1.is_leaf())
+        self.failIf(new_leaf_2.is_leaf())
+        self.failUnless(new_leaf_3.is_leaf())
+        self.failUnless(new_leaf_4.is_leaf())
+        
+        # right number of leaves 
+        self.failUnless(self.tree.get_number_of_leaves() == 3)
+        
+        # root did not change
+        self.failUnless(new_leaf_1.get_root() is self.tree)
+        self.failUnless(new_leaf_2.get_root() is self.tree)
+        self.failUnless(new_leaf_3.get_root() is self.tree)
+        self.failUnless(new_leaf_4.get_root() is self.tree)
+
+#         # keep a list of leaves
+#         leaves = self.tree.get_leaves()
+#             
+#         # delete first leaf
+#         leaf_1 = self.tree.get_leaves()[0]
+#         leaf_1.delete()
+# 
+#         # one leaf less        
+#         self.failUnless(self.tree.get_number_of_leaves() == 2)
+# 
+#         # root has only one child now
+#         self.failUnless(self.tree.get_number_of_children() == 1)
+#         
+#         # delete first node with all children
+#         node_1 = new_leaf_2
+#         node_1.delete()
+# 
+#         # root is the last leaf now
+#         self.failUnless(self.tree.get_number_of_leaves() == 1)
+# 
+#         # root has no children left
+#         self.failUnless(self.tree.get_number_of_children() == 0)
+#         
+#         # all leaves deleted?
+#         for leaf in leaves:
+#             self.failUnless(leaf._parent is None)
             
-        # delete first leaf
-        leaf1 = self.tree.get_leaves()[0]
-        leaf1.delete()
-
-        # one leaf less        
-        self.failUnless(self.tree.get_number_of_leaves() == 2)
-
-        # root has only one child now
-        self.failUnless(self.tree.get_number_of_children() == 1)
-        
-        # delete first node with all children
-        node1 = leaf2
-        node1.delete()
-
-        # root is the last leaf now
-        self.failUnless(self.tree.get_number_of_leaves() == 1)
-
-        # root has no children left
-        self.failUnless(self.tree.get_number_of_children() == 0)
-        
-        # all leaves deleted?
-        for leaf in leaves:
-            self.failUnless(leaf.parent is None)
+        return
         
             
         
-
 if __name__ == "__main__":
-    #import sys;sys.argv = ['', 'Test.testName']
     unittest.main()
     
