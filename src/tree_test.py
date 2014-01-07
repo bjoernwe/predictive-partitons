@@ -81,33 +81,6 @@ class Test(unittest.TestCase):
         self.failUnless(new_leaf_3.get_root() is self.tree)
         self.failUnless(new_leaf_4.get_root() is self.tree)
 
-#         # keep a list of leaves
-#         leaves = self.tree.get_leaves()
-#             
-#         # delete first leaf
-#         leaf_1 = self.tree.get_leaves()[0]
-#         leaf_1.delete()
-# 
-#         # one leaf less        
-#         self.failUnless(self.tree.get_number_of_leaves() == 2)
-# 
-#         # root has only one child now
-#         self.failUnless(self.tree.get_number_of_children() == 1)
-#         
-#         # delete first node with all children
-#         node_1 = new_leaf_2
-#         node_1.delete()
-# 
-#         # root is the last leaf now
-#         self.failUnless(self.tree.get_number_of_leaves() == 1)
-# 
-#         # root has no children left
-#         self.failUnless(self.tree.get_number_of_children() == 0)
-#         
-#         # all leaves deleted?
-#         for leaf in leaves:
-#             self.failUnless(leaf._parent is None)
-            
         return
         
             
