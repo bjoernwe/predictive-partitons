@@ -95,7 +95,7 @@ class Test(unittest.TestCase):
         self.failUnless(self.tree.get_number_of_children() == 1)
         
         # delete first node with all children
-        node1 = self.tree.children[0]
+        node1 = leaf2
         node1.delete()
 
         # root is the last leaf now
