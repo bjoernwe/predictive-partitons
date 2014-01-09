@@ -1,6 +1,6 @@
 import unittest
 
-import tree
+import tree_structure
 import worldmodel_tree
 
 
@@ -8,53 +8,60 @@ class Test(unittest.TestCase):
 
 
     def setUp(self):
-        
-        # set up an empty tree
-        self.tree = tree.Tree()
-        #self.tree = worldmodel_tree.WorldmodelTree(model=self)
-        
+        pass
+    
+    
+    def testTree(self):
+        # set up empty tree
+        tree = tree_structure.Tree()
+        self.basicTests(tree)
+
+
+    def testWorldmodelTree(self):
+        # set up empty tree
+        tree = worldmodel_tree.WorldmodelTree(model=None)
+        self.basicTests(tree)
+
+
+    def basicTests(self, tree):
+
         # root is a leaf
-        self.failUnless(self.tree.is_leaf())
+        self.failUnless(tree.is_leaf())
         
         # root of tree is tree itself again
-        self.failUnless(self.tree.get_root() == self.tree)
+        self.failUnless(tree.get_root() == tree)
         
         # first leaf is tree itself again
-        self.failUnless(self.tree.get_leaves()[0] == self.tree)
+        self.failUnless(tree.get_leaves()[0] == tree)
         
         # number of leaves equals 1
-        self.failUnless(self.tree.get_number_of_leaves() == 1)
+        self.failUnless(tree.get_number_of_leaves() == 1)
         
         # index is the first leaf
-        self.failUnless(self.tree.get_leaf_index() == 0)
-        
-        return
-
-
-    def testAddingRemoving(self):
+        self.failUnless(tree.get_leaf_index() == 0)
         
         # add new leaf
-        new_leaf_1, new_leaf_2 = self.tree.split()
+        new_leaf_1, new_leaf_2 = tree.split()
         self.failIf(new_leaf_1 is None)
         self.failIf(new_leaf_2 is None)
         
         # tree is not the new leaf
-        self.failIf(self.tree is new_leaf_1)
-        self.failIf(self.tree is new_leaf_2)
+        self.failIf(tree is new_leaf_1)
+        self.failIf(tree is new_leaf_2)
         
         # tree is not a leaf anymore
-        self.failIf(self.tree.is_leaf())
+        self.failIf(tree.is_leaf())
         
         # new leaf is a leaf
         self.failUnless(new_leaf_1.is_leaf())
         self.failUnless(new_leaf_2.is_leaf())
         
         # right number of leaves 
-        self.failUnless(self.tree.get_number_of_leaves() == 2)
+        self.failUnless(tree.get_number_of_leaves() == 2)
         
         # root did not change
-        self.failUnless(new_leaf_1.get_root() is self.tree)
-        self.failUnless(new_leaf_2.get_root() is self.tree)
+        self.failUnless(new_leaf_1.get_root() is tree)
+        self.failUnless(new_leaf_2.get_root() is tree)
             
         # add a new leafs
         new_leaf_3, new_leaf_4 = new_leaf_2.split()
@@ -62,24 +69,24 @@ class Test(unittest.TestCase):
         self.failIf(new_leaf_4 is None)
 
         # tree is not the new leaf
-        self.failIf(self.tree is new_leaf_3)
-        self.failIf(self.tree is new_leaf_4)
+        self.failIf(tree is new_leaf_3)
+        self.failIf(tree is new_leaf_4)
         
         # every leaf in place?
-        self.failIf(self.tree.is_leaf())
+        self.failIf(tree.is_leaf())
         self.failUnless(new_leaf_1.is_leaf())
         self.failIf(new_leaf_2.is_leaf())
         self.failUnless(new_leaf_3.is_leaf())
         self.failUnless(new_leaf_4.is_leaf())
         
         # right number of leaves 
-        self.failUnless(self.tree.get_number_of_leaves() == 3)
+        self.failUnless(tree.get_number_of_leaves() == 3)
         
         # root did not change
-        self.failUnless(new_leaf_1.get_root() is self.tree)
-        self.failUnless(new_leaf_2.get_root() is self.tree)
-        self.failUnless(new_leaf_3.get_root() is self.tree)
-        self.failUnless(new_leaf_4.get_root() is self.tree)
+        self.failUnless(new_leaf_1.get_root() is tree)
+        self.failUnless(new_leaf_2.get_root() is tree)
+        self.failUnless(new_leaf_3.get_root() is tree)
+        self.failUnless(new_leaf_4.get_root() is tree)
 
         return
         

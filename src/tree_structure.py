@@ -43,6 +43,14 @@ class Tree(object):
         return self.get_leaves().index(self)
     
     
+    def get_leaf(self, index):
+        """
+        Returns the leaf with the given index.
+        """
+        assert self.get_root() is self
+        return self.get_leaves()[index]
+    
+    
     def split(self, **kwargs):
         """
         Creates two new instances of the same class and adds it as a children to 

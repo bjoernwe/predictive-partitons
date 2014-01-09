@@ -1,61 +1,62 @@
+import collections
 import numpy as np
 
 import worldmodel_tree
 
 
-class WorldmodelTrivial(WorldmodelTree):
+class WorldmodelTrivial(worldmodel_tree.WorldmodelTree):
     """
     Partitions the feature space into regular (hyper-) cubes.
     """
     
+    
+    TestParams = collections.namedtuple('TestParams', ['dim', 'cut'])
+    
+    
     def __init__(self, model, parents=None):
         super(WorldmodelTrivial, self).__init__(model=model)
-        self.mins = None
-        self.maxs = None    
+        self._mins = None
+        self._maxs = None    
 
     
-    def _init_test(self, action, fast_partition=False):
+    def _init_test_params(self, action, fast_partition=False):
         """
         Initializes the parameters that split the node in two halves.
         """
-        assert self.status == 'leaf'
-        
+
         # init borders
-        D = self.model.get_input_dim()
+        D = self._model.get_input_dim()
         if self.mins is None:
-            if len(self.parents) > 0:
+            if self._parent is not None:
                 # calculate borders from parent
-                parent = self.parents[0]
-                self.mins = np.array(parent.mins)
-                self.maxs = np.array(parent.maxs)
+                parent = self._parent
+                self._mins = np.array(parent.mins)
+                self._maxs = np.array(parent.maxs)
                 dim = parent.classifier[0]
                 cut = parent.classifier[1]
                 # are we the first or the second child?
                 assert self in parent._children
                 if self is parent._children[0]:
-                    self.maxs[dim] = cut
+                    self._maxs[dim] = cut
                 else:
-                    self.mins[dim] = cut
+                    self._mins[dim] = cut
             else: 
                 # top node
-                self.mins = np.zeros(D)
-                self.maxs = np.ones(D) 
+                self._mins = np.zeros(D)
+                self._maxs = np.ones(D) 
 
         # classifier
-        diffs = self.maxs - self.mins
+        diffs = self._maxs - self._mins
         dim = np.argmax(diffs)
-        cut = self.mins[dim] + (self.maxs[dim] - self.mins[dim]) / 2.
-        #self.classifier = (dim, cut)
-        return (dim, cut)
+        cut = self._mins[dim] + (self._maxs[dim] - self._mins[dim]) / 2.
+        return WorldmodelTrivial.TestParams(dim=dim, cut=cut)
 
 
-    def _test(self, x):
+    def _test(self, x, params):
         """
-        Tests to which child the data point x belongs
+        Tests to which child the data point x belongs.
         """
-        dim = self.classifier[0]
-        cut = self.classifier[1]
-        if x[dim] > cut:
+        if x[params.dim] > params.cut:
             return 1
         return 0
 
