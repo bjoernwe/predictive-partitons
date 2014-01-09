@@ -40,7 +40,7 @@ class WorldmodelTree(tree_structure.Tree):
         if x.ndim > 1:
 
             # classify every point
-            labels = [self.classify(row) for row in x]
+            labels = [self._classify(row) for row in x]
             return labels
 
         else:

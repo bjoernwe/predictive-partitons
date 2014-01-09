@@ -47,7 +47,7 @@ class Worldmodel(object):
         model. Since each action has its own model for classification, the
         action has to be specified.
         """
-        return np.array(self._partitionings[action].tree.classify(data), dtype=int)
+        return np.array(self._partitionings[action].tree._classify(data), dtype=int)
     
     
     def add_data(self, data, actions=None):
@@ -61,22 +61,23 @@ class Worldmodel(object):
         data = np.atleast_2d(data)
 
         # data length
-        n = data.shape[0]
-        N = self.get_number_of_samples() + n
+        n = self.get_number_of_samples()
+        m = data.shape[0]
+        N = n + m
         
         # prepare list of actions
         if actions is None:
-            actions = [None for _ in range(n-1)]
+            actions = [None for _ in range(m-1)]
             
         # add missing action
-        if self._data is not None and len(actions) == n-1:
+        if self._data is not None and len(actions) == m-1:
             actions = [None] + actions
         
         # make sure right number of actions
         if self._data is not None:
-            assert len(actions) == n
+            assert len(actions) == m
         else:
-            assert len(actions) == n-1
+            assert len(actions) == m-1
             
         # store data in model
         if self._data is None:
@@ -85,39 +86,55 @@ class Worldmodel(object):
             self._data = data
             self._actions = actions
         else:
-            first_data = self.get_number_of_samples()
+            first_data = n
             first_source = first_data - 1
             self._data = np.vstack([self._data, data])
             self._actions = self._actions + actions
             
         # same number of actions and data points?
-        assert self._data.shape[0] == len(self._actions)+1
+        assert self._data.shape[0] == len(self._actions) + 1
         
-        # remember actions
+        # update set of actions
         self._action_set = self._action_set.union(set(actions))
         
         # initialize/update partition structures
         for action in self._action_set:
-            
-            labels = self.classify(data, action=action)
+
+            # this case happens if an action was not observed before
+            # thus an empty tree is created, an empty transition matrix and
+            # all-zero labels if needed
             
             # initialize new structure
             if action not in self._partitionings.keys():
                 
+                labels = np.zeros(n, dtype=int)
                 tree = self._tree_class(model=self)
                 transitions = {}
                 for action_2 in self._action_set:
-                    transitions[action_2] = np.zeros((1, 1), dtype=int) 
+                    transitions[action_2] = np.zeros((1, 1), dtype=int)
                 self._partitionings[action] = Partitioning(labels=labels, transitions=transitions, tree=tree)
                 
             # update existing structure
             else:
                 
-                self._partitionings[action].labels = np.hstack([self._partitionings[action].labels, labels])
-                K = self._partitionings[action].tree.get_number_of_leaves()
+                # in this case, the action is already known and thus a 
+                # partitioning already exists. however, it may happen that the
+                # new data brings new actions that also need transition matrices
+                # (yet empty).
+                
+                partitioning = self._partitionings[action]
+                K = partitioning.tree.get_number_of_leaves()
                 for action_2 in self._action_set:
-                    if action_2 not in self._partitionings[action].transitions.keys():
-                        self._partitionings[action].transitions[action_2] = np.zeros((K, K), dtype=int)
+                    if action_2 not in partitioning.transitions.keys():
+                        partitioning.transitions[action_2] = np.zeros((K, K), dtype=int)
+                        
+        # calculate new labels, and append
+        for action in self._action_set:
+            partitioning = self._partitionings[action]
+            labels = self.classify(data, action=action)
+            new_labels = np.hstack([partitioning.labels, labels])
+            self._partitionings[action] = partitioning._replace(labels=new_labels)
+            assert len(self._partitionings[action].labels) == N
 
         # add references of new data to corresponding partitions            
         for action in self._action_set:
@@ -152,9 +169,14 @@ class Worldmodel(object):
         P = np.zeros((K, K), dtype=int)
         
         for a in self._action_set:
+            print (partitioning.transitions[a])
             P += partitioning.transitions[a]
+        print ''
 
-        assert np.sum(P) == self._data.shape[0] - 1
+        print self.get_number_of_samples()
+        print ''
+        
+        assert np.sum(P) == self.get_number_of_samples() - 1
         return P
     
 
