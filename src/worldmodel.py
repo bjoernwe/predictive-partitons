@@ -15,7 +15,7 @@ class Worldmodel(object):
         
         # data storage
         self._data = None        # global data storage
-        self._actions = None     # a sequence of actions
+        self._actions = []       # a sequence of actions
         self._action_set = set()
         
         # partitionings for each action (including labels, transitions and tree)
@@ -39,6 +39,10 @@ class Worldmodel(object):
         if self._data is None:
             return 0
         return self._data.shape[0]
+    
+    
+    def get_known_actions(self):
+        return set(self._action_set)
 
 
     def classify(self, data, action):
@@ -79,21 +83,6 @@ class Worldmodel(object):
         else:
             assert len(actions) == m-1
             
-        # store data in model
-        if self._data is None:
-            first_data = 0
-            first_source = 0
-            self._data = data
-            self._actions = actions
-        else:
-            first_data = n
-            first_source = first_data - 1
-            self._data = np.vstack([self._data, data])
-            self._actions = self._actions + actions
-            
-        # same number of actions and data points?
-        assert self._data.shape[0] == len(self._actions) + 1
-        
         # update set of actions
         self._action_set = self._action_set.union(set(actions))
         
@@ -111,7 +100,7 @@ class Worldmodel(object):
                 tree = self._tree_class(model=self)
                 transitions = {}
                 for action_2 in self._action_set:
-                    transitions[action_2] = np.zeros((1, 1), dtype=int)
+                    transitions[action_2] = np.ones((1, 1), dtype=int) * self._actions.count(action_2)
                 self._partitionings[action] = Partitioning(labels=labels, transitions=transitions, tree=tree)
                 
             # update existing structure
@@ -128,6 +117,21 @@ class Worldmodel(object):
                     if action_2 not in partitioning.transitions.keys():
                         partitioning.transitions[action_2] = np.zeros((K, K), dtype=int)
                         
+        # store data in model
+        if self._data is None:
+            first_data = 0
+            first_source = 0
+            self._data = data
+            self._actions = actions
+        else:
+            first_data = n
+            first_source = first_data - 1
+            self._data = np.vstack([self._data, data])
+            self._actions = self._actions + actions
+            
+        # same number of actions and data points?
+        assert self._data.shape[0] == len(self._actions) + 1
+        
         # calculate new labels, and append
         for action in self._action_set:
             partitioning = self._partitionings[action]
@@ -169,13 +173,8 @@ class Worldmodel(object):
         P = np.zeros((K, K), dtype=int)
         
         for a in self._action_set:
-            print (partitioning.transitions[a])
             P += partitioning.transitions[a]
-        print ''
 
-        print self.get_number_of_samples()
-        print ''
-        
         assert np.sum(P) == self.get_number_of_samples() - 1
         return P
     
