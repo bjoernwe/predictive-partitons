@@ -24,6 +24,7 @@ def entropy(x, normalize=False, ignore_empty_classes=True):
         return 1.0
 
     # empty class?
+    # TODO it may also make sense to assume low entropy here...
     if trans_sum == 0:
         if not ignore_empty_classes:
             print "Warning: Entropy of zero vector. Returning max. entropy."

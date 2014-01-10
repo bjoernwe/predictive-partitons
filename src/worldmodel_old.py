@@ -1115,7 +1115,7 @@ class WorldModelTree(object):
         refs_out = []
          
         if heading_in:
-            refs_in = [ref-1 for ref in refs if (ref-1 not in refs) and (ref > 0)]
+            refs_in = [ref-1 for ref in refs if (ref-1 not in refs) and (ref-1 > 0)]
             
         if inside:
             refs_inside = [ref for ref in refs if (ref+1 in refs)]
@@ -1201,7 +1201,7 @@ class WorldModelTree(object):
 
     def _calc_local_gain(self, action):
         """
-        Calculates the mutual entropy for a bipartition of that node (call 
+        Calculates the mutual information for a bipartition of that node (call 
         _init_test() before).
         """
         return self.model._mutual_information(self._calc_local_transition_matrix(action))
