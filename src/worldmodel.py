@@ -7,6 +7,11 @@ import worldmodel_methods
 
 Partitioning = collections.namedtuple('Partitioning', ['labels', 'transitions', 'tree'])
 
+SplitResult = collections.namedtuple('SplitResult', ['node',
+                                                     'action',
+                                                     'gain',
+                                                     'test_params'])
+
 
 class Worldmodel(object):
 
@@ -177,11 +182,31 @@ class Worldmodel(object):
 
         assert np.sum(P) == self.get_number_of_samples() - 1
         return P
+
+
+    def _calc_best_split(self, active_action):
+        """
+        Calculates the gain for each state and returns a split-object for the
+        best one
+        """
+        
+        if self.data is None:
+            return None
+                
+        best_split = None
+
+        tree = self._partitionings[active_action].tree
+        for leaf in tree.get_leaves():
+            test_params = tree.calc_test_params(active_action=active_action)
+            gain = leaf.calc_local_gain(active_action=active_action, test_params=test_params)
+            if best_split is None or gain > best_split.gain:
+                best_split = SplitResult(node = self,
+                                         action = active_action, 
+                                         gain = gain, 
+                                         test_params = test_params)
+        return best_split
     
 
 
 if __name__ == '__main__':
-    
-    model = Worldmodel()
-    model.add_data(data=np.random.random((10, 2)), actions=None)
-    
+    pass    

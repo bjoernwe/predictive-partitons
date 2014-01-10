@@ -14,7 +14,7 @@ class WorldmodelTree(tree_structure.Tree):
         self._dat_ref = []   # indices of data belonging to this node
         
         
-    def _init_test_params(self, action, fast_partition=False):
+    def calc_test_params(self, active_action, fast_partition=False):
         """
         Initializes the parameters that split the node in two halves and returns
         them.
@@ -25,7 +25,7 @@ class WorldmodelTree(tree_structure.Tree):
     def _test(self, x, params):
         """
         Tests to which child the data point x belongs. Parameters are the ones
-        calculated by _init_test_params().
+        calculated by calc_test_params().
         """
         raise NotImplementedError("Use subclass like WorldmodelSpectral instead.")
     
@@ -125,7 +125,7 @@ class WorldmodelTree(tree_structure.Tree):
         return (n_samples_active >= number) and (n_actions == 1 or n_samples_inactive >= number)
         
         
-    def _calc_local_gain(self, active_action, test_params, heading_in=False, inside=True, heading_out=False):
+    def calc_local_gain(self, active_action, test_params):
         """
         For every action a 2x2 transition matrix is calculated, induced by the
         given split (test_params). For the "active" action the mutual 
