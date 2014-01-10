@@ -1,3 +1,6 @@
+import weakref
+
+
 class Tree(object):
     
     
@@ -60,8 +63,8 @@ class Tree(object):
         assert self.is_leaf()
         child_1 = self.__class__(**kwargs)
         child_2 = self.__class__(**kwargs)
-        child_1._parent = self
-        child_2._parent = self
+        child_1._parent = weakref.proxy(self)
+        child_2._parent = weakref.proxy(self)
         self._children.append(child_1)
         self._children.append(child_2)
         return (child_1, child_2)
