@@ -9,12 +9,6 @@ import worldmodel_methods
 
 Partitioning = collections.namedtuple('Partitioning', ['labels', 'transitions', 'tree'])
 
-# SplitParams = collections.namedtuple('SplitParams', ['node',
-#                                                      'action',
-#                                                      'gain',
-#                                                      'test_params',
-#                                                      'ref_test_dict'])
-
 
 class Worldmodel(object):
 

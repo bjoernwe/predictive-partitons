@@ -1,7 +1,6 @@
 import unittest
 
 import tree_structure
-import worldmodel_tree
 
 
 class Test(unittest.TestCase):
@@ -14,16 +13,6 @@ class Test(unittest.TestCase):
     def testTree(self):
         # set up empty tree
         tree = tree_structure.Tree()
-        self.basicTests(tree)
-
-
-    def testWorldmodelTree(self):
-        # set up empty tree
-        tree = worldmodel_tree.WorldmodelTree(model=None)
-        self.basicTests(tree)
-
-
-    def basicTests(self, tree):
 
         # root is a leaf
         self.failUnless(tree.is_leaf())
