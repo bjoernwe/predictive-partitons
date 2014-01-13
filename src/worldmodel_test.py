@@ -56,6 +56,17 @@ class Test(unittest.TestCase):
 
         for a in [0, 1, None]:
             self.failUnless(model._partitionings[a].transitions[None] == 1)
+            
+            
+    def testBasics(self):
+
+        N = 100
+        data = np.random.random((100, 2))
+        actions = [i%2 for i in range(N-1)]
+        model = worldmodel.Worldmodel(method='naive', seed=None)
+        model.add_data(data=data, actions=actions)
+        model.split(action=None)
+
 
 
 if __name__ == "__main__":

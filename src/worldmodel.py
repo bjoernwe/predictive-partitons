@@ -37,6 +37,13 @@ class Worldmodel(object):
             self.random.seed(seed)
             
             
+    def get_input_dim(self):
+        """
+        Returns the input dimensionality of the model.
+        """
+        return self._data.shape[1]
+    
+    
     def get_number_of_samples(self):
         if self._data is None:
             return 0
@@ -187,17 +194,17 @@ class Worldmodel(object):
         best one
         """
         
-        if self.data is None:
+        if self._data is None:
             return None
                 
         best_split = None
 
         tree = self._partitionings[active_action].tree
         for leaf in tree.get_leaves():
-            test_params = tree.calc_test_params(active_action=active_action)
+            test_params = tree._calc_test_params(active_action=active_action)
             gain, ref_test_dict = leaf._calc_local_gain(active_action=active_action, test_params=test_params)
             if best_split is None or gain > best_split.gain:
-                best_split = split_params.SplitParams(node = weakref.proxy(self),
+                best_split = split_params.SplitParams(node = weakref.proxy(leaf),
                                                       action = active_action, 
                                                       gain = gain, 
                                                       test_params = test_params,
@@ -214,7 +221,7 @@ class Worldmodel(object):
             
         for a in actions:
             split_params = self._calc_best_split(active_action=a)
-            if split_params is not None and split_params.gain >= min_gain:
+            if split_params is not None and split_params._gain >= min_gain:
                 self._partitionings[a].tree.split(split_params=split_params)
                 
         return

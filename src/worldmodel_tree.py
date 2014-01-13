@@ -11,12 +11,15 @@ class WorldmodelTree(tree_structure.Tree):
         super(WorldmodelTree, self).__init__()
         
         # important references
-        self._model = weakref.proxy(model)
+        if type(model) == weakref.ProxyType:
+            self._model = model
+        else:
+            self._model = weakref.proxy(model)
         self._dat_ref = []   # indices of data belonging to this node
         self._split_params = None
         
         
-    def calc_test_params(self, active_action, fast_partition=False):
+    def _calc_test_params(self, active_action, fast_partition=False):
         """
         Initializes the parameters that split the node in two halves and returns
         them.
@@ -64,17 +67,17 @@ class WorldmodelTree(tree_structure.Tree):
         Applies a split.
         """
         
-        child_1, child_2 = super(WorldmodelTree, self).split(model=self._model)
         self._split_params = split_params
         
         # re-calculate labels and transitions for split
         new_labels, new_dat_refs, new_trans = split_params.calc_labels_and_transitions_matrices()
         
         # copy labels and transitions to model
-        self._model._labels = new_labels
-        self._model._partitionings[split_params._action]._transitions = new_trans
+        action = split_params._action
+        self._model._partitionings[action] = self._model._partitionings[action]._replace(labels = new_labels, transitions = new_trans) 
         
         # copy new references to children
+        child_1, child_2 = super(WorldmodelTree, self).split(model=self._model)
         child_1._dat_ref = new_dat_refs[0]
         child_2._dat_ref = new_dat_refs[1]
         
@@ -111,7 +114,7 @@ class WorldmodelTree(tree_structure.Tree):
         """
         
         refs = self._get_data_refs()
-        N = self.model.get_number_of_samples()
+        N = self._model.get_number_of_samples()
         
         refs_1 = [] 
          
@@ -133,7 +136,7 @@ class WorldmodelTree(tree_structure.Tree):
     
     def _reached_number_of_active_and_inactive_samples(self, number, active_action):
         """
-        Calculates whether for the active action and all other actions a certain
+        Calculates whether for the active _action and all other actions a certain
         number of samples is reached.
         """
         refs_1, _ = self._get_transition_refs(heading_in=False, inside=True, heading_out=False)
@@ -149,8 +152,8 @@ class WorldmodelTree(tree_structure.Tree):
         
     def _calc_local_gain(self, active_action, test_params):
         """
-        For every action a 2x2 transition matrix is calculated, induced by the
-        given split (test_params). For the "active" action the mutual 
+        For every _action a 2x2 transition matrix is calculated, induced by the
+        given split (test_params). For the "active" _action the mutual 
         information is calculated and the average of all the others. For the
         final value, mutual information of active and inactive actions each have
         half of the weight.

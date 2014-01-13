@@ -1,11 +1,10 @@
 import numpy as np
-import weakref
 
 
 class SplitParams(object):
     
     def __init__(self, node, action, gain, test_params, ref_test_dict):
-        self._node = weakref.proxy(node)
+        self._node = node
         self._action = action
         self._gain = gain
         self._test_params = test_params
@@ -24,6 +23,7 @@ class SplitParams(object):
         Returns new labels and split data references.
         """
         node = self._node
+        partitioning = node._model._partitionings[self._action]
         assert node.is_leaf()
 
         # some useful variables
@@ -32,7 +32,7 @@ class SplitParams(object):
         
         # make of copy of all labels
         # increase labels above current state by one to make space for the split
-        new_labels = [(label+1 if label > current_state else label) for label in node._model._labels]
+        new_labels = [(label+1 if label > current_state else label) for label in partitioning.labels]
         new_dat_ref = [[], []]
 
         # every entry belonging to this node has to be re-classified
@@ -42,7 +42,7 @@ class SplitParams(object):
             new_labels[ref] += child_i
             new_dat_ref[child_i].append(ref)
 
-        assert len(new_labels) == len(node._model._labels)
+        assert len(new_labels) == len(partitioning.labels)
         assert len(new_labels) == len(new_dat_ref[0]) + len(new_dat_ref[1])
         
         # does the split really split the data in two?
@@ -60,9 +60,10 @@ class SplitParams(object):
         """
         
         N = len(new_labels)
-        action = self._action
         node = self._node
-        index = node.get_index()
+        index = node.get_leaf_index()
+        action = self._action
+        partitioning = node._model._partitionings[action]
         assert node.is_leaf()
         
         transition_matrices = {}
@@ -70,7 +71,7 @@ class SplitParams(object):
         for a in node._model.get_known_actions():
         
             # new transition matrix
-            new_trans = np.array(node._model._partitionings[action].transitions[a])
+            new_trans = np.array(partitioning.transitions[a])
             # split current row and set to zero
             new_trans[index,:] = 0
             new_trans = np.insert(new_trans, index, 0, axis=0)  # new row
@@ -80,15 +81,15 @@ class SplitParams(object):
             
             # update all transitions from or to current state
             for i in range(N-1):
-                source = self.labels[i]
-                target = self.labels[i+1]
-                if node._model._actions[i] == action:
+                if node._model._actions[i] == a:
+                    source = partitioning.labels[i]
+                    target = partitioning.labels[i+1]
                     if source == index or target == index:
                         new_source = new_labels[i]
                         new_target = new_labels[i+1]
                         new_trans[new_source, new_target] += 1
     
-            assert np.sum(new_trans) == np.sum(node._model._partitionings[action].transitions[a])
+            assert np.sum(new_trans) == np.sum(partitioning.transitions[a])
             transition_matrices[a] = new_trans
             
         return transition_matrices

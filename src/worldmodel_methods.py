@@ -19,19 +19,19 @@ class WorldmodelTrivial(worldmodel_tree.WorldmodelTree):
         self._maxs = None    
 
     
-    def _init_test_params(self, action, fast_partition=False):
+    def _calc_test_params(self, active_action, fast_partition=False):
         """
         Initializes the parameters that split the node in two halves.
         """
 
         # init borders
         D = self._model.get_input_dim()
-        if self.mins is None:
+        if self._mins is None:
             if self._parent is not None:
                 # calculate borders from parent
                 parent = self._parent
-                self._mins = np.array(parent.mins)
-                self._maxs = np.array(parent.maxs)
+                self._mins = np.array(parent._mins)
+                self._maxs = np.array(parent._maxs)
                 dim = parent.classifier[0]
                 cut = parent.classifier[1]
                 # are we the first or the second child?
