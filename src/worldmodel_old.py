@@ -320,34 +320,34 @@ class WorldModel(object):
         assert np.sum(transitions) == N-1
         
         for action in self.transitions.keys():
-            result[action] = self._split_transition_matrix(action=action, new_labels=new_labels, index1=index1, index2=index2)
+            result[action] = self._split_transition_matrix(action=action, new_labels=new_labels, index=index1, index2=index2)
             
         return result
 
 
-    def _split_transition_matrix(self, action, new_labels, index1, index2=None):
+    def _split_transition_matrix(self, action, new_labels, index, index2=None):
         """
-        Calculates a new transition matrix with the split index1 -> index1 & index1+1.
+        Calculates a new transition matrix with the split index -> index & index+1.
         
-        In special cases it might be necessary to have a split index1 -> index1 & index2.
+        In special cases it might be necessary to have a split index -> index & index2.
         """
         N = len(new_labels)
         S = np.sum(self.transitions[action])
         
-        assert self.tree.get_leaves()[index1].status == 'leaf'
+        assert self.tree.get_leaves()[index].status == 'leaf'
         #assert max(new_labels) == self.transitions[action].shape[0]
         
         if index2 is None:
-            index2 = index1
-            assert self.tree.get_leaves()[index1].status == 'leaf'
+            index2 = index
+            assert self.tree.get_leaves()[index].status == 'leaf'
 
         # new transition matrix
         new_trans = np.array(self.transitions[action])
         # split current row and set to zero
-        new_trans[index1,:] = 0
+        new_trans[index,:] = 0
         new_trans = np.insert(new_trans, index2, 0, axis=0)  # new row
         # split current column and set to zero
-        new_trans[:,index1] = 0
+        new_trans[:,index] = 0
         new_trans = np.insert(new_trans, index2, 0, axis=1)  # new column
         
         # update all transitions from or to current state
@@ -355,7 +355,7 @@ class WorldModel(object):
             source = self.labels[i]
             target = self.labels[i+1]
             if self.actions is None or self.actions[i+1] == action:
-                if source == index1 or target == index1:
+                if source == index or target == index:
                     new_source = new_labels[i]
                     new_target = new_labels[i+1]
                     new_trans[new_source, new_target] += 1
@@ -2061,8 +2061,6 @@ class WorldModelTree(object):
 #         Calculates the gain in mutual information if this node would be split.
 #         
 #         Calculations can be restricted to a given action.
-#         
-#         TODO: cache result!
 #         """
 #         
 #         root = self.root()
@@ -2119,8 +2117,6 @@ class WorldModelTree(object):
 #         """
 #         Calculates the gain for each state and splits the best one. Can be
 #         restricted to a given action.
-#         
-#         TODO: only re-calculate states with some change
 #         """
 #         
 #         root = self.root()

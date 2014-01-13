@@ -1,4 +1,5 @@
 import numpy as np
+import weakref
 
 import entropy_utils
 import tree_structure
@@ -10,8 +11,9 @@ class WorldmodelTree(tree_structure.Tree):
         super(WorldmodelTree, self).__init__()
         
         # important references
-        self._model = model
+        self._model = weakref.proxy(model)
         self._dat_ref = []   # indices of data belonging to this node
+        self._split_params = None
         
         
     def calc_test_params(self, active_action, fast_partition=False):
@@ -57,8 +59,14 @@ class WorldmodelTree(tree_structure.Tree):
         return len(self._dat_ref)
             
             
-    def split(self):
+    def split(self, split_params):
         child_1, child_2 = super(WorldmodelTree, self).split(model=self._model)
+        self._split_params = split_params
+        
+        new_labels, new_data_refs = self._relabel_data()
+        self.model.transitions = self.model._split_transition_matrices(new_labels=new_labels, 
+                                                                       index1=self.get_leaf_index())
+        
         return child_1, child_2
     
 
@@ -153,6 +161,7 @@ class WorldmodelTree(tree_structure.Tree):
         child_indices = [self._test(self._model._data[ref], test_params) for ref in refs]
         child_indices_1 = [child_indices[i] for i, ref in enumerate(refs) if ref in refs_1]
         child_indices_2 = [child_indices[i] for i, ref in enumerate(refs) if ref in refs_2]
+        ref_test_dict = dict(zip(refs, child_indices))
         assert len(refs_1) == len(child_indices_1)
         assert len(refs_2) == len(child_indices_2)
         
@@ -169,7 +178,44 @@ class WorldmodelTree(tree_structure.Tree):
             mi_inactive = np.mean([entropy_utils.mutual_information(matrices[action]) for action in actions if action is not active_action])
             mi = np.mean([mi, mi_inactive])
             
-        return mi
+        return mi, ref_test_dict
+
+
+    def _relabel_data(self, test_params):
+        """
+        Returns new labels and split data references according to the 
+        test_params.
+        """
+        assert self.is_leaf()
+
+        # some useful variables
+        current_state = self.get_leaf_index()
+        assert current_state is not None
+        
+        # make of copy of all labels
+        # increase labels above current state by one to make space for the split
+        new_labels = [(label+1 if label > current_state else label) for label in self._model._labels]
+        new_dat_ref = [[], []]
+
+        # TODO: avoid call of _test! re-use results from _calc_local_gain.
+        
+        # every entry belonging to this node has to be re-classified
+        for ref in self._dat_ref:
+            dat = self._model.data[ref]
+            child_i = self._test(dat, test_params=test_params)
+            new_labels[ref] += child_i
+            new_dat_ref[child_i].append(ref)
+
+        assert len(new_labels) == len(self._model._labels)
+        assert len(new_labels) == len(new_dat_ref[0]) + len(new_dat_ref[1])
+        
+        # does the split really split the data in two?
+        assert len(new_dat_ref[0]) > 0
+        assert len(new_dat_ref[1]) > 0
+        #if (len(new_dat_ref[0]) == 0 or
+        #    len(new_dat_ref[1]) == 0):
+        #    return None, None
+        return new_labels, new_dat_ref
             
         
 
