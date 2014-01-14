@@ -208,7 +208,7 @@ class Worldmodel(object):
                                              action = active_action, 
                                              test_params = test_params)
             if split is not None:
-                if best_split is None or split._gain >= best_split._gain:
+                if best_split is None or split.get_gain() >= best_split.get_gain():
                     best_split = split
                 
         return best_split
@@ -223,7 +223,8 @@ class Worldmodel(object):
             
         for a in actions:
             split_params = self._calc_best_split(active_action=a)
-            if split_params is not None and split_params._gain >= min_gain:
+            if split_params is not None and split_params.get_gain() >= min_gain:
+                print split_params._gain
                 split_params.apply()
                 
         return
@@ -268,25 +269,25 @@ class Worldmodel(object):
 
 if __name__ == '__main__':
 
-    N = 10000
+    N = 100000
     np.random.seed(0)
     data = np.random.random((N, 2))
     actions = [i%2 for i in range(N-1)]
     model = Worldmodel(method='naive', seed=None)
     model.add_data(data=data, actions=actions)
     model.split(action=0)
-    model.split(action=0)
-    model.split(action=0)
-    model.split(action=0)
-    model.split(action=0)
-    model.split(action=0)
-    model.split(action=0)
-    model.split(action=0)
-    model.split(action=0)
-    model.split(action=0)
+#     model.split(action=0)
+#     model.split(action=0)
+#     model.split(action=0)
+#     model.split(action=0)
+#     model.split(action=0)
+#     model.split(action=0)
+#     model.split(action=0)
+#     model.split(action=0)
+#     model.split(action=0)
     #model.split(action=None)
     for i, action in enumerate(model.get_known_actions()):
         pyplot.subplot(1, 2, i+1)
-        model.plot_data_colored_for_state(active_action=action, show_plot=False)
-    pyplot.show()
+        #model.plot_data_colored_for_state(active_action=action, show_plot=False)
+    #pyplot.show()
     

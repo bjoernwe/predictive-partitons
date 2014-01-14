@@ -91,8 +91,8 @@ class WorldmodelTree(tree_structure.Tree):
         self._model._partitionings[action] = self._model._partitionings[action]._replace(labels = split_params.get_new_labels(), transitions = split_params.get_new_trans()) 
         
         # copy new references to children
-        child_1, child_2 = super(WorldmodelTree, self).split(model=self._model)
         new_dat_refs = split_params.get_new_dat_refs()
+        child_1, child_2 = super(WorldmodelTree, self).split(model=self._model)
         child_1._dat_ref = new_dat_refs[0]
         child_2._dat_ref = new_dat_refs[1]
         
