@@ -1,14 +1,17 @@
 import numpy as np
 
+import entropy_utils
+
 
 class SplitParams(object):
     
-    def __init__(self, node, action, gain, test_params, ref_test_dict):
+    def __init__(self, node, action, test_params):
         self._node = node
         self._action = action
-        self._gain = gain
         self._test_params = test_params
-        self._ref_test_dict = ref_test_dict 
+        self._gain, self._ref_test_dict = self._calc_local_gain()
+        self._new_labels, self._new_dat_refs = self._relabel_data()
+        self._new_trans = self._calc_transition_matrices() 
         return
 
 
@@ -17,12 +20,6 @@ class SplitParams(object):
         return
     
     
-    def calc_labels_and_transitions_matrices(self):
-        new_labels, new_dat_refs = self._relabel_data()
-        new_trans = self._calc_transition_matrices(new_labels)
-        return new_labels, new_dat_refs, new_trans
-
-
     def _relabel_data(self):
         """
         Returns new labels and split data references.
@@ -62,12 +59,12 @@ class SplitParams(object):
         return new_labels, new_dat_ref
 
 
-    def _calc_transition_matrices(self, new_labels):
+    def _calc_transition_matrices(self):
         """
         Calculates a new transition matrix with the split index -> index & index+1.
         """
         
-        N = len(new_labels)
+        N = len(self._new_labels)
         node = self._node
         index = node.get_leaf_index()
         action = self._action
@@ -93,8 +90,8 @@ class SplitParams(object):
                     source = partitioning.labels[i]
                     target = partitioning.labels[i+1]
                     if source == index or target == index:
-                        new_source = new_labels[i]
-                        new_target = new_labels[i+1]
+                        new_source = self._new_labels[i]
+                        new_target = self._new_labels[i+1]
                         new_trans[new_source, new_target] += 1
     
             assert np.sum(new_trans) == np.sum(partitioning.transitions[a])
@@ -102,6 +99,63 @@ class SplitParams(object):
             
         return transition_matrices
 
+
+    def _calc_local_gain(self):
+        """
+        For every _action a 2x2 transition matrix is calculated, induced by the
+        given split (test_params). For the "active" _action the mutual 
+        information is calculated and the average of all the others. For the
+        final value, mutual information of active and inactive actions each have
+        half of the weight.
+        
+        For the transition matrices calculated, +1 is added for every possible
+        transition to account for uncertainty in cases where only few samples 
+        have been collected.
+        """
+        
+        # initialize transition matrices
+        matrices = {}
+        actions = self._node._model.get_known_actions()
+        for action in actions:
+            matrices[action] = np.ones((2, 2))
+
+        # transitions inside current partition
+        refs_1, refs_2 = self._node._get_transition_refs(heading_in=False, inside=True, heading_out=False)
+        refs = list(set(refs_1 + refs_2))
+        refs.sort()
+        
+        # assign data to one of the two sub-partitions
+        child_indices = [self._node._test(self._node._model._data[ref], self._test_params) for ref in refs]
+        child_indices_1 = [child_indices[i] for i, ref in enumerate(refs) if ref in refs_1]
+        child_indices_2 = [child_indices[i] for i, ref in enumerate(refs) if ref in refs_2]
+        ref_test_dict = dict(zip(refs, child_indices))
+        assert len(refs_1) == len(child_indices_1)
+        assert len(refs_2) == len(child_indices_2)
+        
+        # transition matrices
+        for i, ref in enumerate(refs_1):
+            c1 = child_indices_1[i]
+            c2 = child_indices_2[i]
+            a = self._node._model._actions[ref]
+            matrices[a][c1, c2] += 1
+            
+        # mutual information
+        mi = entropy_utils.mutual_information(matrices[self._action])
+        if len(actions) >= 2:
+            mi_inactive = np.mean([entropy_utils.mutual_information(matrices[action]) for action in actions if action is not self._action])
+            mi = np.mean([mi, mi_inactive])
+            
+        return mi, ref_test_dict
+
+
+    def _calc_global_gain(self, active_action, test_params):
+        
+        partitioning = self._model._partitionings[active_action]
+        
+        for a in self._model.get_known_actions():
+            
+            transitions = partitioning.transitions[a]
+            
 
 
 if __name__ == '__main__':

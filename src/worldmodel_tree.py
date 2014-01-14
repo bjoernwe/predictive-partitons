@@ -87,16 +87,16 @@ class WorldmodelTree(tree_structure.Tree):
         self._split_params = split_params
         
         # re-calculate labels and transitions for split
-        new_labels, new_dat_refs, new_trans = split_params.calc_labels_and_transitions_matrices()
+        #new_labels, new_dat_refs, new_trans = split_params.calc_labels_and_transitions_matrices()
         
         # copy labels and transitions to model
         action = split_params._action
-        self._model._partitionings[action] = self._model._partitionings[action]._replace(labels = new_labels, transitions = new_trans) 
+        self._model._partitionings[action] = self._model._partitionings[action]._replace(labels = split_params._new_labels, transitions = split_params._new_trans) 
         
         # copy new references to children
         child_1, child_2 = super(WorldmodelTree, self).split(model=self._model)
-        child_1._dat_ref = new_dat_refs[0]
-        child_2._dat_ref = new_dat_refs[1]
+        child_1._dat_ref = split_params._new_dat_refs[0]
+        child_2._dat_ref = split_params._new_dat_refs[1]
         
         # free some memory
         self._dat_ref = None
@@ -166,54 +166,6 @@ class WorldmodelTree(tree_structure.Tree):
         
         return (n_samples_active >= number) and (n_actions == 1 or n_samples_inactive >= number)
         
-        
-    def _calc_local_gain(self, active_action, test_params):
-        """
-        For every _action a 2x2 transition matrix is calculated, induced by the
-        given split (test_params). For the "active" _action the mutual 
-        information is calculated and the average of all the others. For the
-        final value, mutual information of active and inactive actions each have
-        half of the weight.
-        
-        For the transition matrices calculated, +1 is added for every possible
-        transition to account for uncertainty in cases where only few samples 
-        have been collected.
-        """
-        
-        # initialize transition matrices
-        matrices = {}
-        actions = self._model.get_known_actions()
-        for action in actions:
-            matrices[action] = np.ones((2, 2))
-
-        # transitions inside current partition
-        refs_1, refs_2 = self._get_transition_refs(heading_in=False, inside=True, heading_out=False)
-        refs = list(set(refs_1 + refs_2))
-        refs.sort()
-        
-        # assign data to one of the two sub-partitions
-        child_indices = [self._test(self._model._data[ref], test_params) for ref in refs]
-        child_indices_1 = [child_indices[i] for i, ref in enumerate(refs) if ref in refs_1]
-        child_indices_2 = [child_indices[i] for i, ref in enumerate(refs) if ref in refs_2]
-        ref_test_dict = dict(zip(refs, child_indices))
-        assert len(refs_1) == len(child_indices_1)
-        assert len(refs_2) == len(child_indices_2)
-        
-        # transition matrices
-        for i, ref in enumerate(refs_1):
-            c1 = child_indices_1[i]
-            c2 = child_indices_2[i]
-            a = self._model._actions[ref]
-            matrices[a][c1, c2] += 1
-            
-        # mutual information
-        mi = entropy_utils.mutual_information(matrices[active_action])
-        if len(actions) >= 2:
-            mi_inactive = np.mean([entropy_utils.mutual_information(matrices[action]) for action in actions if action is not active_action])
-            mi = np.mean([mi, mi_inactive])
-            
-        return mi, ref_test_dict
-            
         
 
 if __name__ == '__main__':

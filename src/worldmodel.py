@@ -204,13 +204,13 @@ class Worldmodel(object):
         tree = self._partitionings[active_action].tree
         for leaf in tree.get_leaves():
             test_params = leaf._calc_test_params(active_action=active_action)
-            gain, ref_test_dict = leaf._calc_local_gain(active_action=active_action, test_params=test_params)
-            if best_split is None or gain > best_split._gain:
-                best_split = split_params.SplitParams(node = weakref.proxy(leaf),
-                                                      action = active_action, 
-                                                      gain = gain, 
-                                                      test_params = test_params,
-                                                      ref_test_dict = ref_test_dict)
+            split = split_params.SplitParams(node = weakref.proxy(leaf),
+                                             action = active_action, 
+                                             test_params = test_params)
+            if split is not None:
+                if best_split is None or split._gain >= best_split._gain:
+                    best_split = split
+                
         return best_split
     
     
@@ -224,6 +224,7 @@ class Worldmodel(object):
         for a in actions:
             split_params = self._calc_best_split(active_action=a)
             if split_params is not None and split_params._gain >= min_gain:
+                print split_params._gain
                 split_params.apply()
                 
         return
@@ -268,12 +269,13 @@ class Worldmodel(object):
 
 if __name__ == '__main__':
 
-    N = 1000
+    N = 10000
     np.random.seed(0)
     data = np.random.random((N, 2))
     actions = [i%2 for i in range(N-1)]
     model = Worldmodel(method='naive', seed=None)
     model.add_data(data=data, actions=actions)
+    model.split(action=0)
     model.split(action=0)
     model.split(action=0)
     model.split(action=0)
