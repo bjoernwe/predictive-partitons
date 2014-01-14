@@ -10,8 +10,8 @@ class SplitParams(object):
         self._action = action
         self._test_params = test_params
         self._gain, self._ref_test_dict = self._calc_local_gain()
-        self._new_labels, self._new_dat_refs = self._relabel_data()
-        self._new_trans = self._calc_transition_matrices() 
+        self._new_labels, self._new_dat_refs = None, None
+        self._new_trans = None 
         return
 
 
@@ -20,7 +20,25 @@ class SplitParams(object):
         return
     
     
-    def _relabel_data(self):
+    def get_new_labels(self):
+        if self._new_labels is None:
+            self._new_labels, self._new_dat_refs = self._relabel_data(ref_test_dict=self._ref_test_dict)
+        return self._new_labels
+    
+    
+    def get_new_dat_refs(self):
+        if self._new_dat_refs is None:
+            self._new_labels, self._new_dat_refs = self._relabel_data(ref_test_dict=self._ref_test_dict)
+        return self._new_dat_refs
+    
+    
+    def get_new_trans(self):
+        if self._new_trans is None:
+            self._new_trans = self._calc_transition_matrices()
+        return self._new_trans
+    
+    
+    def _relabel_data(self, ref_test_dict=None):
         """
         Returns new labels and split data references.
         """
@@ -39,8 +57,8 @@ class SplitParams(object):
 
         # every entry belonging to this node has to be re-classified
         for ref in node._dat_ref:
-            if ref in self._ref_test_dict:
-                child_i = self._ref_test_dict[ref]
+            if ref_test_dict is not None and ref in ref_test_dict:
+                child_i = ref_test_dict[ref]
             else:
                 dat = node._model._data[ref]
                 child_i = node._test(dat, params=self._test_params)
@@ -149,6 +167,10 @@ class SplitParams(object):
             mi = np.mean([mi, mi_inactive])
             
         return mi, ref_test_dict
+    
+    
+    def _calc_global_gain(self):
+        pass
 
 
 

@@ -280,9 +280,13 @@ if __name__ == '__main__':
     model.split(action=0)
     model.split(action=0)
     model.split(action=0)
+    model.split(action=0)
+    model.split(action=0)
+    model.split(action=0)
+    model.split(action=0)
     #model.split(action=None)
     for i, action in enumerate(model.get_known_actions()):
         pyplot.subplot(1, 2, i+1)
         model.plot_data_colored_for_state(active_action=action, show_plot=False)
-    #pyplot.show()
+    pyplot.show()
     
