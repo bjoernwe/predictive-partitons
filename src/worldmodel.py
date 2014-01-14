@@ -3,6 +3,8 @@ import numpy as np
 import random
 import weakref
 
+from matplotlib import pyplot
+
 import split_params
 import worldmodel_methods
 
@@ -201,9 +203,9 @@ class Worldmodel(object):
 
         tree = self._partitionings[active_action].tree
         for leaf in tree.get_leaves():
-            test_params = tree._calc_test_params(active_action=active_action)
+            test_params = leaf._calc_test_params(active_action=active_action)
             gain, ref_test_dict = leaf._calc_local_gain(active_action=active_action, test_params=test_params)
-            if best_split is None or gain > best_split.gain:
+            if best_split is None or gain > best_split._gain:
                 best_split = split_params.SplitParams(node = weakref.proxy(leaf),
                                                       action = active_action, 
                                                       gain = gain, 
@@ -222,12 +224,64 @@ class Worldmodel(object):
         for a in actions:
             split_params = self._calc_best_split(active_action=a)
             if split_params is not None and split_params._gain >= min_gain:
-                self._partitionings[a].tree.split(split_params=split_params)
+                split_params.apply()
                 
+        return
+
+
+    def plot_data(self, show_plot=True):
+        """
+        Plots all the data that is stored in the model in light gray.
+        """
+        
+        pyplot.plot(self._data[:,0], self._data[:,1], '.', color='silver')
+            
+        if show_plot:
+            pyplot.show()
+            
+        return
+
+
+    def plot_data_colored_for_state(self, active_action, show_plot=True):
+        """
+        Plots all the data that is stored in the tree with color and shape
+        according to the learned state.
+        """
+        
+        # fancy shapes and colors
+        symbols = ['o', '^', 'd', 's', '*']
+        colormap = pyplot.cm.get_cmap('prism')
+        pyplot.gca().set_color_cycle([colormap(i) for i in np.linspace(0, 0.98, 7)])
+        
+        # data for the different classes
+        all_leaves = self._partitionings[active_action].tree.get_leaves()
+        for i, leaf in enumerate(all_leaves):
+            data = leaf.get_data()
+            pyplot.plot(data[:,0], data[:,1], symbols[i%len(symbols)])
+                
+        if show_plot:
+            pyplot.show()
+            
         return
     
 
 
 if __name__ == '__main__':
-    pass
+
+    N = 1000
+    np.random.seed(0)
+    data = np.random.random((N, 2))
+    actions = [i%2 for i in range(N-1)]
+    model = Worldmodel(method='naive', seed=None)
+    model.add_data(data=data, actions=actions)
+    model.split(action=0)
+    model.split(action=0)
+    model.split(action=0)
+    model.split(action=0)
+    model.split(action=0)
+    #model.split(action=None)
+    for i, action in enumerate(model.get_known_actions()):
+        pyplot.subplot(1, 2, i+1)
+        model.plot_data_colored_for_state(active_action=action, show_plot=False)
+    pyplot.show()
     

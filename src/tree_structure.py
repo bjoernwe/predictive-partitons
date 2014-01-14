@@ -43,7 +43,7 @@ class Tree(object):
     def get_leaf_index(self):
         if not self.is_leaf():
             return None
-        return self.get_leaves().index(self)
+        return self.get_root().get_leaves().index(self)
     
     
     def get_leaf(self, index):

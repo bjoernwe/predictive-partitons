@@ -62,11 +62,28 @@ class WorldmodelTree(tree_structure.Tree):
         return len(self._dat_ref)
             
             
+    def get_data(self):
+        """
+        Returns the data belonging to the node. If the node isn't a leaf, the
+        data of sub-nodes is returned.
+        """
+        
+        dat_refs = self._get_data_refs()
+        if len(dat_refs) == 0:
+            return None
+        
+        # fetch the actual data
+        #data_list = map(lambda i: self.model.data[i], dat_refs)
+        data_list = [self._model._data[ref] for ref in dat_refs]
+        return np.vstack(data_list)
+    
+    
     def split(self, split_params):
         """
         Applies a split.
         """
         
+        assert self.is_leaf()
         self._split_params = split_params
         
         # re-calculate labels and transitions for split

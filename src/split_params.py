@@ -10,6 +10,11 @@ class SplitParams(object):
         self._test_params = test_params
         self._ref_test_dict = ref_test_dict 
         return
+
+
+    def apply(self):
+        self._node.split(split_params=self)
+        return
     
     
     def calc_labels_and_transitions_matrices(self):
@@ -22,12 +27,12 @@ class SplitParams(object):
         """
         Returns new labels and split data references.
         """
-        node = self._node
-        partitioning = node._model._partitionings[self._action]
-        assert node.is_leaf()
 
         # some useful variables
+        node = self._node
+        partitioning = node._model._partitionings[self._action]
         current_state = node.get_leaf_index()
+        assert node.is_leaf()
         assert current_state is not None
         
         # make of copy of all labels
@@ -36,14 +41,17 @@ class SplitParams(object):
         new_dat_ref = [[], []]
 
         # every entry belonging to this node has to be re-classified
-        assert len(node._dat_ref) == len(self._ref_test_dict)
         for ref in node._dat_ref:
-            child_i = self._ref_test_dict[ref]
+            if ref in self._ref_test_dict:
+                child_i = self._ref_test_dict[ref]
+            else:
+                dat = node._model._data[ref]
+                child_i = node._test(dat, params=self._test_params)
             new_labels[ref] += child_i
             new_dat_ref[child_i].append(ref)
 
         assert len(new_labels) == len(partitioning.labels)
-        assert len(new_labels) == len(new_dat_ref[0]) + len(new_dat_ref[1])
+        assert len(node._dat_ref) == len(new_dat_ref[0]) + len(new_dat_ref[1])
         
         # does the split really split the data in two?
         assert len(new_dat_ref[0]) > 0

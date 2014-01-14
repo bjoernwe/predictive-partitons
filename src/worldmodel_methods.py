@@ -15,8 +15,8 @@ class WorldmodelTrivial(worldmodel_tree.WorldmodelTree):
     
     def __init__(self, model, parents=None):
         super(WorldmodelTrivial, self).__init__(model=model)
-        self._mins = None
-        self._maxs = None    
+        self._minima = None
+        self._maxima = None    
 
     
     def _calc_test_params(self, active_action, fast_partition=False):
@@ -26,29 +26,29 @@ class WorldmodelTrivial(worldmodel_tree.WorldmodelTree):
 
         # init borders
         D = self._model.get_input_dim()
-        if self._mins is None:
+        if self._minima is None:
             if self._parent is not None:
                 # calculate borders from parent
                 parent = self._parent
-                self._mins = np.array(parent._mins)
-                self._maxs = np.array(parent._maxs)
-                dim = parent.classifier[0]
-                cut = parent.classifier[1]
+                self._minima = np.array(parent._minima)
+                self._maxima = np.array(parent._maxima)
+                dim = parent._split_params._test_params[0]
+                cut = parent._split_params._test_params[1]
                 # are we the first or the second child?
                 assert self in parent._children
                 if self is parent._children[0]:
-                    self._maxs[dim] = cut
+                    self._maxima[dim] = cut
                 else:
-                    self._mins[dim] = cut
+                    self._minima[dim] = cut
             else: 
                 # top node
-                self._mins = np.zeros(D)
-                self._maxs = np.ones(D) 
+                self._minima = np.zeros(D)
+                self._maxima = np.ones(D) 
 
         # classifier
-        diffs = self._maxs - self._mins
+        diffs = self._maxima - self._minima
         dim = np.argmax(diffs)
-        cut = self._mins[dim] + (self._maxs[dim] - self._mins[dim]) / 2.
+        cut = self._minima[dim] + (self._maxima[dim] - self._minima[dim]) / 2.
         return WorldmodelTrivial.TestParams(dim=dim, cut=cut)
 
 
