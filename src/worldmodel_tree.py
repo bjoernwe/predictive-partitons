@@ -86,9 +86,6 @@ class WorldmodelTree(tree_structure.Tree):
         assert self.is_leaf()
         self._split_params = split_params
         
-        # re-calculate labels and transitions for split
-        #new_labels, new_dat_refs, new_trans = split_params.calc_labels_and_transitions_matrices()
-        
         # copy labels and transitions to model
         action = split_params._action
         self._model._partitionings[action] = self._model._partitionings[action]._replace(labels = split_params._new_labels, transitions = split_params._new_trans) 

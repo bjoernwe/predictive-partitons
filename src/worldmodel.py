@@ -224,7 +224,6 @@ class Worldmodel(object):
         for a in actions:
             split_params = self._calc_best_split(active_action=a)
             if split_params is not None and split_params._gain >= min_gain:
-                print split_params._gain
                 split_params.apply()
                 
         return
@@ -285,5 +284,5 @@ if __name__ == '__main__':
     for i, action in enumerate(model.get_known_actions()):
         pyplot.subplot(1, 2, i+1)
         model.plot_data_colored_for_state(active_action=action, show_plot=False)
-    pyplot.show()
+    #pyplot.show()
     

@@ -64,13 +64,16 @@ class SplitParams(object):
         Calculates a new transition matrix with the split index -> index & index+1.
         """
         
-        N = len(self._new_labels)
+        # helper variables
+        new_labels = self._new_labels
+        N = len(new_labels)
         node = self._node
         index = node.get_leaf_index()
         action = self._action
         partitioning = node._model._partitionings[action]
         assert node.is_leaf()
         
+        # result
         transition_matrices = {}
         
         for a in node._model.get_known_actions():
@@ -90,8 +93,8 @@ class SplitParams(object):
                     source = partitioning.labels[i]
                     target = partitioning.labels[i+1]
                     if source == index or target == index:
-                        new_source = self._new_labels[i]
-                        new_target = self._new_labels[i+1]
+                        new_source = new_labels[i]
+                        new_target = new_labels[i+1]
                         new_trans[new_source, new_target] += 1
     
             assert np.sum(new_trans) == np.sum(partitioning.transitions[a])
@@ -147,15 +150,6 @@ class SplitParams(object):
             
         return mi, ref_test_dict
 
-
-    def _calc_global_gain(self, active_action, test_params):
-        
-        partitioning = self._model._partitionings[active_action]
-        
-        for a in self._model.get_known_actions():
-            
-            transitions = partitioning.transitions[a]
-            
 
 
 if __name__ == '__main__':
