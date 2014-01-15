@@ -191,11 +191,11 @@ class SplitParams(object):
         current_state = node.get_leaf_index()
         if self._new_labels is None:
             self._new_labels = np.array([(label+1 if label > current_state else label if label < current_state else -1) for label in partitioning.labels], dtype=int)
-        for i, ref in enumerate(refs):
+        for i, ref in enumerate(sorted_refs):
             self._new_labels[ref] = current_state + child_indices[i]
         
         # transition matrices
-        for i, ref in enumerate(refs_1):
+        for i, ref in enumerate(sorted(refs_1)):
             c1 = child_indices_1[i]
             c2 = child_indices_2[i]
             a = node._model._actions[ref]

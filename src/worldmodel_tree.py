@@ -72,12 +72,11 @@ class WorldmodelTree(tree_structure.Tree):
         data of sub-nodes is returned.
         """
         
-        dat_refs = self._get_data_refs()
+        dat_refs = sorted(self._get_data_refs())
         if len(dat_refs) == 0:
             return None
         
         # fetch the actual data
-        #data_list = map(lambda i: self.model.data[i], dat_refs)
         data_list = [self._model._data[ref] for ref in dat_refs]
         return np.vstack(data_list)
     
@@ -108,8 +107,9 @@ class WorldmodelTree(tree_structure.Tree):
 
     def _get_data_refs(self):
         """
-        Returns the data references (i.e. indices for root.data) belonging to 
-        the node. If the node isn't a leaf, the data of sub-nodes is returned.
+        Returns a set (!) of data references (i.e. indices for root.data) 
+        belonging to the node. If the node isn't a leaf, the data of sub-nodes 
+        is returned.
         """
 
         if self.is_leaf():

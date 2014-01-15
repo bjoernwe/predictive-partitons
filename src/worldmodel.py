@@ -271,16 +271,16 @@ class Worldmodel(object):
 if __name__ == '__main__':
 
     N = 100000
-    #np.random.seed(0)
+    np.random.seed(0)
     data = np.random.random((N, 2))
     actions = [i%2 for i in range(N-1)]
     model = Worldmodel(method='naive', seed=None)
     model.add_data(data=data, actions=actions)
     #model.split(action=None)
-    for _ in range(5):
+    for i in range(4):
         model.split(action=0)
-    for i, action in enumerate(model.get_known_actions()):
-        pyplot.subplot(1, 2, i+1)
-        #model.plot_data_colored_for_state(active_action=action, show_plot=False)
-    #pyplot.show()
+    #for i, action in enumerate(model.get_known_actions()):
+        pyplot.subplot(1, 4, i+1)
+        model.plot_data_colored_for_state(active_action=0, show_plot=False)
+    pyplot.show()
     
