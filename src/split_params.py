@@ -24,7 +24,8 @@ class SplitParams(object):
     
     def get_gain(self):
         if self._gain is None:
-            self._gain = self._calc_local_gain()
+            #self._gain = self._calc_local_gain()
+            self._gain = self._calc_global_gain()
         return self._gain
     
     
@@ -214,8 +215,12 @@ class SplitParams(object):
         active_action = self._action
         actions = self._node._model.get_known_actions()
         
-        old_trans = self._node._model._partitionings[active_action]._transitions
+        old_trans = self._node._model._partitionings[active_action].transitions
         new_trans = self.get_new_trans()
+        
+#         for action in actions:
+#             old_trans[action] += 10 * np.ones_like(old_trans)
+#             new_trans[action] += 10 * np.ones_like(new_trans)
         
         mi_old = entropy_utils.mutual_information(P=old_trans[active_action])
         mi_new = entropy_utils.mutual_information(P=new_trans[active_action])

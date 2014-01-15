@@ -154,9 +154,10 @@ class Worldmodel(object):
         # add references of new data to corresponding partitions            
         for action in self._action_set:
             partitioning = self._partitionings[action]
+            leaves = partitioning.tree.get_leaves()
             for i in range(first_data, N):
                 label = partitioning.labels[i]
-                leaf = partitioning.tree.get_leaf(label)
+                leaf = leaves[label]
                 leaf._dat_ref.append(i)
         
         # update transition matrices

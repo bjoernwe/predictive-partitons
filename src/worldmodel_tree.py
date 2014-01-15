@@ -47,6 +47,8 @@ class WorldmodelTree(tree_structure.Tree):
         
         N, _ = x.shape
         labels = np.zeros(N, dtype=int)
+        leaves = self.get_leaves()
+        node_indices = dict(zip(leaves, [leaf.get_leaf_index() for leaf in leaves]))
         
         for i, dat in enumerate(x):
             
@@ -55,7 +57,7 @@ class WorldmodelTree(tree_structure.Tree):
                 child_index = node._test(dat, params=self._test_params)
                 node = self._children[child_index]
                 
-            labels[i] = node.get_leaf_index()
+            labels[i] = node_indices[node]
 
         return labels
             
