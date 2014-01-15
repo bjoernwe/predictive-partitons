@@ -95,7 +95,7 @@ class Worldmodel(object):
             assert len(actions) == m-1
             
         # update set of actions
-        self._action_set = self._action_set.union(set(actions))
+        self._action_set.update(actions)
         
         # initialize/update partition structures
         for action in self._action_set:
@@ -158,7 +158,7 @@ class Worldmodel(object):
             for i in range(first_data, N):
                 label = partitioning.labels[i]
                 leaf = leaves[label]
-                leaf._dat_ref.append(i)
+                leaf._dat_refs.add(i)
         
         # update transition matrices
         for action in self._action_set:
@@ -270,17 +270,17 @@ class Worldmodel(object):
 
 if __name__ == '__main__':
 
-    N = 1000000
+    N = 100000
     #np.random.seed(0)
     data = np.random.random((N, 2))
     actions = [i%2 for i in range(N-1)]
     model = Worldmodel(method='naive', seed=None)
     model.add_data(data=data, actions=actions)
     #model.split(action=None)
-    for _ in range(1):
+    for _ in range(5):
         model.split(action=0)
     for i, action in enumerate(model.get_known_actions()):
         pyplot.subplot(1, 2, i+1)
-        model.plot_data_colored_for_state(active_action=action, show_plot=False)
+        #model.plot_data_colored_for_state(active_action=action, show_plot=False)
     #pyplot.show()
     

@@ -15,7 +15,7 @@ class WorldmodelTree(tree_structure.Tree):
             self._model = model
         else:
             self._model = weakref.proxy(model)
-        self._dat_ref = []   # indices of data belonging to this node
+        self._dat_refs = set()  # indices of data belonging to this node
         self._split_params = None
         
         
@@ -63,7 +63,7 @@ class WorldmodelTree(tree_structure.Tree):
             
             
     def get_number_of_samples(self):
-        return len(self._dat_ref)
+        return len(self._dat_refs)
             
             
     def get_data(self):
@@ -97,11 +97,11 @@ class WorldmodelTree(tree_structure.Tree):
         # copy new references to children
         new_dat_refs = split_params.get_new_dat_refs()
         child_1, child_2 = super(WorldmodelTree, self).split(model=self._model)
-        child_1._dat_ref = new_dat_refs[0]
-        child_2._dat_ref = new_dat_refs[1]
+        child_1._dat_refs = new_dat_refs[0]
+        child_2._dat_refs = new_dat_refs[1]
         
         # free some memory
-        self._dat_ref = None
+        self._dat_refs = None
         
         return child_1, child_2
     
@@ -113,15 +113,14 @@ class WorldmodelTree(tree_structure.Tree):
         """
 
         if self.is_leaf():
-            return self._dat_ref
+            return self._dat_refs
 
         # else        
-        data_refs = []
+        data_refs = set()
         for child in self._children:
-            data_refs += child._get_data_refs()
+            data_refs.update(child._get_data_refs())
         
-        data_refs.sort()
-        assert len(data_refs) == len(set(data_refs))
+        assert len(data_refs) == len(data_refs)
         return data_refs
 
 
@@ -135,19 +134,18 @@ class WorldmodelTree(tree_structure.Tree):
         refs = self._get_data_refs()
         N = self._model.get_number_of_samples()
         
-        refs_1 = [] 
+        refs_1 = set() 
          
         if heading_in:
-            refs_1 += [ref-1 for ref in refs if (ref-1 not in refs) and (ref-1 > 0)]
+            refs_1.update([ref-1 for ref in refs if (ref-1 not in refs) and (ref-1 > 0)])
             
         if inside:
-            refs_1 += [ref for ref in refs if (ref+1 in refs)]
+            refs_1.update([ref for ref in refs if (ref+1 in refs)])
 
         if heading_out:
-            refs_1 += [ref for ref in refs if (ref+1 not in refs) and (ref+1 < N)]
+            refs_1.update([ref for ref in refs if (ref+1 not in refs) and (ref+1 < N)])
             
-        refs_1.sort()
-        refs_2 = [t+1 for t in refs_1]
+        refs_2 = set([t+1 for t in refs_1])
         
         assert len(refs_1) == len(set(refs_1))
         return [refs_1, refs_2]

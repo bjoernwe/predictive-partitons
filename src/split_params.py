@@ -24,8 +24,8 @@ class SplitParams(object):
     
     def get_gain(self):
         if self._gain is None:
-            #self._gain = self._calc_local_gain()
-            self._gain = self._calc_global_gain()
+            self._gain = self._calc_local_gain()
+            #self._gain = self._calc_global_gain()
         return self._gain
     
     
@@ -67,7 +67,7 @@ class SplitParams(object):
         new_labels = self._new_labels
 
         # every entry belonging to this node has to be re-classified
-        for ref in node._dat_ref:
+        for ref in node._dat_refs:
             # or has it already?
             if new_labels[ref] < 0:
                 dat = node._model._data[ref]
@@ -88,14 +88,14 @@ class SplitParams(object):
         assert current_state is not None
         
         new_labels = self.get_new_labels()
-        new_dat_refs = [[], []]
+        new_dat_refs = [set(), set()]
         
-        for ref in node._dat_ref:
+        for ref in node._dat_refs:
             assert new_labels[ref] in [current_state, current_state+1]
             if new_labels[ref] == current_state:
-                new_dat_refs[0].append(ref)
+                new_dat_refs[0].add(ref)
             else:
-                new_dat_refs[1].append(ref)
+                new_dat_refs[1].add(ref)
                 
         # does the split really split the data into two parts?
         assert len(new_dat_refs[0]) > 0
@@ -176,13 +176,13 @@ class SplitParams(object):
 
         # transitions inside current partition
         refs_1, refs_2 = node._get_transition_refs(heading_in=False, inside=True, heading_out=False)
-        refs = list(set(refs_1 + refs_2))
-        refs.sort()
+        refs = refs_1.union(refs_2)
+        sorted_refs = sorted(refs)
         
         # assign data to one of the two sub-partitions
-        child_indices = [node._test(model._data[ref], self._test_params) for ref in refs]
-        child_indices_1 = [child_indices[i] for i, ref in enumerate(refs) if ref in refs_1]
-        child_indices_2 = [child_indices[i] for i, ref in enumerate(refs) if ref in refs_2]
+        child_indices = [node._test(model._data[ref], self._test_params) for ref in sorted_refs]
+        child_indices_1 = [child_indices[i] for i, ref in enumerate(sorted_refs) if ref in refs_1]
+        child_indices_2 = [child_indices[i] for i, ref in enumerate(sorted_refs) if ref in refs_2]
         #ref_test_dict = dict(zip(refs, child_indices))
         assert len(refs_1) == len(child_indices_1)
         assert len(refs_2) == len(child_indices_2)
