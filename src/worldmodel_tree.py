@@ -41,21 +41,23 @@ class WorldmodelTree(tree_structure.Tree):
         x is a matrix, a list is returned containing a integer state for every
         row.
         """
+        
+        assert self.get_root() is self
+        assert x.ndim == 2
+        
+        N, _ = x.shape
+        labels = np.zeros(N, dtype=int)
+        
+        for i, dat in enumerate(x):
+            
+            node = self
+            while not node.is_leaf():
+                child_index = node._test(dat, params=self._test_params)
+                node = self._children[child_index]
+                
+            labels[i] = node.get_leaf_index()
 
-        # is x a matrix?
-        if x.ndim > 1:
-
-            # classify every point
-            labels = [self._classify(row) for row in x]
-            return labels
-
-        else:
-
-            if self.is_leaf():
-                return self.get_leaf_index()
-            else:
-                child_index = int(self._test(x, params=self._test_params))
-                return self._children[child_index].classify(x)
+        return labels
             
             
     def get_number_of_samples(self):
