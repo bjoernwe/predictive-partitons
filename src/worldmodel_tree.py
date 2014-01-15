@@ -72,13 +72,19 @@ class WorldmodelTree(tree_structure.Tree):
         data of sub-nodes is returned.
         """
         
+        model = self._model
         dat_refs = sorted(self._get_data_refs())
-        if len(dat_refs) == 0:
+        N = len(dat_refs)
+        D = model.get_input_dim()
+        
+        if N == 0:
             return None
         
-        # fetch the actual data
-        data_list = [self._model._data[ref] for ref in dat_refs]
-        return np.vstack(data_list)
+        data = np.empty((N, D))
+        for i, ref in enumerate(dat_refs):
+            data[i] = model._data[ref]
+            
+        return data 
     
     
     def split(self, split_params):
@@ -90,18 +96,27 @@ class WorldmodelTree(tree_structure.Tree):
         self._split_params = split_params
         
         # copy labels and transitions to model
+        model = self._model
         action = split_params._action
-        self._model._partitionings[action] = self._model._partitionings[action]._replace(labels = split_params.get_new_labels(), transitions = split_params.get_new_trans()) 
+        leaf_index = self.get_leaf_index()
+        assert len(self._dat_refs) == np.count_nonzero(model._partitionings[action].labels == leaf_index)
+        model._partitionings[action] = model._partitionings[action]._replace(labels = split_params.get_new_labels(), transitions = split_params.get_new_trans())
         
         # copy new references to children
         new_dat_refs = split_params.get_new_dat_refs()
-        child_1, child_2 = super(WorldmodelTree, self).split(model=self._model)
+        assert len(self._dat_refs) == len(new_dat_refs[0]) + len(new_dat_refs[1])
+        child_1, child_2 = super(WorldmodelTree, self).split(model=model)
         child_1._dat_refs = new_dat_refs[0]
         child_2._dat_refs = new_dat_refs[1]
         
+        assert len(child_1._dat_refs) == np.count_nonzero(model._partitionings[action].labels == leaf_index)
+        assert len(child_2._dat_refs) == np.count_nonzero(model._partitionings[action].labels == leaf_index+1)
+        
+        assert False not in [model._partitionings[action].labels[ref]==leaf_index for ref in child_1._dat_refs]
+        assert False not in [model._partitionings[action].labels[ref]==leaf_index+1 for ref in child_2._dat_refs]
+        
         # free some memory
         self._dat_refs = None
-        
         return child_1, child_2
     
 
@@ -113,7 +128,7 @@ class WorldmodelTree(tree_structure.Tree):
         """
 
         if self.is_leaf():
-            return self._dat_refs
+            return set(self._dat_refs)
 
         # else        
         data_refs = set()

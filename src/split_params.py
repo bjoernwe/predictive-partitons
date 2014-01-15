@@ -64,23 +64,27 @@ class SplitParams(object):
         # increase labels above current state by one to make space for the split
         if self._new_labels is None:
             self._new_labels = np.array([(label+1 if label > current_state else label if label < current_state else -1) for label in partitioning.labels], dtype=int)
+            assert np.count_nonzero(self._new_labels==-1) == len(node._dat_refs)
         new_labels = self._new_labels
 
         # every entry belonging to this node has to be re-classified
         for ref in node._dat_refs:
             # or has it already?
+            assert new_labels[ref] in [-1, current_state, current_state+1]
             if new_labels[ref] < 0:
                 dat = node._model._data[ref]
                 child_i = node._test(dat, params=self._test_params)
+                assert child_i in [0, 1]
                 new_labels[ref] = current_state + child_i
 
-        assert len(new_labels) == len(partitioning.labels)
-        return new_labels
+        assert np.count_nonzero(self._new_labels==-1) == 0
+        assert len(self._new_labels) == len(partitioning.labels)
+        return
     
     
     def _update_dat_refs(self):
         """
-        Calculates new data references ans stores two lists, one for each child.
+        Calculates new data references and stores two lists, one for each child.
         """
         
         node = self._node
@@ -89,6 +93,9 @@ class SplitParams(object):
         
         new_labels = self.get_new_labels()
         new_dat_refs = [set(), set()]
+        
+        assert np.count_nonzero(new_labels < 0) == 0
+        assert len(node._dat_refs) == np.count_nonzero(new_labels == current_state) + np.count_nonzero(new_labels == current_state+1)
         
         for ref in node._dat_refs:
             assert new_labels[ref] in [current_state, current_state+1]
@@ -115,8 +122,14 @@ class SplitParams(object):
         node = self._node
         model = node._model
         index = node.get_leaf_index()
+        number_of_samples = model.get_number_of_samples()
         partitioning = node._model._partitionings[self._action]
         assert node.is_leaf()
+        
+        # all potentially changed references
+        changed_refs = node._get_data_refs()
+        changed_refs.update([ref-1 for ref in changed_refs if ref-1 > 0])
+        changed_refs.difference_update([number_of_samples-1])
         
         # result
         transition_matrices = {}
@@ -133,14 +146,14 @@ class SplitParams(object):
             new_trans = np.insert(new_trans, index, 0, axis=1)  # new column
             
             # update all transitions from or to current state
-            for i in range(model.get_number_of_samples()-1):
-                if node._model._actions[i] == a:
-                    source = partitioning.labels[i]
-                    target = partitioning.labels[i+1]
-                    if source == index or target == index:
-                        new_source = new_labels[i]
-                        new_target = new_labels[i+1]
-                        new_trans[new_source, new_target] += 1
+            for ref in changed_refs:
+                if model._actions[ref] == a:
+                    source = partitioning.labels[ref]
+                    target = partitioning.labels[ref+1]
+                    assert source == index or target == index
+                    new_source = new_labels[ref]
+                    new_target = new_labels[ref+1]
+                    new_trans[new_source, new_target] += 1
     
             assert np.sum(new_trans) == np.sum(partitioning.transitions[a])
             transition_matrices[a] = new_trans
@@ -167,6 +180,7 @@ class SplitParams(object):
         node = self._node
         model = node._model
         partitioning = model._partitionings[active_action]
+        current_state = node.get_leaf_index()
         
         # initialize transition matrices
         matrices = {}
@@ -177,25 +191,24 @@ class SplitParams(object):
         # transitions inside current partition
         refs_1, refs_2 = node._get_transition_refs(heading_in=False, inside=True, heading_out=False)
         refs = refs_1.union(refs_2)
+        sorted_refs_1 = sorted(refs_1)
         sorted_refs = sorted(refs)
         
         # assign data to one of the two sub-partitions
         child_indices = [node._test(model._data[ref], self._test_params) for ref in sorted_refs]
         child_indices_1 = [child_indices[i] for i, ref in enumerate(sorted_refs) if ref in refs_1]
         child_indices_2 = [child_indices[i] for i, ref in enumerate(sorted_refs) if ref in refs_2]
-        #ref_test_dict = dict(zip(refs, child_indices))
         assert len(refs_1) == len(child_indices_1)
         assert len(refs_2) == len(child_indices_2)
         
         # store _test results in labels to avoid re-calculation
-        current_state = node.get_leaf_index()
         if self._new_labels is None:
             self._new_labels = np.array([(label+1 if label > current_state else label if label < current_state else -1) for label in partitioning.labels], dtype=int)
         for i, ref in enumerate(sorted_refs):
             self._new_labels[ref] = current_state + child_indices[i]
         
         # transition matrices
-        for i, ref in enumerate(sorted(refs_1)):
+        for i, ref in enumerate(sorted_refs_1):
             c1 = child_indices_1[i]
             c2 = child_indices_2[i]
             a = node._model._actions[ref]
