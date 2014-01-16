@@ -283,6 +283,6 @@ if __name__ == '__main__':
     for i in range(8):
         model.split(action=0)
         pyplot.subplot(2, 4, i+1)
-        model.plot_data_colored_for_state(active_action=0, show_plot=False)
-    pyplot.show()
+        #model.plot_data_colored_for_state(active_action=0, show_plot=False)
+    #pyplot.show()
     

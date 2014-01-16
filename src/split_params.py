@@ -67,6 +67,7 @@ class SplitParams(object):
         return
 
 
+    #@profile
     def _update_labels(self):
         """
         Calculates new labels. If some of them are already calculated, old
@@ -77,21 +78,20 @@ class SplitParams(object):
         node = self._node
         partitioning = node.model.partitionings[self._action]
         current_state = node.get_leaf_index()
+        test_function = node._test
+        test_params = self._test_params
         assert node.is_leaf()
         assert current_state is not None
 
         self._init_new_labels()        
         new_labels = self._new_labels
 
-        # every entry belonging to this node has to be re-classified
-        for ref in node.data_refs:
-            # or has it already?
-            assert new_labels[ref] in [-1, current_state, current_state+1]
-            if new_labels[ref] < 0:
-                dat = node.model.data[ref]
-                child_i = node._test(dat, params=self._test_params)
-                assert child_i in [0, 1]
-                new_labels[ref] = current_state + child_i
+        # every entry that node has to be re-classified...
+        for ref in np.where(new_labels==-1)[0]:
+            dat = node.model.data[ref]
+            child_i = test_function(dat, params=test_params)
+            assert child_i in [0, 1]
+            new_labels[ref] = current_state + child_i
 
         assert np.count_nonzero(self._new_labels==-1) == 0
         assert len(self._new_labels) == len(partitioning.labels)
