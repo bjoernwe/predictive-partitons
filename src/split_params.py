@@ -76,6 +76,7 @@ class SplitParams(object):
 
         # some useful variables
         node = self._node
+        data = node.model.data
         partitioning = node.model.partitionings[self._action]
         current_state = node.get_leaf_index()
         test_function = node._test
@@ -87,12 +88,11 @@ class SplitParams(object):
         new_labels = self._new_labels
 
         # every entry that node has to be re-classified...
-        for ref in np.where(new_labels==-1)[0]:
-            dat = node.model.data[ref]
-            child_i = test_function(dat, params=test_params)
-            assert child_i in [0, 1]
-            new_labels[ref] = current_state + child_i
-
+        refs = np.where(new_labels==-1)[0]
+        child_indices = np.array([test_function(data[ref], params=test_params) for ref in refs], dtype=int)
+        new_labels[refs] = current_state + child_indices
+        self._new_labels = new_labels
+        
         assert np.count_nonzero(self._new_labels==-1) == 0
         assert len(self._new_labels) == len(partitioning.labels)
         return
