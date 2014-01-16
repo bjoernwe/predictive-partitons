@@ -270,7 +270,7 @@ class Worldmodel(object):
 
 if __name__ == '__main__':
 
-    N = 1000000
+    N = 100000
     np.random.seed(0)
     data = np.random.random((N, 2))
     actions = [i%2 for i in range(N-1)]
@@ -282,5 +282,5 @@ if __name__ == '__main__':
     #for i, action in enumerate(model.get_known_actions()):
         pyplot.subplot(1, 4, i+1)
         model.plot_data_colored_for_state(active_action=0, show_plot=False)
-    #pyplot.show()
+    pyplot.show()
     

@@ -162,6 +162,7 @@ class SplitParams(object):
         return
 
 
+    #@profile
     def _calc_local_gain(self):
         """
         For every _action a 2x2 transition matrix is calculated, induced by the
@@ -193,24 +194,27 @@ class SplitParams(object):
         refs = refs_1.union(refs_2)
         sorted_refs_1 = sorted(refs_1)
         sorted_refs = sorted(refs)
+        assert type(refs_1) == set
+        assert type(refs_2) == set
         
         # assign data to one of the two sub-partitions
         child_indices = [node._test(model._data[ref], self._test_params) for ref in sorted_refs]
-        child_indices_1 = [child_indices[i] for i, ref in enumerate(sorted_refs) if ref in refs_1]
-        child_indices_2 = [child_indices[i] for i, ref in enumerate(sorted_refs) if ref in refs_2]
-        assert len(refs_1) == len(child_indices_1)
-        assert len(refs_2) == len(child_indices_2)
+        child_indices_1_2 = [(child_indices[i], child_indices[i+1]) for i, ref in enumerate(sorted_refs) if ref in refs_1]
+        assert len(refs_1) == len(child_indices_1_2)
         
         # store _test results in labels to avoid re-calculation
         if self._new_labels is None:
-            self._new_labels = np.array([(label+1 if label > current_state else label if label < current_state else -1) for label in partitioning.labels], dtype=int)
+            new_labels = np.array(partitioning.labels, dtype=int)
+            new_labels = np.where(new_labels > current_state, new_labels + 1, new_labels)
+            new_labels = np.where(new_labels == current_state, -1, new_labels)
+            self._new_labels = new_labels
+            
         for i, ref in enumerate(sorted_refs):
             self._new_labels[ref] = current_state + child_indices[i]
         
         # transition matrices
         for i, ref in enumerate(sorted_refs_1):
-            c1 = child_indices_1[i]
-            c2 = child_indices_2[i]
+            c1, c2 = child_indices_1_2[i]
             a = node._model._actions[ref]
             matrices[a][c1, c2] += 1
             
