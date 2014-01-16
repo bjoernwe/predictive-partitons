@@ -15,11 +15,12 @@ Partitioning = collections.namedtuple('Partitioning', ['labels', 'transitions', 
 class Worldmodel(object):
 
 
-    def __init__(self, method='naive', seed=None):
+    def __init__(self, method='naive', seed=None, uncertainty_bias=10):
         
         # data storage
         self.data = None        # global data storage
         self.actions = []       # a sequence of actions
+        self.uncertainty_bias = uncertainty_bias
         self._action_set = set()
         
         # partitionings for each action (including labels, transitions and tree)
@@ -271,17 +272,17 @@ class Worldmodel(object):
 
 if __name__ == '__main__':
 
-    N = 100000
+    N = 10000
     np.random.seed(0)
     data = np.random.random((N, 2))
     actions = [i%2 for i in range(N-1)]
-    model = Worldmodel(method='naive', seed=None)
+    model = Worldmodel(method='naive', uncertainty_bias=10, seed=None)
     model.add_data(data=data, actions=actions)
     #model.split(action=None)
-    for i in range(4):
+    for i in range(8):
         model.split(action=0)
     #for i, action in enumerate(model.get_known_actions()):
-        pyplot.subplot(1, 4, i+1)
+        pyplot.subplot(2, 4, i+1)
         model.plot_data_colored_for_state(active_action=0, show_plot=False)
     pyplot.show()
     

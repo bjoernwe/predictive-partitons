@@ -220,7 +220,7 @@ class SplitParams(object):
         matrices = {}
         actions = model.get_known_actions()
         for action in actions:
-            matrices[action] = 10 * np.ones((2, 2))
+            matrices[action] = np.ones((2, 2)) * model.uncertainty_bias
 
         # transition matrices
         for i, ref in enumerate(sorted_refs_1):
@@ -242,12 +242,13 @@ class SplitParams(object):
         active_action = self._action
         actions = self._node.model.get_known_actions()
         
-        old_trans = self._node.model.partitionings[active_action].transitions
+        old_trans = {}
         new_trans = self.get_new_trans()
+        uncertain_trans = np.ones((), dtype=int)
         
-#         for action in actions:
-#             old_trans[action] += 10 * np.ones_like(old_trans)
-#             new_trans[action] += 10 * np.ones_like(new_trans)
+        for action in actions:
+            old_trans[action] = self._node.model.partitionings[active_action].transitions[action] + uncertain_trans
+            new_trans[action] += uncertain_trans
         
         mi_old = entropy_utils.mutual_information(P=old_trans[active_action])
         mi_new = entropy_utils.mutual_information(P=new_trans[active_action])
