@@ -140,7 +140,7 @@ class SplitParams(object):
         assert node.is_leaf()
         
         # all potentially changed references
-        changed_refs = node._get_data_refs()
+        changed_refs = node.get_data_refs()
         changed_refs.update([ref-1 for ref in changed_refs])
         changed_refs.difference_update([-1, number_of_samples-1])
         

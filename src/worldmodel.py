@@ -37,6 +37,7 @@ class Worldmodel(object):
         self._random = random.Random()
         if seed is not None:
             self.random.seed(seed)
+        return
             
             
     def get_input_dim(self):

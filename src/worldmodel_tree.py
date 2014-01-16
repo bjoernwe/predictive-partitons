@@ -14,8 +14,10 @@ class WorldmodelTree(tree_structure.Tree):
             self.model = model
         else:
             self.model = weakref.proxy(model)
+            
         self.data_refs = set()  # indices of data belonging to this node
         self._split_params = None
+        return
         
         
     def _calc_test_params(self, active_action, fast_partition=False):
@@ -54,7 +56,7 @@ class WorldmodelTree(tree_structure.Tree):
             node = self
             while not node.is_leaf():
                 child_index = node._test(dat, params=self._test_params)
-                node = self._children[child_index]
+                node = self.children[child_index]
                 
             labels[i] = node_indices[node]
 
@@ -72,7 +74,7 @@ class WorldmodelTree(tree_structure.Tree):
         """
         
         model = self.model
-        dat_refs = sorted(self._get_data_refs())
+        dat_refs = sorted(self.get_data_refs())
         N = len(dat_refs)
         D = model.get_input_dim()
         
@@ -111,15 +113,15 @@ class WorldmodelTree(tree_structure.Tree):
         assert len(child_1.data_refs) == np.count_nonzero(model.partitionings[action].labels == leaf_index)
         assert len(child_2.data_refs) == np.count_nonzero(model.partitionings[action].labels == leaf_index+1)
         
-        assert False not in [model.partitionings[action].labels[ref]==leaf_index for ref in child_1.data_refs]
-        assert False not in [model.partitionings[action].labels[ref]==leaf_index+1 for ref in child_2.data_refs]
+        #assert False not in [model.partitionings[action].labels[ref]==leaf_index for ref in child_1.data_refs]
+        #assert False not in [model.partitionings[action].labels[ref]==leaf_index+1 for ref in child_2.data_refs]
         
         # free some memory
         self.data_refs = None
         return child_1, child_2
     
 
-    def _get_data_refs(self):
+    def get_data_refs(self):
         """
         Returns a set (!) of data references (i.e. indices for root.data) 
         belonging to the node. If the node isn't a leaf, the data of sub-nodes 
@@ -131,8 +133,8 @@ class WorldmodelTree(tree_structure.Tree):
 
         # else        
         data_refs = set()
-        for child in self._children:
-            data_refs.update(child._get_data_refs())
+        for child in self.children:
+            data_refs.update(child.get_data_refs())
         
         assert len(data_refs) == len(data_refs)
         return data_refs
@@ -145,7 +147,7 @@ class WorldmodelTree(tree_structure.Tree):
         and one for the end of the transition.
         """
         
-        refs = self._get_data_refs()
+        refs = self.get_data_refs()
         N = self.model.get_number_of_samples()
         
         refs_1 = set() 
