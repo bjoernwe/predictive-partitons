@@ -18,12 +18,12 @@ class Worldmodel(object):
     def __init__(self, method='naive', seed=None):
         
         # data storage
-        self._data = None        # global data storage
-        self._actions = []       # a sequence of actions
+        self.data = None        # global data storage
+        self.actions = []       # a sequence of actions
         self._action_set = set()
         
         # partitionings for each action (including labels, transitions and tree)
-        self._partitionings = {}
+        self.partitionings = {}
 
         # root node of tree
         assert method in ['naive']
@@ -43,13 +43,13 @@ class Worldmodel(object):
         """
         Returns the input dimensionality of the model.
         """
-        return self._data.shape[1]
+        return self.data.shape[1]
     
     
     def get_number_of_samples(self):
-        if self._data is None:
+        if self.data is None:
             return 0
-        return self._data.shape[0]
+        return self.data.shape[0]
     
     
     def get_known_actions(self):
@@ -62,7 +62,7 @@ class Worldmodel(object):
         model. Since each action has its own model for classification, the
         action has to be specified.
         """
-        return np.array(self._partitionings[action].tree._classify(data), dtype=int)
+        return np.array(self.partitionings[action].tree.classify(data), dtype=int)
     
     
     def add_data(self, data, actions=None):
@@ -85,11 +85,11 @@ class Worldmodel(object):
             actions = [None for _ in range(m-1)]
             
         # add missing action
-        if self._data is not None and len(actions) == m-1:
+        if self.data is not None and len(actions) == m-1:
             actions = [None] + actions
         
         # make sure right number of actions
-        if self._data is not None:
+        if self.data is not None:
             assert len(actions) == m
         else:
             assert len(actions) == m-1
@@ -105,14 +105,14 @@ class Worldmodel(object):
             # all-zero labels if needed
             
             # initialize new structure
-            if action not in self._partitionings.keys():
+            if action not in self.partitionings.keys():
                 
                 labels = np.zeros(n, dtype=int)
                 tree = self._tree_class(model=self)
                 transitions = {}
                 for action_2 in self._action_set:
-                    transitions[action_2] = np.ones((1, 1), dtype=int) * self._actions.count(action_2)
-                self._partitionings[action] = Partitioning(labels=labels, transitions=transitions, tree=tree)
+                    transitions[action_2] = np.ones((1, 1), dtype=int) * self.actions.count(action_2)
+                self.partitionings[action] = Partitioning(labels=labels, transitions=transitions, tree=tree)
                 
             # update existing structure
             else:
@@ -122,51 +122,51 @@ class Worldmodel(object):
                 # new data brings new actions that also need transition matrices
                 # (yet empty).
                 
-                partitioning = self._partitionings[action]
+                partitioning = self.partitionings[action]
                 K = partitioning.tree.get_number_of_leaves()
                 for action_2 in self._action_set:
                     if action_2 not in partitioning.transitions.keys():
                         partitioning.transitions[action_2] = np.zeros((K, K), dtype=int)
                         
         # store data in model
-        if self._data is None:
+        if self.data is None:
             first_data = 0
             first_source = 0
-            self._data = data
-            self._actions = actions
+            self.data = data
+            self.actions = actions
         else:
             first_data = n
             first_source = first_data - 1
-            self._data = np.vstack([self._data, data])
-            self._actions = self._actions + actions
+            self.data = np.vstack([self.data, data])
+            self.actions = self.actions + actions
             
         # same number of actions and data points?
-        assert self._data.shape[0] == len(self._actions) + 1
+        assert self.data.shape[0] == len(self.actions) + 1
         
         # calculate new labels, and append
         for action in self._action_set:
-            partitioning = self._partitionings[action]
+            partitioning = self.partitionings[action]
             labels = self.classify(data, action=action)
             new_labels = np.hstack([partitioning.labels, labels])
-            self._partitionings[action] = partitioning._replace(labels=new_labels)
-            assert len(self._partitionings[action].labels) == N
+            self.partitionings[action] = partitioning._replace(labels=new_labels)
+            assert len(self.partitionings[action].labels) == N
 
         # add references of new data to corresponding partitions            
         for action in self._action_set:
-            partitioning = self._partitionings[action]
+            partitioning = self.partitionings[action]
             leaves = partitioning.tree.get_leaves()
             for i in range(first_data, N):
                 label = partitioning.labels[i]
                 leaf = leaves[label]
-                leaf._dat_refs.add(i)
+                leaf.data_refs.add(i)
         
         # update transition matrices
         for action in self._action_set:
-            partitioning = self._partitionings[action]
+            partitioning = self.partitionings[action]
             for i in range(first_source, N-1):
                 source = partitioning.labels[i]
                 target = partitioning.labels[i+1]
-                action_2 = self._actions[i]
+                action_2 = self.actions[i]
                 partitioning.transitions[action_2][source, target] += 1
             
         for action in self._action_set:
@@ -179,7 +179,7 @@ class Worldmodel(object):
         Merges the transition matrices for a certain model (action).
         """
         
-        partitioning = self._partitionings[action]
+        partitioning = self.partitionings[action]
         
         K = partitioning.tree.get_number_of_leaves()
         P = np.zeros((K, K), dtype=int)
@@ -197,12 +197,12 @@ class Worldmodel(object):
         best one
         """
         
-        if self._data is None:
+        if self.data is None:
             return None
                 
         best_split = None
 
-        tree = self._partitionings[active_action].tree
+        tree = self.partitionings[active_action].tree
         for leaf in tree.get_leaves():
             test_params = leaf._calc_test_params(active_action=active_action)
             split = split_params.SplitParams(node = weakref.proxy(leaf),
@@ -236,7 +236,7 @@ class Worldmodel(object):
         Plots all the data that is stored in the model in light gray.
         """
         
-        pyplot.plot(self._data[:,0], self._data[:,1], '.', color='silver')
+        pyplot.plot(self.data[:,0], self.data[:,1], '.', color='silver')
             
         if show_plot:
             pyplot.show()
@@ -256,7 +256,7 @@ class Worldmodel(object):
         pyplot.gca().set_color_cycle([colormap(i) for i in np.linspace(0, 0.98, 7)])
         
         # data for the different classes
-        all_leaves = self._partitionings[active_action].tree.get_leaves()
+        all_leaves = self.partitionings[active_action].tree.get_leaves()
         for i, leaf in enumerate(all_leaves):
             data = leaf.get_data()
             pyplot.plot(data[:,0], data[:,1], symbols[i%len(symbols)])
@@ -270,7 +270,7 @@ class Worldmodel(object):
 
 if __name__ == '__main__':
 
-    N = 1000000
+    N = 100000
     np.random.seed(0)
     data = np.random.random((N, 2))
     actions = [i%2 for i in range(N-1)]
@@ -282,5 +282,5 @@ if __name__ == '__main__':
     #for i, action in enumerate(model.get_known_actions()):
         pyplot.subplot(1, 4, i+1)
         model.plot_data_colored_for_state(active_action=0, show_plot=False)
-    #pyplot.show()
+    pyplot.show()
     

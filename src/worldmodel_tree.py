@@ -1,7 +1,6 @@
 import numpy as np
 import weakref
 
-import entropy_utils
 import tree_structure
 
 
@@ -11,11 +10,11 @@ class WorldmodelTree(tree_structure.Tree):
         super(WorldmodelTree, self).__init__()
         
         # important references
-        if type(model) == weakref.ProxyType:
-            self._model = model
+        if type(model) in weakref.ProxyTypes:
+            self.model = model
         else:
-            self._model = weakref.proxy(model)
-        self._dat_refs = set()  # indices of data belonging to this node
+            self.model = weakref.proxy(model)
+        self.data_refs = set()  # indices of data belonging to this node
         self._split_params = None
         
         
@@ -35,7 +34,7 @@ class WorldmodelTree(tree_structure.Tree):
         raise NotImplementedError("Use subclass like WorldmodelSpectral instead.")
     
 
-    def _classify(self, x):
+    def classify(self, x):
         """
         Returns the state that x belongs to according to the current model. If
         x is a matrix, a list is returned containing a integer state for every
@@ -63,7 +62,7 @@ class WorldmodelTree(tree_structure.Tree):
             
             
     def get_number_of_samples(self):
-        return len(self._dat_refs)
+        return len(self.data_refs)
             
             
     def get_data(self):
@@ -72,7 +71,7 @@ class WorldmodelTree(tree_structure.Tree):
         data of sub-nodes is returned.
         """
         
-        model = self._model
+        model = self.model
         dat_refs = sorted(self._get_data_refs())
         N = len(dat_refs)
         D = model.get_input_dim()
@@ -82,7 +81,7 @@ class WorldmodelTree(tree_structure.Tree):
         
         data = np.empty((N, D))
         for i, ref in enumerate(dat_refs):
-            data[i] = model._data[ref]
+            data[i] = model.data[ref]
             
         return data 
     
@@ -96,27 +95,27 @@ class WorldmodelTree(tree_structure.Tree):
         self._split_params = split_params
         
         # copy labels and transitions to model
-        model = self._model
+        model = self.model
         action = split_params._action
         leaf_index = self.get_leaf_index()
-        assert len(self._dat_refs) == np.count_nonzero(model._partitionings[action].labels == leaf_index)
-        model._partitionings[action] = model._partitionings[action]._replace(labels = split_params.get_new_labels(), transitions = split_params.get_new_trans())
+        assert len(self.data_refs) == np.count_nonzero(model.partitionings[action].labels == leaf_index)
+        model.partitionings[action] = model.partitionings[action]._replace(labels = split_params.get_new_labels(), transitions = split_params.get_new_trans())
         
         # copy new references to children
         new_dat_refs = split_params.get_new_dat_refs()
-        assert len(self._dat_refs) == len(new_dat_refs[0]) + len(new_dat_refs[1])
+        assert len(self.data_refs) == len(new_dat_refs[0]) + len(new_dat_refs[1])
         child_1, child_2 = super(WorldmodelTree, self).split(model=model)
-        child_1._dat_refs = new_dat_refs[0]
-        child_2._dat_refs = new_dat_refs[1]
+        child_1.data_refs = new_dat_refs[0]
+        child_2.data_refs = new_dat_refs[1]
         
-        assert len(child_1._dat_refs) == np.count_nonzero(model._partitionings[action].labels == leaf_index)
-        assert len(child_2._dat_refs) == np.count_nonzero(model._partitionings[action].labels == leaf_index+1)
+        assert len(child_1.data_refs) == np.count_nonzero(model.partitionings[action].labels == leaf_index)
+        assert len(child_2.data_refs) == np.count_nonzero(model.partitionings[action].labels == leaf_index+1)
         
-        assert False not in [model._partitionings[action].labels[ref]==leaf_index for ref in child_1._dat_refs]
-        assert False not in [model._partitionings[action].labels[ref]==leaf_index+1 for ref in child_2._dat_refs]
+        assert False not in [model.partitionings[action].labels[ref]==leaf_index for ref in child_1.data_refs]
+        assert False not in [model.partitionings[action].labels[ref]==leaf_index+1 for ref in child_2.data_refs]
         
         # free some memory
-        self._dat_refs = None
+        self.data_refs = None
         return child_1, child_2
     
 
@@ -128,7 +127,7 @@ class WorldmodelTree(tree_structure.Tree):
         """
 
         if self.is_leaf():
-            return set(self._dat_refs)
+            return set(self.data_refs)
 
         # else        
         data_refs = set()
@@ -139,7 +138,7 @@ class WorldmodelTree(tree_structure.Tree):
         return data_refs
 
 
-    def _get_transition_refs(self, heading_in=False, inside=True, heading_out=False):
+    def get_transition_refs(self, heading_in=False, inside=True, heading_out=False):
         """
         Finds all transitions that start, end or happen strictly inside the 
         node. The result is given as two lists of references. One for the start 
@@ -147,7 +146,7 @@ class WorldmodelTree(tree_structure.Tree):
         """
         
         refs = self._get_data_refs()
-        N = self._model.get_number_of_samples()
+        N = self.model.get_number_of_samples()
         
         refs_1 = set() 
          
@@ -171,10 +170,10 @@ class WorldmodelTree(tree_structure.Tree):
         Calculates whether for the active _action and all other actions a certain
         number of samples is reached.
         """
-        refs_1, _ = self._get_transition_refs(heading_in=False, inside=True, heading_out=False)
-        actions = [self._model._actions[ref] for ref in refs_1]
+        refs_1, _ = self.get_transition_refs(heading_in=False, inside=True, heading_out=False)
+        actions = [self.model.actions[ref] for ref in refs_1]
         
-        n_actions = len(self._model.get_known_actions())
+        n_actions = len(self.model.get_known_actions())
         n_samples = len(refs_1)
         n_samples_active = actions.count(active_action)
         n_samples_inactive = n_samples - n_samples_active

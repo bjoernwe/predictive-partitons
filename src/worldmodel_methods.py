@@ -25,7 +25,7 @@ class WorldmodelTrivial(worldmodel_tree.WorldmodelTree):
         """
 
         # init borders
-        D = self._model.get_input_dim()
+        D = self.model.get_input_dim()
         if self._minima is None:
             if self._parent is not None:
                 # calculate borders from parent
