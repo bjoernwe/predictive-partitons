@@ -10,7 +10,6 @@ class SplitParams(object):
         self._action = action
         self._test_params = test_params
         self._gain = None
-        self._ref_test_dict = None
         self._new_labels = None
         self._new_dat_refs = None
         self._new_trans = None 
@@ -24,8 +23,12 @@ class SplitParams(object):
     
     def get_gain(self):
         if self._gain is None:
-            self._gain = self._calc_local_gain()
-            #self._gain = self._calc_global_gain()
+            if self._node.model.gain_measure == 'local':
+                self._gain = self._calc_local_gain()
+            elif self._node.model.gain_measure == 'global':
+                self._gain = self._calc_global_gain()
+            else:
+                assert False
         return self._gain
     
     
@@ -161,9 +164,9 @@ class SplitParams(object):
             # update all transitions from or to current state
             for ref in changed_refs:
                 if model.actions[ref] == a:
-                    source = partitioning.labels[ref]
-                    target = partitioning.labels[ref+1]
-                    assert source == index or target == index
+                    #source = partitioning.labels[ref]
+                    #target = partitioning.labels[ref+1]
+                    #assert source == index or target == index
                     new_source = new_labels[ref]
                     new_target = new_labels[ref+1]
                     new_trans[new_source, new_target] += 1
@@ -241,21 +244,24 @@ class SplitParams(object):
         
         active_action = self._action
         actions = self._node.model.get_known_actions()
+        N = self._node.model.partitionings[active_action].tree.get_number_of_leaves()
         
-        old_trans = {}
+        old_trans_uncertain = {}
+        new_trans_uncertain = {}
         new_trans = self.get_new_trans()
-        uncertain_trans = np.ones((), dtype=int)
+        uncertain_trans_old = np.ones((N, N), dtype=int) * self._node.model.uncertainty_bias
+        uncertain_trans_new = np.ones((N+1, N+1), dtype=int) * self._node.model.uncertainty_bias
         
         for action in actions:
-            old_trans[action] = self._node.model.partitionings[active_action].transitions[action] + uncertain_trans
-            new_trans[action] += uncertain_trans
+            old_trans_uncertain[action] = self._node.model.partitionings[active_action].transitions[action] + uncertain_trans_old
+            new_trans_uncertain[action] = new_trans[action] + uncertain_trans_new
         
-        mi_old = entropy_utils.mutual_information(P=old_trans[active_action])
-        mi_new = entropy_utils.mutual_information(P=new_trans[active_action])
+        mi_old = entropy_utils.mutual_information(P=old_trans_uncertain[active_action])
+        mi_new = entropy_utils.mutual_information(P=new_trans_uncertain[active_action])
         
         if len(actions) >= 2:
-            mi_old_inactive = np.mean([entropy_utils.mutual_information(old_trans[action]) for action in actions if action is not active_action])
-            mi_new_inactive = np.mean([entropy_utils.mutual_information(new_trans[action]) for action in actions if action is not active_action])
+            mi_old_inactive = np.mean([entropy_utils.mutual_information(old_trans_uncertain[action]) for action in actions if action is not active_action])
+            mi_new_inactive = np.mean([entropy_utils.mutual_information(new_trans_uncertain[action]) for action in actions if action is not active_action])
             mi_old = np.mean([mi_old, mi_old_inactive])
             mi_new = np.mean([mi_new, mi_new_inactive])
             
