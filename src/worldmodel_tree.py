@@ -140,28 +140,40 @@ class WorldmodelTree(tree_structure.Tree):
         return data_refs
 
 
+    #@profile
     def get_transition_refs(self, heading_in=False, inside=True, heading_out=False):
         """
         Finds all transitions that start, end or happen strictly inside the 
         node. The result is given as two lists of references. One for the start 
         and one for the end of the transition.
+        
+        TODO: check!
         """
         
         refs = self.get_data_refs()
+        refs_array_1 = np.array(list(refs), dtype=int)
+        refs_array_0 = refs_array_1 - 1
         N = self.model.get_number_of_samples()
         
-        refs_1 = set() 
-         
         if heading_in:
-            refs_1.update([ref-1 for ref in refs if (ref-1 not in refs) and (ref-1 > 0)])
+            assert False
+            # [ref-1 for ref in refs if (ref-1 not in refs) and (ref-1 > 0)]
+            #np.in1d(refs_array_1, refs_array_1, assume_unique)
+            #refs = refs_array_0[mask]
             
         if inside:
-            refs_1.update([ref for ref in refs if (ref+1 in refs)])
+            # [ref for ref in refs if (ref+1 in refs)]
+            mask = np.in1d(refs_array_1, refs_array_0, assume_unique=True)
+            refs_array_inside = refs_array_1[mask]
 
         if heading_out:
-            refs_1.update([ref for ref in refs if (ref+1 not in refs) and (ref+1 < N)])
+            assert False
+            # [ref for ref in refs if (ref+1 not in refs) and (ref+1 < N)]
+            #refs_out = refs.difference(refs_inside)
+            #refs_out.difference_update([N-1])
             
-        refs_2 = set([t+1 for t in refs_1])
+        refs_1 = set(refs_array_inside)
+        refs_2 = set(refs_array_inside+1)
         
         assert len(refs_1) == len(set(refs_1))
         return [refs_1, refs_2]
