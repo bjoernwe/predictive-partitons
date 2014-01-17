@@ -273,7 +273,7 @@ class Worldmodel(object):
 
 if __name__ == '__main__':
 
-    N = 100000
+    N = 1000000
     np.random.seed(0)
     data = np.random.random((N, 2))
     actions = [i%2 for i in range(N-1)]

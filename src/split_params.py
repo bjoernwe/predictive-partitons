@@ -101,7 +101,6 @@ class SplitParams(object):
         return
     
     
-    #@profile
     def _update_dat_refs(self):
         """
         Calculates new data references and stores two lists, one for each child.
@@ -130,49 +129,62 @@ class SplitParams(object):
 
     def _update_transition_matrices(self):
         """
-        Calculates a new transition matrix with the split index -> index & index+1.
+        Calculates action new transition matrix with the split index -> index & index+1.
         """
         
         # helper variables
         new_labels = self.get_new_labels()
         node = self._node
         model = node.model
-        index = node.get_leaf_index()
+        index_1 = node.get_leaf_index()
+        index_2 = index_1 + 1
         number_of_samples = model.get_number_of_samples()
         partitioning = node.model.partitionings[self._action]
+        action_vector = np.array(model.actions)
         assert node.is_leaf()
-        
-        # all potentially changed references
-        changed_refs = node.get_data_refs()
-        changed_refs.update([ref-1 for ref in changed_refs])
-        changed_refs.difference_update([-1, number_of_samples-1])
-        
+
         # result
         transition_matrices = {}
-        
-        for a in node.model.get_known_actions():
-        
+
+        for action in node.model.get_known_actions():
+         
             # new transition matrix
-            new_trans = np.array(partitioning.transitions[a])
+            new_trans = np.array(partitioning.transitions[action])
             # split current row and set to zero
-            new_trans[index,:] = 0
-            new_trans = np.insert(new_trans, index, 0, axis=0)  # new row
+            new_trans[index_1,:] = 0
+            new_trans = np.insert(new_trans, index_1, 0, axis=0)  # new row
             # split current column and set to zero
-            new_trans[:,index] = 0
-            new_trans = np.insert(new_trans, index, 0, axis=1)  # new column
+            new_trans[:,index_1] = 0
+            new_trans = np.insert(new_trans, index_1, 0, axis=1)  # new column
+
+            # transitions from current state to another
+            refs_1 = np.array(list(node.get_data_refs().difference([number_of_samples-1])), dtype=int)
+            refs_2 = refs_1 + 1
+        
+            labels_1 = new_labels[refs_1]
+            labels_2 = new_labels[refs_2]
+
+            mask_actions = action_vector[refs_1] == action
             
-            # update all transitions from or to current state
-            for ref in changed_refs:
-                if model.actions[ref] == a:
-                    #source = partitioning.labels[ref]
-                    #target = partitioning.labels[ref+1]
-                    #assert source == index or target == index
-                    new_source = new_labels[ref]
-                    new_target = new_labels[ref+1]
-                    new_trans[new_source, new_target] += 1
+            for i in range(node.get_root().get_number_of_leaves()+1):
+                new_trans[index_1, i] = np.count_nonzero((labels_1 == index_1) & (labels_2 == i) & mask_actions) 
+                new_trans[index_2, i] = np.count_nonzero((labels_1 == index_2) & (labels_2 == i) & mask_actions) 
+        
+            # transitions into current state
+            refs_2 = np.array(list(node.get_data_refs().difference([0])), dtype=int)
+            refs_1 = refs_2 - 1
     
-            assert np.sum(new_trans) == np.sum(partitioning.transitions[a])
-            transition_matrices[a] = new_trans
+            labels_1 = new_labels[refs_1]
+            labels_2 = new_labels[refs_2]
+
+            mask_actions = action_vector[refs_1] == action
+         
+            for i in range(node.get_root().get_number_of_leaves()+1):
+                new_trans[i, index_1] = np.count_nonzero((labels_1 == i) & (labels_2 == index_1) & mask_actions) 
+                new_trans[i, index_2] = np.count_nonzero((labels_1 == i) & (labels_2 == index_2) & mask_actions) 
+        
+            assert np.sum(new_trans) == np.sum(partitioning.transitions[action])
+            transition_matrices[action] = new_trans
             
         self._new_trans = transition_matrices
         return
