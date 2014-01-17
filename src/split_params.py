@@ -67,7 +67,6 @@ class SplitParams(object):
         return
 
 
-    #@profile
     def _update_labels(self):
         """
         Calculates new labels. If some of them are already calculated, old
@@ -84,12 +83,16 @@ class SplitParams(object):
         assert node.is_leaf()
         assert current_state is not None
 
+        # create a vectorized test-function
+        t = lambda r: test_function(data[r], params=test_params)
+        t = np.vectorize(t, otypes=[np.int])
+
         self._init_new_labels()        
         new_labels = self._new_labels
-
+        
         # every entry that node has to be re-classified...
         refs = np.where(new_labels==-1)[0]
-        child_indices = np.array([test_function(data[ref], params=test_params) for ref in refs], dtype=int)
+        child_indices = t(refs)
         new_labels[refs] = current_state + child_indices
         self._new_labels = new_labels
         
@@ -98,6 +101,7 @@ class SplitParams(object):
         return
     
     
+    #@profile
     def _update_dat_refs(self):
         """
         Calculates new data references and stores two lists, one for each child.
@@ -113,13 +117,9 @@ class SplitParams(object):
         assert np.count_nonzero(new_labels < 0) == 0
         assert len(node.data_refs) == np.count_nonzero(new_labels == current_state) + np.count_nonzero(new_labels == current_state+1)
         
-        for ref in node.data_refs:
-            assert new_labels[ref] in [current_state, current_state+1]
-            if new_labels[ref] == current_state:
-                new_dat_refs[0].add(ref)
-            else:
-                new_dat_refs[1].add(ref)
-                
+        new_dat_refs[0] = np.where(new_labels == current_state)[0]
+        new_dat_refs[1] = np.where(new_labels == current_state+1)[0]
+        
         # does the split really split the data into two parts?
         assert len(new_dat_refs[0]) > 0
         assert len(new_dat_refs[1]) > 0
