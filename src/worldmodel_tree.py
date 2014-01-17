@@ -157,20 +157,22 @@ class WorldmodelTree(tree_structure.Tree):
         
         if heading_in:
             assert False
-            # [ref-1 for ref in refs if (ref-1 not in refs) and (ref-1 > 0)]
-            #np.in1d(refs_array_1, refs_array_1, assume_unique)
-            #refs = refs_array_0[mask]
+            # [ref-1 for ref in refs if (ref-1 not in refs) and (ref-1 >= 0)]
+            refs_array_in = np.setdiff1d(refs_array_0, refs_array_1, assume_unique=True)
+            refs_array_in.difference_update([-1])
+            assert set(refs_array_in) == set([ref-1 for ref in refs if (ref-1 not in refs) and (ref-1 >= 0)])
             
         if inside:
             # [ref for ref in refs if (ref+1 in refs)]
             mask = np.in1d(refs_array_1, refs_array_0, assume_unique=True)
             refs_array_inside = refs_array_1[mask]
+            assert set(refs_array_inside) == set([ref for ref in refs if (ref+1 in refs)])
 
         if heading_out:
-            assert False
             # [ref for ref in refs if (ref+1 not in refs) and (ref+1 < N)]
-            #refs_out = refs.difference(refs_inside)
-            #refs_out.difference_update([N-1])
+            refs_array_out = np.setdiff1d(refs_array_1, refs_array_0, assume_unique=True)
+            refs_array_out.difference_udate([N-1])
+            assert set(refs_array_out) == set([ref for ref in refs if (ref+1 not in refs) and (ref+1 < N)])
             
         refs_1 = set(refs_array_inside)
         refs_2 = set(refs_array_inside+1)
