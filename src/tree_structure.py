@@ -5,29 +5,29 @@ class Tree(object):
     
     
     def __init__(self):
-        self.children = []
-        self.parent = None
+        self._children = []
+        self._parent = None
         
         
     def is_leaf(self):
-        if len(self.children) == 0:
+        if len(self._children) == 0:
             return True
         return False
     
     
     def get_root(self):
-        if self.parent is None:
+        if self._parent is None:
             return self
         else:
-            return self.parent.get_root()
+            return self._parent.get_root()
         
         
     def get_leaves(self):
-        if len(self.children) == 0:
+        if len(self._children) == 0:
             return [self]
         else:
             leaves = []
-            for child in self.children:
+            for child in self._children:
                 leaves += child.get_leaves()
             return leaves
         
@@ -37,7 +37,7 @@ class Tree(object):
     
     
     def get_number_of_children(self):
-        return len(self.children)
+        return len(self._children)
     
     
     def get_leaf_index(self):
@@ -63,10 +63,10 @@ class Tree(object):
         assert self.is_leaf()
         child_1 = self.__class__(**kwargs)
         child_2 = self.__class__(**kwargs)
-        child_1.parent = weakref.proxy(self)
-        child_2.parent = weakref.proxy(self)
-        self.children.append(child_1)
-        self.children.append(child_2)
+        child_1._parent = weakref.proxy(self)
+        child_2._parent = weakref.proxy(self)
+        self._children.append(child_1)
+        self._children.append(child_2)
         return (child_1, child_2)
     
     

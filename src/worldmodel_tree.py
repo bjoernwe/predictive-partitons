@@ -56,7 +56,7 @@ class WorldmodelTree(tree_structure.Tree):
             node = self
             while not node.is_leaf():
                 child_index = node._test(dat, params=self._test_params)
-                node = self.children[child_index]
+                node = self._children[child_index]
                 
             labels[i] = node_indices[node]
 
@@ -133,7 +133,7 @@ class WorldmodelTree(tree_structure.Tree):
 
         # else        
         data_refs = set()
-        for child in self.children:
+        for child in self._children:
             data_refs.update(child.get_data_refs())
         
         assert len(data_refs) == len(data_refs)

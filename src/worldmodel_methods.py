@@ -27,16 +27,16 @@ class WorldmodelTrivial(worldmodel_tree.WorldmodelTree):
         # init borders
         D = self.model.get_input_dim()
         if self._minima is None:
-            if self.parent is not None:
+            if self._parent is not None:
                 # calculate borders from parent
-                parent = self.parent
+                parent = self._parent
                 self._minima = np.array(parent._minima)
                 self._maxima = np.array(parent._maxima)
                 dim = parent._split_params._test_params[0]
                 cut = parent._split_params._test_params[1]
                 # are we the first or the second child?
-                assert self in parent.children
-                if self is parent.children[0]:
+                assert self in parent._children
+                if self is parent._children[0]:
                     self._maxima[dim] = cut
                 else:
                     self._minima[dim] = cut
