@@ -41,6 +41,8 @@ class WorldmodelTree(tree_structure.Tree):
         Returns the state that x belongs to according to the current model. If
         x is a matrix, a list is returned containing a integer state for every
         row.
+        
+        TODO: vectorize function
         """
         
         assert self.get_root() is self
@@ -166,7 +168,7 @@ class WorldmodelTree(tree_structure.Tree):
             # [ref for ref in refs if (ref+1 in refs)]
             mask = np.in1d(refs_array_1, refs_array_0, assume_unique=True)
             refs_array_inside = refs_array_1[mask]
-            assert set(refs_array_inside) == set([ref for ref in refs if (ref+1 in refs)])
+            #assert set(refs_array_inside) == set([ref for ref in refs if (ref+1 in refs)])
 
         if heading_out:
             # [ref for ref in refs if (ref+1 not in refs) and (ref+1 < N)]

@@ -216,32 +216,36 @@ class SplitParams(object):
         # transitions inside current partition
         refs_1, refs_2 = node.get_transition_refs(heading_in=False, inside=True, heading_out=False)
         refs = refs_1.union(refs_2)
-        sorted_refs_1 = sorted(refs_1)
         sorted_refs = sorted(refs)
+        sorted_refs_1 = np.array(sorted(refs_1), dtype=int)
         assert type(refs_1) == set
         assert type(refs_2) == set
         
         # assign data to one of the two sub-partitions
-        child_indices = [test_function(data[ref], test_params) for ref in sorted_refs]
-        child_indices_1_2 = [(child_indices[i], child_indices[i+1]) for i, ref in enumerate(sorted_refs) if ref in refs_1]
-        assert len(refs_1) == len(child_indices_1_2)
+        t = lambda r: test_function(data[r], params=test_params)
+        t = np.vectorize(t, otypes=[np.int])
+        child_indices = t(sorted_refs)
         
-        # store _test results in labels to avoid re-calculation
+        # new labels
         self._init_new_labels()        
-        for i, ref in enumerate(sorted_refs):
-            self._new_labels[ref] = current_state + child_indices[i]
+        self._new_labels[sorted_refs] = current_state + np.array(child_indices, dtype=int)
+        new_labels_1 = self._new_labels[sorted_refs_1]
+        new_labels_2 = self._new_labels[sorted_refs_1+1]
         
         # initialize transition matrices
         matrices = {}
         actions = model.get_known_actions()
         for action in actions:
             matrices[action] = np.ones((2, 2)) * model.uncertainty_bias
-
+            
         # transition matrices
-        for i, ref in enumerate(sorted_refs_1):
-            c1, c2 = child_indices_1_2[i]
-            a = node.model.actions[ref]
-            matrices[a][c1, c2] += 1
+        action_vector = np.array(model.actions)[sorted_refs_1]
+        for action in actions:
+            action_mask = (action_vector == action)
+            matrices[action][0,0] += np.count_nonzero((new_labels_1 == current_state) & (new_labels_2 == current_state) & action_mask)
+            matrices[action][0,1] += np.count_nonzero((new_labels_1 == current_state) & (new_labels_2 == current_state+1) & action_mask)
+            matrices[action][1,0] += np.count_nonzero((new_labels_1 == current_state+1) & (new_labels_2 == current_state) & action_mask)
+            matrices[action][1,1] += np.count_nonzero((new_labels_1 == current_state+1) & (new_labels_2 == current_state+1) & action_mask)
             
         # mutual information
         mi = entropy_utils.mutual_information(matrices[active_action])
