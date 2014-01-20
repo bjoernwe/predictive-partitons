@@ -61,7 +61,7 @@ class SplitParams(object):
         if self._new_labels is None:
             new_labels = np.array(partitioning.labels, dtype=int)
             new_labels = np.where(new_labels > current_state, new_labels + 1, new_labels)
-            new_labels = np.where(new_labels == current_state, -1, new_labels)
+            new_labels[new_labels == current_state] = -1
             self._new_labels = new_labels
             
         return
@@ -111,7 +111,7 @@ class SplitParams(object):
         assert current_state is not None
         
         new_labels = self.get_new_labels()
-        new_dat_refs = [set(), set()]
+        new_dat_refs = [None, None]
         
         assert np.count_nonzero(new_labels < 0) == 0
         assert len(node.data_refs) == np.count_nonzero(new_labels == current_state) + np.count_nonzero(new_labels == current_state+1)
@@ -130,12 +130,15 @@ class SplitParams(object):
     def _update_transition_matrices(self):
         """
         Calculates action new transition matrix with the split index -> index & index+1.
+        
+        TODO: can we use get_transition_refs here?
         """
         
         # helper variables
         new_labels = self.get_new_labels()
         node = self._node
         model = node.model
+        refs = node.get_data_refs()
         index_1 = node.get_leaf_index()
         index_2 = index_1 + 1
         number_of_samples = model.get_number_of_samples()
@@ -158,7 +161,7 @@ class SplitParams(object):
             new_trans = np.insert(new_trans, index_1, 0, axis=1)  # new column
 
             # transitions from current state to another
-            refs_1 = np.array(list(node.get_data_refs().difference([number_of_samples-1])), dtype=int)
+            refs_1 = np.setdiff1d(refs, [number_of_samples-1], assume_unique=True)
             refs_2 = refs_1 + 1
         
             labels_1 = new_labels[refs_1]
@@ -171,7 +174,7 @@ class SplitParams(object):
                 new_trans[index_2, i] = np.count_nonzero((labels_1 == index_2) & (labels_2 == i) & mask_actions) 
         
             # transitions into current state
-            refs_2 = np.array(list(node.get_data_refs().difference([0])), dtype=int)
+            refs_2 = np.setdiff1d(refs, [0], assume_unique=True)
             refs_1 = refs_2 - 1
     
             labels_1 = new_labels[refs_1]
@@ -215,22 +218,18 @@ class SplitParams(object):
         
         # transitions inside current partition
         refs_1, refs_2 = node.get_transition_refs(heading_in=False, inside=True, heading_out=False)
-        refs = refs_1.union(refs_2)
-        sorted_refs = sorted(refs)
-        sorted_refs_1 = np.array(sorted(refs_1), dtype=int)
-        assert type(refs_1) == set
-        assert type(refs_2) == set
+        refs = np.union1d(refs_1, refs_2)
         
         # assign data to one of the two sub-partitions
         t = lambda r: test_function(data[r], params=test_params)
         t = np.vectorize(t, otypes=[np.int])
-        child_indices = t(sorted_refs)
+        child_indices = t(refs)
         
         # new labels
         self._init_new_labels()        
-        self._new_labels[sorted_refs] = current_state + np.array(child_indices, dtype=int)
-        new_labels_1 = self._new_labels[sorted_refs_1]
-        new_labels_2 = self._new_labels[sorted_refs_1+1]
+        self._new_labels[refs] = current_state + child_indices
+        new_labels_1 = self._new_labels[refs_1]
+        new_labels_2 = self._new_labels[refs_1+1]
         
         # initialize transition matrices
         matrices = {}
@@ -239,7 +238,7 @@ class SplitParams(object):
             matrices[action] = np.ones((2, 2)) * model.uncertainty_bias
             
         # transition matrices
-        action_vector = np.array(model.actions)[sorted_refs_1]
+        action_vector = np.array(model.actions)[refs_1]
         for action in actions:
             action_mask = (action_vector == action)
             matrices[action][0,0] += np.count_nonzero((new_labels_1 == current_state) & (new_labels_2 == current_state) & action_mask)

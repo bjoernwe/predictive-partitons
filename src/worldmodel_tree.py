@@ -15,7 +15,7 @@ class WorldmodelTree(tree_structure.Tree):
         else:
             self.model = weakref.proxy(model)
             
-        self.data_refs = set()  # indices of data belonging to this node
+        self.data_refs = np.empty(0, dtype=int) # indices of data belonging to this node
         self._split_params = None
         return
         
@@ -125,24 +125,23 @@ class WorldmodelTree(tree_structure.Tree):
 
     def get_data_refs(self):
         """
-        Returns a set (!) of data references (i.e. indices for root.data) 
+        Returns a list of data references (i.e. indices for root.data) 
         belonging to the node. If the node isn't a leaf, the data of sub-nodes 
         is returned.
         """
 
         if self.is_leaf():
-            return set(self.data_refs)
+            return self.data_refs
 
         # else        
-        data_refs = set()
+        data_refs = np.empty(0, dtype=int)
         for child in self._children:
-            data_refs.update(child.get_data_refs())
+            data_refs = np.hstack([data_refs, child.get_data_refs()])
         
-        assert len(data_refs) == len(data_refs)
+        data_refs.sort()
         return data_refs
 
 
-    #@profile
     def get_transition_refs(self, heading_in=False, inside=True, heading_out=False):
         """
         Finds all transitions that start, end or happen strictly inside the 
@@ -152,34 +151,31 @@ class WorldmodelTree(tree_structure.Tree):
         TODO: check!
         """
         
-        refs = self.get_data_refs()
-        refs_array_1 = np.array(list(refs), dtype=int)
-        refs_array_0 = refs_array_1 - 1
+        refs_1 = self.get_data_refs()
+        refs_0 = refs_1 - 1
         N = self.model.get_number_of_samples()
         
         if heading_in:
             assert False
             # [ref-1 for ref in refs if (ref-1 not in refs) and (ref-1 >= 0)]
-            refs_array_in = np.setdiff1d(refs_array_0, refs_array_1, assume_unique=True)
+            refs_array_in = np.setdiff1d(refs_0, refs_1, assume_unique=True)
             refs_array_in.difference_update([-1])
-            assert set(refs_array_in) == set([ref-1 for ref in refs if (ref-1 not in refs) and (ref-1 >= 0)])
+            assert set(refs_array_in) == set([ref-1 for ref in refs_1 if (ref-1 not in refs_1) and (ref-1 >= 0)])
             
         if inside:
             # [ref for ref in refs if (ref+1 in refs)]
-            mask = np.in1d(refs_array_1, refs_array_0, assume_unique=True)
-            refs_array_inside = refs_array_1[mask]
+            mask = np.in1d(refs_1, refs_0, assume_unique=True)
+            refs_array_inside = refs_1[mask]
             #assert set(refs_array_inside) == set([ref for ref in refs if (ref+1 in refs)])
 
         if heading_out:
             # [ref for ref in refs if (ref+1 not in refs) and (ref+1 < N)]
-            refs_array_out = np.setdiff1d(refs_array_1, refs_array_0, assume_unique=True)
+            refs_array_out = np.setdiff1d(refs_1, refs_0, assume_unique=True)
             refs_array_out.difference_udate([N-1])
-            assert set(refs_array_out) == set([ref for ref in refs if (ref+1 not in refs) and (ref+1 < N)])
+            assert set(refs_array_out) == set([ref for ref in refs_1 if (ref+1 not in refs_1) and (ref+1 < N)])
             
-        refs_1 = set(refs_array_inside)
-        refs_2 = set(refs_array_inside+1)
-        
-        assert len(refs_1) == len(set(refs_1))
+        refs_1 = refs_array_inside
+        refs_2 = refs_array_inside + 1
         return [refs_1, refs_2]
     
     

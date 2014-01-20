@@ -150,23 +150,23 @@ class Worldmodel(object):
         # calculate new labels, and append
         for action in self._action_set:
             partitioning = self.partitionings[action]
-            labels = self.classify(data, action=action)
-            new_labels = np.hstack([partitioning.labels, labels])
-            self.partitionings[action] = partitioning._replace(labels=new_labels)
+            new_labels = self.classify(data, action=action)
+            labels = np.hstack([partitioning.labels, new_labels])
+            self.partitionings[action] = partitioning._replace(labels=labels)
             assert len(self.partitionings[action].labels) == N
 
         # add references of new data to corresponding partitions            
         for action in self._action_set:
             partitioning = self.partitionings[action]
-            labels = partitioning.labels
             leaves = partitioning.tree.get_leaves()
             for leaf in leaves:
                 leaf_index = leaf.get_leaf_index()
-                new_refs_mask = labels[first_data: N] == leaf_index
+                new_refs_mask = (new_labels[first_data: N] == leaf_index)
                 new_refs = np.where(new_refs_mask)[0] + first_data
-                leaf.data_refs.update(new_refs)
+                leaf.data_refs = np.hstack([leaf.data_refs, new_refs])
             
         # update transition matrices
+        # TODO: could be faster
         for action in self._action_set:
             partitioning = self.partitionings[action]
             for i in range(first_source, N-1):
