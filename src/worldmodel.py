@@ -67,7 +67,8 @@ class Worldmodel(object):
         """
         return np.array(self.partitionings[action].tree.classify(data), dtype=int)
     
-    
+
+    #@profile    
     def add_data(self, data, actions=None):
         """
         Adds a matrix of new observations to the node. The data is interpreted 
@@ -157,12 +158,14 @@ class Worldmodel(object):
         # add references of new data to corresponding partitions            
         for action in self._action_set:
             partitioning = self.partitionings[action]
+            labels = partitioning.labels
             leaves = partitioning.tree.get_leaves()
-            for i in range(first_data, N):
-                label = partitioning.labels[i]
-                leaf = leaves[label]
-                leaf.data_refs.add(i)
-        
+            for leaf in leaves:
+                leaf_index = leaf.get_leaf_index()
+                new_refs_mask = labels[first_data: N] == leaf_index
+                new_refs = np.where(new_refs_mask)[0] + first_data
+                leaf.data_refs.update(new_refs)
+            
         # update transition matrices
         for action in self._action_set:
             partitioning = self.partitionings[action]
