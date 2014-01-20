@@ -130,8 +130,6 @@ class SplitParams(object):
     def _update_transition_matrices(self):
         """
         Calculates action new transition matrix with the split index -> index & index+1.
-        
-        TODO: can we use get_transition_refs here?
         """
         
         # helper variables

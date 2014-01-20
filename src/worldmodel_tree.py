@@ -41,8 +41,6 @@ class WorldmodelTree(tree_structure.Tree):
         Returns the state that x belongs to according to the current model. If
         x is a matrix, a list is returned containing a integer state for every
         row.
-        
-        TODO: vectorize function
         """
         
         assert self.get_root() is self
