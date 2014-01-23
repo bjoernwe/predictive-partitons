@@ -26,7 +26,7 @@ class Worldmodel(object):
 
         assert gain_measure in ['local', 'global']
         self.gain_measure = gain_measure
-
+        
         # root node of tree
         assert method in ['naive']
         self._method = method
@@ -203,6 +203,8 @@ class Worldmodel(object):
         best one
         """
         
+        # TODO: This could become part of a new Partitioning class.
+        
         if self.data is None:
             return None
                 
@@ -210,6 +212,7 @@ class Worldmodel(object):
 
         tree = self.partitionings[active_action].tree
         for leaf in tree.get_leaves():
+            # TODO: test_params should be cached because their calculation can be expensive.
             test_params = leaf._calc_test_params(active_action=active_action)
             split = split_params.SplitParams(node = weakref.proxy(leaf),
                                              action = active_action, 
@@ -286,6 +289,6 @@ if __name__ == '__main__':
     for i in range(8):
         model.split(action=0)
         pyplot.subplot(2, 4, i+1)
-        #model.plot_data_colored_for_state(active_action=0, show_plot=False)
-    #pyplot.show()
+        model.plot_data_colored_for_state(active_action=0, show_plot=False)
+    pyplot.show()
     

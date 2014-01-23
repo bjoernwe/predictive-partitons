@@ -9,14 +9,19 @@ class WorldmodelTree(tree_structure.Tree):
     def __init__(self, model):
         super(WorldmodelTree, self).__init__()
         
-        # important references
+        # a weak reference to the model
         if type(model) in weakref.ProxyTypes:
             self.model = model
         else:
             self.model = weakref.proxy(model)
             
-        self.data_refs = np.empty(0, dtype=int) # indices of data belonging to this node
+        # indices of data belonging to this node
+        self.data_refs = np.empty(0, dtype=int)
+        
+        # if node was split, parameters are stored here
         self._split_params = None
+        
+        # 
         return
         
         
@@ -98,7 +103,7 @@ class WorldmodelTree(tree_structure.Tree):
         
         # copy labels and transitions to model
         model = self.model
-        action = split_params._action
+        action = split_params.model_action
         leaf_index = self.get_leaf_index()
         assert len(self.data_refs) == np.count_nonzero(model.partitionings[action].labels == leaf_index)
         model.partitionings[action] = model.partitionings[action]._replace(labels = split_params.get_new_labels(), transitions = split_params.get_new_trans())
@@ -179,7 +184,7 @@ class WorldmodelTree(tree_structure.Tree):
     
     def _reached_number_of_active_and_inactive_samples(self, number, active_action):
         """
-        Calculates whether for the active _action and all other actions a certain
+        Calculates whether for the active model_action and all other actions a certain
         number of samples is reached.
         """
         refs_1, _ = self.get_transition_refs(heading_in=False, inside=True, heading_out=False)

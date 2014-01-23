@@ -6,13 +6,16 @@ import entropy_utils
 class SplitParams(object):
     
     def __init__(self, node, action, test_params):
+        self.model_action = action
         self._node = node
-        self._action = action
+        self._model = self._node.model
+        self._partitioning = self._model.partitionings[self.model_action]
         self._test_params = test_params
         self._gain = None
         self._new_labels = None
         self._new_dat_refs = None
-        self._new_trans = None 
+        self._new_trans = None
+        self._number_of_samples_when_created = len(self._node.get_data_refs()) 
         return
 
 
@@ -52,14 +55,12 @@ class SplitParams(object):
 
     def _init_new_labels(self):    
         
-        node = self._node
-        partitioning = node.model.partitionings[self._action]
-        current_state = node.get_leaf_index()
-        assert node.is_leaf()
+        current_state = self._node.get_leaf_index()
+        assert self._node.is_leaf()
         assert current_state is not None
         
         if self._new_labels is None:
-            new_labels = np.array(partitioning.labels, dtype=int)
+            new_labels = np.array(self._partitioning.labels, dtype=int)
             new_labels = np.where(new_labels > current_state, new_labels + 1, new_labels)
             new_labels[new_labels == current_state] = -1
             self._new_labels = new_labels
@@ -69,18 +70,15 @@ class SplitParams(object):
 
     def _update_labels(self):
         """
-        Calculates new labels. If some of them are already calculated, old
-        values are kept.
+        Calculates new labels.
         """
 
         # some useful variables
-        node = self._node
-        data = node.model.data
-        partitioning = node.model.partitionings[self._action]
-        current_state = node.get_leaf_index()
-        test_function = node._test
+        data = self._node.model.data
+        current_state = self._node.get_leaf_index()
+        test_function = self._node._test
         test_params = self._test_params
-        assert node.is_leaf()
+        assert self._node.is_leaf()
         assert current_state is not None
 
         # create a vectorized test-function
@@ -90,6 +88,9 @@ class SplitParams(object):
         self._init_new_labels()        
         new_labels = self._new_labels
         
+        # TODO: We can avoid re-calculations of (old) labels, when test-function
+        # has not changed. We could consider caching the test-parameters...
+        
         # every entry that node has to be re-classified...
         refs = np.where(new_labels==-1)[0]
         child_indices = t(refs)
@@ -97,7 +98,7 @@ class SplitParams(object):
         self._new_labels = new_labels
         
         assert np.count_nonzero(self._new_labels==-1) == 0
-        assert len(self._new_labels) == len(partitioning.labels)
+        assert len(self._new_labels) == len(self._partitioning.labels)
         return
     
     
@@ -106,15 +107,14 @@ class SplitParams(object):
         Calculates new data references and stores two lists, one for each child.
         """
         
-        node = self._node
-        current_state = node.get_leaf_index()
+        current_state = self._node.get_leaf_index()
         assert current_state is not None
         
         new_labels = self.get_new_labels()
         new_dat_refs = [None, None]
         
         assert np.count_nonzero(new_labels < 0) == 0
-        assert len(node.data_refs) == np.count_nonzero(new_labels == current_state) + np.count_nonzero(new_labels == current_state+1)
+        assert len(self._node.data_refs) == np.count_nonzero(new_labels == current_state) + np.count_nonzero(new_labels == current_state+1)
         
         new_dat_refs[0] = np.where(new_labels == current_state)[0]
         new_dat_refs[1] = np.where(new_labels == current_state+1)[0]
@@ -134,23 +134,21 @@ class SplitParams(object):
         
         # helper variables
         new_labels = self.get_new_labels()
-        node = self._node
-        model = node.model
-        refs = node.get_data_refs()
-        index_1 = node.get_leaf_index()
+        refs = self._node.get_data_refs()
+        index_1 = self._node.get_leaf_index()
         index_2 = index_1 + 1
-        number_of_samples = model.get_number_of_samples()
-        partitioning = node.model.partitionings[self._action]
-        action_vector = np.array(model.actions)
-        assert node.is_leaf()
+        number_of_samples = self._model.get_number_of_samples()
+        action_vector = np.array(self._model.actions)
+        assert self._node.is_leaf()
+        assert len(refs) == self._number_of_samples_when_created
 
         # result
         transition_matrices = {}
 
-        for action in node.model.get_known_actions():
+        for action in self._model.get_known_actions():
          
             # new transition matrix
-            new_trans = np.array(partitioning.transitions[action])
+            new_trans = np.array(self._partitioning.transitions[action])
             # split current row and set to zero
             new_trans[index_1,:] = 0
             new_trans = np.insert(new_trans, index_1, 0, axis=0)  # new row
@@ -159,7 +157,8 @@ class SplitParams(object):
             new_trans = np.insert(new_trans, index_1, 0, axis=1)  # new column
 
             # transitions from current state to another
-            refs_1 = np.setdiff1d(refs, [number_of_samples-1], assume_unique=True)
+            
+            refs_1 = np.setdiff1d(refs, [number_of_samples-1], assume_unique=True) # remove N-1
             refs_2 = refs_1 + 1
         
             labels_1 = new_labels[refs_1]
@@ -167,11 +166,12 @@ class SplitParams(object):
 
             mask_actions = action_vector[refs_1] == action
             
-            for i in range(node.get_root().get_number_of_leaves()+1):
+            for i in range(self._node.get_root().get_number_of_leaves()+1):
                 new_trans[index_1, i] = np.count_nonzero((labels_1 == index_1) & (labels_2 == i) & mask_actions) 
                 new_trans[index_2, i] = np.count_nonzero((labels_1 == index_2) & (labels_2 == i) & mask_actions) 
         
             # transitions into current state
+            
             refs_2 = np.setdiff1d(refs, [0], assume_unique=True)
             refs_1 = refs_2 - 1
     
@@ -180,22 +180,21 @@ class SplitParams(object):
 
             mask_actions = action_vector[refs_1] == action
          
-            for i in range(node.get_root().get_number_of_leaves()+1):
+            for i in range(self._node.get_root().get_number_of_leaves()+1):
                 new_trans[i, index_1] = np.count_nonzero((labels_1 == i) & (labels_2 == index_1) & mask_actions) 
                 new_trans[i, index_2] = np.count_nonzero((labels_1 == i) & (labels_2 == index_2) & mask_actions) 
         
-            assert np.sum(new_trans) == np.sum(partitioning.transitions[action])
+            assert np.sum(new_trans) == np.sum(self._partitioning.transitions[action])
             transition_matrices[action] = new_trans
             
         self._new_trans = transition_matrices
         return
 
 
-    #@profile
     def _calc_local_gain(self):
         """
-        For every _action a 2x2 transition matrix is calculated, induced by the
-        given split (test_params). For the "active" _action the mutual 
+        For every model_action a 2x2 transition matrix is calculated, induced by the
+        given split (test_params). For the "active" model_action the mutual 
         information is calculated and the average of all the others. For the
         final value, mutual information of active and inactive actions each have
         half of the weight.
@@ -206,16 +205,13 @@ class SplitParams(object):
         """
         
         # helper variables
-        active_action = self._action
-        node = self._node
-        model = node.model
-        current_state = node.get_leaf_index()
-        data = model.data
-        test_function = node._test
+        current_state = self._node.get_leaf_index()
+        data = self._model.data
+        test_function = self._node._test
         test_params = self._test_params
         
         # transitions inside current partition
-        refs_1, refs_2 = node.get_transition_refs(heading_in=False, inside=True, heading_out=False)
+        refs_1, refs_2 = self._node.get_transition_refs(heading_in=False, inside=True, heading_out=False)
         refs = np.union1d(refs_1, refs_2)
         
         # assign data to one of the two sub-partitions
@@ -231,12 +227,12 @@ class SplitParams(object):
         
         # initialize transition matrices
         matrices = {}
-        actions = model.get_known_actions()
+        actions = self._model.get_known_actions()
         for action in actions:
-            matrices[action] = np.ones((2, 2)) * model.uncertainty_bias
+            matrices[action] = np.ones((2, 2)) * self._model.uncertainty_bias
             
         # transition matrices
-        action_vector = np.array(model.actions)[refs_1]
+        action_vector = np.array(self._model.actions)[refs_1]
         for action in actions:
             action_mask = (action_vector == action)
             matrices[action][0,0] += np.count_nonzero((new_labels_1 == current_state) & (new_labels_2 == current_state) & action_mask)
@@ -245,9 +241,9 @@ class SplitParams(object):
             matrices[action][1,1] += np.count_nonzero((new_labels_1 == current_state+1) & (new_labels_2 == current_state+1) & action_mask)
             
         # mutual information
-        mi = entropy_utils.mutual_information(matrices[active_action])
+        mi = entropy_utils.mutual_information(matrices[self.model_action])
         if len(actions) >= 2:
-            mi_inactive = np.mean([entropy_utils.mutual_information(matrices[action]) for action in actions if action is not active_action])
+            mi_inactive = np.mean([entropy_utils.mutual_information(matrices[action]) for action in actions if action is not self.model_action])
             mi = np.mean([mi, mi_inactive])
             
         return mi
@@ -255,7 +251,7 @@ class SplitParams(object):
     
     def _calc_global_gain(self):
         
-        active_action = self._action
+        active_action = self.model_action
         actions = self._node.model.get_known_actions()
         N = self._node.model.partitionings[active_action].tree.get_number_of_leaves()
         
