@@ -74,6 +74,9 @@ class Worldmodel(object):
         Adds a matrix of new observations to the node. The data is interpreted 
         as one observation following the previous one. This is important to 
         calculate the transition probabilities.
+        
+        Actions are stored as an array of positive integer values. If an action
+        is unknown (e.g., the action between two chunks of data) it's set to -1.
         """
 
         # check for dimensionality of x
