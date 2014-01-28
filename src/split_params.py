@@ -138,7 +138,6 @@ class SplitParams(object):
         index_1 = self._node.get_leaf_index()
         index_2 = index_1 + 1
         number_of_samples = self._model.get_number_of_samples()
-        action_vector = np.array(self._model.actions)
         assert self._node.is_leaf()
         assert len(refs) == self._number_of_samples_when_created
 
@@ -164,7 +163,7 @@ class SplitParams(object):
             labels_1 = new_labels[refs_1]
             labels_2 = new_labels[refs_2]
 
-            mask_actions = action_vector[refs_1] == action
+            mask_actions = self._model.actions[refs_1] == action
             
             for i in range(self._node.get_root().get_number_of_leaves()+1):
                 new_trans[index_1, i] = np.count_nonzero((labels_1 == index_1) & (labels_2 == i) & mask_actions) 
@@ -178,7 +177,7 @@ class SplitParams(object):
             labels_1 = new_labels[refs_1]
             labels_2 = new_labels[refs_2]
 
-            mask_actions = action_vector[refs_1] == action
+            mask_actions = self._model.actions[refs_1] == action
          
             for i in range(self._node.get_root().get_number_of_leaves()+1):
                 new_trans[i, index_1] = np.count_nonzero((labels_1 == i) & (labels_2 == index_1) & mask_actions) 
@@ -227,14 +226,13 @@ class SplitParams(object):
         
         # initialize transition matrices
         matrices = {}
-        actions = self._model.get_known_actions()
-        for action in actions:
+        known_actions = self._model.get_known_actions()
+        for action in known_actions:
             matrices[action] = np.ones((2, 2)) * self._model.uncertainty_bias
             
         # transition matrices
-        action_vector = np.array(self._model.actions)[refs_1]
-        for action in actions:
-            action_mask = (action_vector == action)
+        for action in known_actions:
+            action_mask = (self._model.actions[refs_1] == action)
             matrices[action][0,0] += np.count_nonzero((new_labels_1 == current_state) & (new_labels_2 == current_state) & action_mask)
             matrices[action][0,1] += np.count_nonzero((new_labels_1 == current_state) & (new_labels_2 == current_state+1) & action_mask)
             matrices[action][1,0] += np.count_nonzero((new_labels_1 == current_state+1) & (new_labels_2 == current_state) & action_mask)
@@ -242,8 +240,8 @@ class SplitParams(object):
             
         # mutual information
         mi = entropy_utils.mutual_information(matrices[self.model_action])
-        if len(actions) >= 2:
-            mi_inactive = np.mean([entropy_utils.mutual_information(matrices[action]) for action in actions if action is not self.model_action])
+        if len(known_actions) >= 2:
+            mi_inactive = np.mean([entropy_utils.mutual_information(matrices[action]) for action in known_actions if action is not self.model_action])
             mi = np.mean([mi, mi_inactive])
             
         return mi

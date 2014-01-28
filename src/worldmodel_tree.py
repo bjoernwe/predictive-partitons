@@ -182,20 +182,20 @@ class WorldmodelTree(tree_structure.Tree):
         return [refs_1, refs_2]
     
     
-    def _reached_number_of_active_and_inactive_samples(self, number, active_action):
-        """
-        Calculates whether for the active model_action and all other actions a certain
-        number of samples is reached.
-        """
-        refs_1, _ = self.get_transition_refs(heading_in=False, inside=True, heading_out=False)
-        actions = [self.model.actions[ref] for ref in refs_1]
-        
-        n_actions = len(self.model.get_known_actions())
-        n_samples = len(refs_1)
-        n_samples_active = actions.count(active_action)
-        n_samples_inactive = n_samples - n_samples_active
-        
-        return (n_samples_active >= number) and (n_actions == 1 or n_samples_inactive >= number)
+#     def _reached_number_of_active_and_inactive_samples(self, number, active_action):
+#         """
+#         Calculates whether for the active_action and all other actions a certain
+#         number of samples is reached.
+#         """
+#         refs_1, _ = self.get_transition_refs(heading_in=False, inside=True, heading_out=False)
+#         actions = [self.model.actions[ref] for ref in refs_1]
+#         
+#         n_actions = len(self.model.get_known_actions())
+#         n_samples = len(refs_1)
+#         n_samples_active = actions.count(active_action)
+#         n_samples_inactive = n_samples - n_samples_active
+#         
+#         return (n_samples_active >= number) and (n_actions == 1 or n_samples_inactive >= number)
         
         
 

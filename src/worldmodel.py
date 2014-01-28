@@ -18,8 +18,8 @@ class Worldmodel(object):
     def __init__(self, method='naive', gain_measure='local', uncertainty_bias=10, seed=None):
         
         # data storage
-        self.data = None        # global data storage
-        self.actions = []       # a sequence of actions
+        self.data = None                        # global data storage
+        self.actions = np.empty(0, dtype=int)   # an array of actions
         self.uncertainty_bias = uncertainty_bias
         self.partitionings = {}
         self._action_set = set()
@@ -86,11 +86,11 @@ class Worldmodel(object):
         
         # prepare list of actions
         if actions is None:
-            actions = [None for _ in range(m-1)]
+            actions = -np.ones(m-1, dtype=int)
             
         # add missing action
         if self.data is not None and len(actions) == m-1:
-            actions = [None] + actions
+            actions = np.hstack([-1, actions])
         
         # make sure right number of actions
         if self.data is not None:
@@ -115,7 +115,7 @@ class Worldmodel(object):
                 tree = self._tree_class(model=self)
                 transitions = {}
                 for action_2 in self._action_set:
-                    transitions[action_2] = np.ones((1, 1), dtype=int) * self.actions.count(action_2)
+                    transitions[action_2] = np.ones((1, 1), dtype=int) * np.count_nonzero(self.actions == action_2)
                 self.partitionings[action] = Partitioning(labels=labels, transitions=transitions, tree=tree)
                 
             # update existing structure
@@ -137,12 +137,12 @@ class Worldmodel(object):
             first_data = 0
             first_source = 0
             self.data = data
-            self.actions = actions
+            self.actions = np.array(actions, dtype=np.int)
         else:
             first_data = n
             first_source = first_data - 1
             self.data = np.vstack([self.data, data])
-            self.actions = self.actions + actions
+            self.actions = np.hstack([self.actions, actions])
             
         # same number of actions and data points?
         assert self.data.shape[0] == len(self.actions) + 1
@@ -178,6 +178,14 @@ class Worldmodel(object):
         for action in self._action_set:
             assert np.sum(self._merge_transition_matrices(action)) == N-1
         return
+    
+    
+    def get_data_for_refs(self, refs):
+        return self.data[refs]
+    
+    
+#     def get_refs_for_action(self, action):
+#         return np.where(np.array(self.actions) == action)
     
 
     def _merge_transition_matrices(self, action):
@@ -279,7 +287,7 @@ class Worldmodel(object):
 
 if __name__ == '__main__':
 
-    N = 100000
+    N = 1000000
     np.random.seed(0)
     data = np.random.random((N, 2))
     actions = [i%2 for i in range(N-1)]
@@ -289,6 +297,6 @@ if __name__ == '__main__':
     for i in range(8):
         model.split(action=0)
         pyplot.subplot(2, 4, i+1)
-        model.plot_data_colored_for_state(active_action=0, show_plot=False)
-    pyplot.show()
+        #model.plot_data_colored_for_state(active_action=0, show_plot=False)
+    #pyplot.show()
     
