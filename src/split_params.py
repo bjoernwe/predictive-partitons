@@ -228,7 +228,7 @@ class SplitParams(object):
         matrices = {}
         known_actions = self._model.get_known_actions()
         for action in known_actions:
-            matrices[action] = np.ones((2, 2)) * self._model.uncertainty_bias
+            matrices[action] = np.ones((2, 2)) * self._model.uncertainty_prior
             
         # transition matrices
         for action in known_actions:
@@ -256,8 +256,8 @@ class SplitParams(object):
         old_trans_uncertain = {}
         new_trans_uncertain = {}
         new_trans = self.get_new_trans()
-        uncertain_trans_old = np.ones((N, N), dtype=int) * self._node.model.uncertainty_bias
-        uncertain_trans_new = np.ones((N+1, N+1), dtype=int) * self._node.model.uncertainty_bias
+        uncertain_trans_old = np.ones((N, N), dtype=int) * self._node.model.uncertainty_prior
+        uncertain_trans_new = np.ones((N+1, N+1), dtype=int) * self._node.model.uncertainty_prior
         
         for action in actions:
             old_trans_uncertain[action] = self._node.model.partitionings[active_action].transitions[action] + uncertain_trans_old
