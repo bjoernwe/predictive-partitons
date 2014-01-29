@@ -13,8 +13,8 @@ class WorldmodelTrivial(worldmodel_tree.WorldmodelTree):
     TestParams = collections.namedtuple('TestParams', ['dim', 'cut'])
     
     
-    def __init__(self, model, parents=None):
-        super(WorldmodelTrivial, self).__init__(model=model)
+    def __init__(self, partitioning):
+        super(WorldmodelTrivial, self).__init__(partitioning=partitioning)
         self._minima = None
         self._maxima = None    
 

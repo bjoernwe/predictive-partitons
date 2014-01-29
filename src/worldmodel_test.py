@@ -26,8 +26,9 @@ class Test(unittest.TestCase):
         self.failUnless(model.get_known_actions() == set([0, 1]))
         self.failUnless(model.get_number_of_samples() == N)
         self.failUnless(len(model.actions) == N-1)
-        self.failUnless(np.sum(model._merge_transition_matrices(action=0)) == N-1)
-        self.failUnless(np.sum(model._merge_transition_matrices(action=1)) == N-1)
+        self.failUnless(np.sum(model.partitionings[0].get_merged_transition_matrices()) == N-1)
+        self.failUnless(np.sum(model.partitionings[1].get_merged_transition_matrices()) == N-1)
+        self.failUnless(np.count_nonzero(model.actions == -1) == 0)
 
         data = np.random.random((100, 2))
         model.add_data(data=data, actions=actions)
@@ -35,9 +36,10 @@ class Test(unittest.TestCase):
         self.failUnless(model.get_known_actions() == set([-1, 0, 1]))
         self.failUnless(model.get_number_of_samples() == 2*N)
         self.failUnless(len(model.actions) == 2*N-1)
-        self.failUnless(np.sum(model._merge_transition_matrices(action=-1)) == 2*N-1)
-        self.failUnless(np.sum(model._merge_transition_matrices(action=0)) == 2*N-1)
-        self.failUnless(np.sum(model._merge_transition_matrices(action=1)) == 2*N-1)
+        self.failUnless(np.sum(model.partitionings[-1].get_merged_transition_matrices()) == 2*N-1)
+        self.failUnless(np.sum(model.partitionings[0].get_merged_transition_matrices()) == 2*N-1)
+        self.failUnless(np.sum(model.partitionings[1].get_merged_transition_matrices()) == 2*N-1)
+        self.failUnless(np.count_nonzero(model.actions == -1) == 1)
         
         for a in [-1, 0, 1]:
             self.failUnless(model.partitionings[a].transitions[-1] == 1)
@@ -49,10 +51,11 @@ class Test(unittest.TestCase):
         self.failUnless(model.get_known_actions() == set([-1, 0, 1, 2]))
         self.failUnless(model.get_number_of_samples() == 3*N)
         self.failUnless(len(model.actions) == 3*N-1)
-        self.failUnless(np.sum(model._merge_transition_matrices(action=-1)) == 3*N-1)
-        self.failUnless(np.sum(model._merge_transition_matrices(action=0)) == 3*N-1)
-        self.failUnless(np.sum(model._merge_transition_matrices(action=1)) == 3*N-1)
-        self.failUnless(np.sum(model._merge_transition_matrices(action=2)) == 3*N-1)
+        self.failUnless(np.sum(model.partitionings[-1].get_merged_transition_matrices()) == 3*N-1)
+        self.failUnless(np.sum(model.partitionings[0].get_merged_transition_matrices()) == 3*N-1)
+        self.failUnless(np.sum(model.partitionings[1].get_merged_transition_matrices()) == 3*N-1)
+        self.failUnless(np.sum(model.partitionings[2].get_merged_transition_matrices()) == 3*N-1)
+        self.failUnless(np.count_nonzero(model.actions == -1) == 1)
 
         for a in [-1, 0, 1]:
             self.failUnless(model.partitionings[a].transitions[-1] == 1)

@@ -1,15 +1,12 @@
-import collections
 import numpy as np
 import random
-import weakref
 
 from matplotlib import pyplot
 
+from partitioning import Partitioning
 import split_params
 import worldmodel_methods
 
-
-Partitioning = collections.namedtuple('Partitioning', ['labels', 'transitions', 'tree'])
 
 
 class Worldmodel(object):
@@ -65,10 +62,9 @@ class Worldmodel(object):
         model. Since each action has its own model for classification, the
         action has to be specified.
         """
-        return np.array(self.partitionings[action].tree.classify(data), dtype=int)
+        return self.partitionings[action].classify(data)
     
 
-    #@profile    
     def add_data(self, data, actions=None):
         """
         Adds a matrix of new observations to the node. The data is interpreted 
@@ -114,12 +110,7 @@ class Worldmodel(object):
             # initialize new structure
             if action not in self.partitionings.keys():
                 
-                labels = np.zeros(n, dtype=int)
-                tree = self._tree_class(model=self)
-                transitions = {}
-                for action_2 in self._action_set:
-                    transitions[action_2] = np.ones((1, 1), dtype=int) * np.count_nonzero(self.actions == action_2)
-                self.partitionings[action] = Partitioning(labels=labels, transitions=transitions, tree=tree)
+                self.partitionings[action] = Partitioning(model=self, active_action=action)
                 
             # update existing structure
             else:
@@ -155,7 +146,7 @@ class Worldmodel(object):
             partitioning = self.partitionings[action]
             new_labels = self.classify(data, action=action)
             labels = np.hstack([partitioning.labels, new_labels])
-            self.partitionings[action] = partitioning._replace(labels=labels)
+            self.partitionings[action].labels = np.hstack([partitioning.labels, new_labels])
             assert len(self.partitionings[action].labels) == N
 
         # add references of new data to corresponding partitions            
@@ -179,60 +170,12 @@ class Worldmodel(object):
                 partitioning.transitions[action_2][source, target] += 1
             
         for action in self._action_set:
-            assert np.sum(self._merge_transition_matrices(action)) == N-1
+            assert np.sum(self.partitionings[action].get_merged_transition_matrices()) == N-1
         return
     
     
     def get_data_for_refs(self, refs):
         return self.data[refs]
-    
-    
-#     def get_refs_for_action(self, action):
-#         return np.where(np.array(self.actions) == action)
-    
-
-    def _merge_transition_matrices(self, action):
-        """
-        Merges the transition matrices for a certain model (action).
-        """
-        
-        partitioning = self.partitionings[action]
-        
-        K = partitioning.tree.get_number_of_leaves()
-        P = np.zeros((K, K), dtype=int)
-        
-        for a in self._action_set:
-            P += partitioning.transitions[a]
-
-        assert np.sum(P) == self.get_number_of_samples() - 1
-        return P
-
-
-    def _calc_best_split(self, active_action):
-        """
-        Calculates the gain for each state and returns a split-object for the
-        best one
-        """
-        
-        # TODO: This could become part of a new Partitioning class.
-        
-        if self.data is None:
-            return None
-                
-        best_split = None
-
-        tree = self.partitionings[active_action].tree
-        for leaf in tree.get_leaves():
-            # TODO: test_params should be cached because their calculation can be expensive.
-            test_params = leaf._calc_test_params(active_action=active_action)
-            split = split_params.SplitParams(node = weakref.proxy(leaf),
-                                             action = active_action, 
-                                             test_params = test_params)
-            if split is not None:
-                if best_split is None or split.get_gain() >= best_split.get_gain():
-                    best_split = split
-                
-        return best_split
     
     
     def split(self, action=None, min_gain=float('-inf')):
@@ -243,7 +186,7 @@ class Worldmodel(object):
             actions = [action]
             
         for a in actions:
-            split_params = self._calc_best_split(active_action=a)
+            split_params = self.partitionings[a].calc_best_split()
             if split_params is not None and split_params.get_gain() >= min_gain:
                 print split_params._gain
                 split_params.apply()
@@ -269,37 +212,23 @@ class Worldmodel(object):
         Plots all the data that is stored in the tree with color and shape
         according to the learned state.
         """
-        
-        # fancy shapes and colors
-        symbols = ['o', '^', 'd', 's', '*']
-        colormap = pyplot.cm.get_cmap('prism')
-        pyplot.gca().set_color_cycle([colormap(i) for i in np.linspace(0, 0.98, 7)])
-        
-        # data for the different classes
-        all_leaves = self.partitionings[active_action].tree.get_leaves()
-        for i, leaf in enumerate(all_leaves):
-            data = leaf.get_data()
-            pyplot.plot(data[:,0], data[:,1], symbols[i%len(symbols)])
-                
-        if show_plot:
-            pyplot.show()
-            
+        self.partitionings[active_action].plot_data_colored_for_state(show_plot=show_plot)
         return
     
 
 
 if __name__ == '__main__':
 
-    N = 1000000
+    N = 100000
     np.random.seed(0)
     data = np.random.random((N, 2))
     actions = [i%2 for i in range(N-1)]
-    model = Worldmodel(method='naive', gain_measure='local', uncertainty_bias=100, seed=None)
+    model = Worldmodel(method='naive', gain_measure='local', uncertainty_prior=100, seed=None)
     model.add_data(data=data, actions=actions)
     model.split(action=None)
     for i in range(8):
         model.split(action=0)
         pyplot.subplot(2, 4, i+1)
-        #model.plot_data_colored_for_state(active_action=0, show_plot=False)
-    #pyplot.show()
+        model.plot_data_colored_for_state(active_action=0, show_plot=False)
+    pyplot.show()
     

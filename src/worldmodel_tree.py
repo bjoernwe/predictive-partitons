@@ -6,23 +6,26 @@ import tree_structure
 
 class WorldmodelTree(tree_structure.Tree):
     
-    def __init__(self, model):
+    def __init__(self, partitioning):
         super(WorldmodelTree, self).__init__()
+
+        # references        
+        self._partitioning = self._get_weakref_proxy(partitioning)
+        self.model = self._get_weakref_proxy(partitioning.model)
+        self._active_action = partitioning.active_action
         
-        # a weak reference to the model
-        if type(model) in weakref.ProxyTypes:
-            self.model = model
-        else:
-            self.model = weakref.proxy(model)
-            
         # indices of data belonging to this node
         self.data_refs = np.empty(0, dtype=int)
         
-        # if node was split, parameters are stored here
+        # if node is split, parameters are stored here
         self._split_params = None
-        
-        # 
         return
+    
+    
+    def _get_weakref_proxy(self, ref):
+        if type(ref) in weakref.ProxyTypes:
+            return ref
+        return weakref.proxy(ref)
         
         
     def _calc_test_params(self, active_action, fast_partition=False):
@@ -79,6 +82,7 @@ class WorldmodelTree(tree_structure.Tree):
         """
         
         model = self.model
+        model_data = model.data
         dat_refs = sorted(self.get_data_refs())
         N = len(dat_refs)
         D = model.get_input_dim()
@@ -88,7 +92,7 @@ class WorldmodelTree(tree_structure.Tree):
         
         data = np.empty((N, D))
         for i, ref in enumerate(dat_refs):
-            data[i] = model.data[ref]
+            data[i] = model_data[ref]
             
         return data 
     
@@ -102,21 +106,21 @@ class WorldmodelTree(tree_structure.Tree):
         self._split_params = split_params
         
         # copy labels and transitions to model
-        model = self.model
-        action = split_params.model_action
         leaf_index = self.get_leaf_index()
-        assert len(self.data_refs) == np.count_nonzero(model.partitionings[action].labels == leaf_index)
-        model.partitionings[action] = model.partitionings[action]._replace(labels = split_params.get_new_labels(), transitions = split_params.get_new_trans())
+        assert len(self.data_refs) == np.count_nonzero(self._partitioning.labels == leaf_index)
+        self._partitioning.labels = split_params.get_new_labels()
+        self._partitioning.transitions = split_params.get_new_trans()
         
         # copy new references to children
         new_dat_refs = split_params.get_new_dat_refs()
         assert len(self.data_refs) == len(new_dat_refs[0]) + len(new_dat_refs[1])
-        child_1, child_2 = super(WorldmodelTree, self).split(model=model)
+        child_1, child_2 = super(WorldmodelTree, self).split(partitioning=self._partitioning)
         child_1.data_refs = new_dat_refs[0]
         child_2.data_refs = new_dat_refs[1]
         
-        assert len(child_1.data_refs) == np.count_nonzero(model.partitionings[action].labels == leaf_index)
-        assert len(child_2.data_refs) == np.count_nonzero(model.partitionings[action].labels == leaf_index+1)
+        # 
+        assert len(child_1.data_refs) == np.count_nonzero(self._partitioning.labels == leaf_index)
+        assert len(child_2.data_refs) == np.count_nonzero(self._partitioning.labels == leaf_index+1)
         
         #assert False not in [model.partitionings[action].labels[ref]==leaf_index for ref in child_1.data_refs]
         #assert False not in [model.partitionings[action].labels[ref]==leaf_index+1 for ref in child_2.data_refs]

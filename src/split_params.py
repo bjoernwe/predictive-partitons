@@ -1,4 +1,5 @@
 import numpy as np
+import weakref
 
 import entropy_utils
 
@@ -7,9 +8,9 @@ class SplitParams(object):
     
     def __init__(self, node, action, test_params):
         self.model_action = action
-        self._node = node
-        self._model = self._node.model
-        self._partitioning = self._model.partitionings[self.model_action]
+        self._node = weakref.proxy(node)
+        self._model = self._get_weakref_proxy(self._node.model)
+        self._partitioning = self._get_weakref_proxy(self._model.partitionings[self.model_action])
         self._test_params = test_params
         self._gain = None
         self._new_labels = None
@@ -17,8 +18,14 @@ class SplitParams(object):
         self._new_trans = None
         self._number_of_samples_when_created = len(self._node.get_data_refs()) 
         return
-
-
+    
+    
+    def _get_weakref_proxy(self, ref):
+        if type(ref) in weakref.ProxyTypes:
+            return ref
+        return weakref.proxy(ref)
+    
+    
     def apply(self):
         self._node.split(split_params=self)
         return
