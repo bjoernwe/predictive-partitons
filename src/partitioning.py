@@ -58,8 +58,14 @@ class Partitioning(object):
         best_split = None
 
         for leaf in self.tree.get_leaves():
-            # TODO: test_params should be cached because their calculation can be expensive.
-            split = split_params.SplitParamsLocalGain(node=leaf)
+            
+            if leaf._cached_split_params is None:
+                leaf._cached_split_params = split_params.SplitParamsLocalGain(node=leaf)
+                
+            split = leaf._cached_split_params
+            split.update()
+                
+            # TODO: find a way to mark split as invalid (for instance test_params failed)
             if split is not None:
                 if best_split is None or split.get_gain() >= best_split.get_gain():
                     best_split = split

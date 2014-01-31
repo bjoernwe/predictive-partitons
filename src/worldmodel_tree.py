@@ -11,14 +11,17 @@ class WorldmodelTree(tree_structure.Tree):
 
         # references        
         self._partitioning = self._get_weakref_proxy(partitioning)
-        self.model = self._get_weakref_proxy(partitioning.model)
         self._active_action = partitioning.active_action
+        self.model = self._get_weakref_proxy(partitioning.model)
         
         # indices of data belonging to this node
         self.data_refs = np.empty(0, dtype=int)
         
         # if node is split, parameters are stored here
         self._split_params = None
+        
+        # a split result that was not (yet) applied
+        self._cached_split_params = None
         return
     
     
@@ -97,6 +100,7 @@ class WorldmodelTree(tree_structure.Tree):
         return data 
     
     
+    #@profile
     def split(self, split_params):
         """
         Applies a split.
