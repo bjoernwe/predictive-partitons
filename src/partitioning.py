@@ -59,10 +59,7 @@ class Partitioning(object):
 
         for leaf in self.tree.get_leaves():
             # TODO: test_params should be cached because their calculation can be expensive.
-            test_params = leaf._calc_test_params(active_action=self.active_action)
-            split = split_params.SplitParams(node = leaf,
-                                             action = self.active_action, 
-                                             test_params = test_params)
+            split = split_params.SplitParamsLocalGain(node=leaf)
             if split is not None:
                 if best_split is None or split.get_gain() >= best_split.get_gain():
                     best_split = split

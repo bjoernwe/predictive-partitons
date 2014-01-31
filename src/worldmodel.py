@@ -12,7 +12,7 @@ import worldmodel_methods
 class Worldmodel(object):
 
 
-    def __init__(self, method='naive', gain_measure='local', uncertainty_prior=10, seed=None):
+    def __init__(self, method='naive', uncertainty_prior=10, seed=None):
         
         # data storage
         self.data = None                        # global data storage
@@ -21,8 +21,8 @@ class Worldmodel(object):
         self.partitionings = {}
         self._action_set = set()
 
-        assert gain_measure in ['local', 'global']
-        self.gain_measure = gain_measure
+        #assert gain_measure in ['local', 'global']
+        #self.gain_measure = gain_measure
         
         # root node of tree
         assert method in ['naive']
@@ -145,7 +145,6 @@ class Worldmodel(object):
         for action in self._action_set:
             partitioning = self.partitionings[action]
             new_labels = self.classify(data, action=action)
-            labels = np.hstack([partitioning.labels, new_labels])
             self.partitionings[action].labels = np.hstack([partitioning.labels, new_labels])
             assert len(self.partitionings[action].labels) == N
 
@@ -188,7 +187,7 @@ class Worldmodel(object):
         for a in actions:
             split_params = self.partitionings[a].calc_best_split()
             if split_params is not None and split_params.get_gain() >= min_gain:
-                print split_params._gain
+                print split_params.get_gain()
                 split_params.apply()
                 
         return
@@ -223,7 +222,7 @@ if __name__ == '__main__':
     np.random.seed(0)
     data = np.random.random((N, 2))
     actions = [i%2 for i in range(N-1)]
-    model = Worldmodel(method='naive', gain_measure='local', uncertainty_prior=100, seed=None)
+    model = Worldmodel(method='naive', uncertainty_prior=100, seed=None)
     model.add_data(data=data, actions=actions)
     model.split(action=None)
     for i in range(8):

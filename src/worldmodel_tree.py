@@ -109,10 +109,10 @@ class WorldmodelTree(tree_structure.Tree):
         leaf_index = self.get_leaf_index()
         assert len(self.data_refs) == np.count_nonzero(self._partitioning.labels == leaf_index)
         self._partitioning.labels = split_params.get_new_labels()
-        self._partitioning.transitions = split_params.get_new_trans()
+        self._partitioning.transitions = split_params.get_new_transition_matrices()
         
         # copy new references to children
-        new_dat_refs = split_params.get_new_dat_refs()
+        new_dat_refs = split_params.get_new_data_refs()
         assert len(self.data_refs) == len(new_dat_refs[0]) + len(new_dat_refs[1])
         child_1, child_2 = super(WorldmodelTree, self).split(partitioning=self._partitioning)
         child_1.data_refs = new_dat_refs[0]
@@ -154,8 +154,6 @@ class WorldmodelTree(tree_structure.Tree):
         Finds all transitions that start, end or happen strictly inside the 
         node. The result is given as two lists of references. One for the start 
         and one for the end of the transition.
-        
-        TODO: check!
         """
         
         refs_1 = self.get_data_refs()
@@ -163,8 +161,8 @@ class WorldmodelTree(tree_structure.Tree):
         N = self.model.get_number_of_samples()
         
         if heading_in:
-            assert False
             # [ref-1 for ref in refs if (ref-1 not in refs) and (ref-1 >= 0)]
+            assert False
             refs_array_in = np.setdiff1d(refs_0, refs_1, assume_unique=True)
             refs_array_in.difference_update([-1])
             assert set(refs_array_in) == set([ref-1 for ref in refs_1 if (ref-1 not in refs_1) and (ref-1 >= 0)])
@@ -177,13 +175,16 @@ class WorldmodelTree(tree_structure.Tree):
 
         if heading_out:
             # [ref for ref in refs if (ref+1 not in refs) and (ref+1 < N)]
+            assert False
             refs_array_out = np.setdiff1d(refs_1, refs_0, assume_unique=True)
             refs_array_out.difference_udate([N-1])
             assert set(refs_array_out) == set([ref for ref in refs_1 if (ref+1 not in refs_1) and (ref+1 < N)])
-            
-        refs_1 = refs_array_inside
-        refs_2 = refs_array_inside + 1
-        return [refs_1, refs_2]
+         
+        # TODO: merge transitions
+        return refs_array_inside   
+        #refs_1 = refs_array_inside
+        #refs_2 = refs_array_inside + 1
+        #return [refs_1, refs_2]
     
     
 #     def _reached_number_of_active_and_inactive_samples(self, number, active_action):
