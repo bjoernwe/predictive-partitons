@@ -59,8 +59,12 @@ class SplitParamsLocalGain(object):
         # every entry of that node has to be classified...
         refs_1 = self._node.get_transition_refs(heading_in=False, inside=True, heading_out=False)
         refs_2 = refs_1 + 1
-        refs = np.union1d(refs_1, refs_2) 
-        self._transition_children = t(refs)
+        refs = np.union1d(refs_1, refs_2)
+        
+        if len(refs) > 0:
+            self._transition_children = t(refs)
+        else:
+            self._transition_children = np.empty(0, dtype=int)
         
         # store references for later
         self._transition_refs = refs
@@ -114,7 +118,10 @@ class SplitParamsLocalGain(object):
         current_transitions_refs_1 = self._node.get_transition_refs(heading_in=False, inside=True, heading_out=False)
         if self._transition_refs_1 is None or len(current_transitions_refs_1) == len(self._transition_refs_1):
             return
-
+        
+        # new transitions! also update test parameters
+        self._test_params = self._node._calc_test_params(active_action=self._active_action)
+        
         # calculate new transitions
         current_transitions_refs_2 = current_transitions_refs_1 + 1
         current_transitions_refs = np.union1d(current_transitions_refs_1, current_transitions_refs_2)
@@ -183,6 +190,7 @@ class SplitParamsLocalGain(object):
              
         # mutual information
         mi = entropy_utils.mutual_information(matrices[self._active_action])
+        print 'MI for ', matrices[self._active_action], ' = ', mi
         if len(known_actions) >= 2:
             mi_inactive = np.mean([entropy_utils.mutual_information(matrices[action]) for action in known_actions if action is not self._active_action])
             mi = np.mean([mi, mi_inactive])

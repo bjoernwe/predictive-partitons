@@ -112,6 +112,8 @@ class VectorEntropyTests(unittest.TestCase):
         # zero entropy
         P = np.eye(4) 
         self.failUnlessAlmostEqual(entropy_utils.mutual_information(P), 2)
+        P = np.array([[0, 0], [4, 0]])
+        self.failUnlessAlmostEqual(entropy_utils.mutual_information(P), 0.25162924917939766)
         P = np.array([[1, 2], [3, 4]])
         self.failUnlessAlmostEqual(entropy_utils.mutual_information(P), 0.0065989113844819869)
         P = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])        
