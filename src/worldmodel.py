@@ -213,6 +213,10 @@ class Worldmodel(object):
         """
         self.partitionings[active_action].plot_data_colored_for_state(show_plot=show_plot)
         return
+
+
+    def plot_state_borders(self, active_action, show_plot=True, range_x=None, range_y=None, resolution=100):
+        self.partitionings[active_action].plot_state_borders(show_plot=show_plot, range_x=range_x, range_y=range_y, resolution=resolution)
     
 
 

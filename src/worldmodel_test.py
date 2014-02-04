@@ -4,7 +4,7 @@ import unittest
 import worldmodel
 
 
-class Test(unittest.TestCase):
+class TestRandomData(unittest.TestCase):
 
 
     def setUp(self):
@@ -69,6 +69,63 @@ class Test(unittest.TestCase):
         model = worldmodel.Worldmodel(method='naive', seed=None)
         model.add_data(data=data, actions=actions)
         model.split(action=None)
+        
+        
+        
+class TestOrderedData1(unittest.TestCase):
+
+    def testSplits(self):
+        
+        # generate data
+        N = 40+1
+        data_centers = ((.25, .75), (.75, .75), (.75, .25), (.25, .25))
+        data = np.empty((N, 2))
+        for i in range(N):
+            data[i] = data_centers[i%4]
+            
+        # create model
+        model = worldmodel.Worldmodel(method='naive', seed=None, uncertainty_prior=0)
+        model.add_data(data=data, actions=None)
+        for i in range(3):
+            model.split()
+             
+        self.failUnlessAlmostEqual(model.partitionings[-1].tree._split_params._gain, 0.0)
+        self.failUnlessAlmostEqual(model.partitionings[-1].tree._children[0]._split_params._gain, 0.25162921584607989)
+        self.failUnlessAlmostEqual(model.partitionings[-1].tree._children[1]._split_params._gain, 0.25162921584607989)
+
+
+
+class TestOrderedData2(unittest.TestCase):
+
+    def testSplits(self):
+        
+        # generate data
+        N = 1600
+        data_centers = ((.25, .75), (.75, .75), (.75, .25), (.25, .25))
+        data_centers_2 = ((.625, .125), (.875, .125), (.875, .375), (.625, .375))
+        data = 0.01 * np.random.randn(N, 2)
+        for i in range(N/4):
+            if i%4 == 2:
+                for j in range(4):
+                    data[4*i+j] += data_centers_2[j%4]
+            else:
+                for j in range(4):
+                    data[4*i+j] += data_centers[i%4]
+            
+        # create model
+        model = worldmodel.Worldmodel(method='naive', seed=None, uncertainty_prior=10)
+        model.add_data(data=data, actions=None)
+        for i in range(5):
+            model.split()
+
+        # test
+        self.failUnless(np.array_equal(model.partitionings[-1].transitions[-1],
+                        np.array([[300,  99,   0,   0,   0,   0],
+                                  [  0, 300,   0,   0,   0, 100],
+                                  [100,   0,   0, 100,   0,   0],
+                                  [  0,   0,   0,   0, 100,   0],
+                                  [  0,   0, 100,   0,   0,   0],
+                                  [  0,   0, 100,   0,   0, 300]])))
 
 
 

@@ -66,8 +66,8 @@ class WorldmodelTree(tree_structure.Tree):
             
             node = self
             while not node.is_leaf():
-                child_index = node._test(dat, params=self._test_params)
-                node = self._children[child_index]
+                child_index = node._test(dat, params=node._split_params._test_params)
+                node = node._children[child_index]
                 
             labels[i] = node_indices[node]
 

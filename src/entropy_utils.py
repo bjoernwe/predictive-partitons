@@ -90,7 +90,7 @@ def entropy_rate(P, mu=None, normalize=False):
     return h
 
 
-def mutual_information(P):
+def mutual_information(P, verbose=False):
     """
     Calculates the mutual information between t and t+1 for a model given
     as transition matrix P.
@@ -122,6 +122,12 @@ def mutual_information(P):
     h_mu = entropy(mu)
     h_p = entropy_rate(P, mu=mu)
     mi = h_mu - h_p
+    
+    if verbose:
+        print 'mu:                 %s' % (mu)
+        print 'entropy of mu:      %f' % (h_mu)
+        print 'entropy rate:       %f' % (h_p)
+        print 'mutual information: %f' % (mi)
     return mi
 
     

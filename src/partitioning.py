@@ -88,11 +88,38 @@ class Partitioning(object):
         leaves = self.tree.get_leaves()
         for i, leaf in enumerate(leaves):
             data = leaf.get_data()
-            pyplot.plot(data[:,0], data[:,1], symbols[i%len(symbols)])
+            if data is not None:
+                pyplot.plot(data[:,0], data[:,1], symbols[i%len(symbols)])
                 
         if show_plot:
             pyplot.show()
             
+        return
+
+
+    def plot_state_borders(self, show_plot=True, range_x=None, range_y=None, resolution=100):
+        """
+        Shows a contour plot of the learned state borders (2D). 
+        """
+        
+        data = self.model.data
+        K = len(self.tree.get_leaves())
+        
+        if range_x is None:
+            range_x = [np.min(data[:,0]), np.max(data[:,0])]
+            
+        if range_y is None:
+            range_y = [np.min(data[:,1]), np.max(data[:,1])]
+            
+        x = np.linspace(range_x[0], range_x[1], resolution)
+        y = np.linspace(range_y[0], range_y[1], resolution)
+        X, Y = np.meshgrid(x, y)
+        v_classify = np.vectorize(lambda x, y: self.classify(np.array([[x,y]])))
+        Z = v_classify(X, Y)
+        pyplot.contour(X, Y, Z, levels = range(-1, K), colors='b', linewidths=1)
+        
+        if show_plot:
+            pyplot.show()
         return
     
 
