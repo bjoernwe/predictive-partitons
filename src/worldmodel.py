@@ -25,10 +25,12 @@ class Worldmodel(object):
         #self.gain_measure = gain_measure
         
         # root node of tree
-        assert method in ['naive']
+        assert method in ['naive', 'sfa']
         self._method = method
         if method == 'naive':
             self._tree_class = worldmodel_methods.WorldmodelTrivial
+        elif method == 'sfa':
+            self._tree_class = worldmodel_methods.WorldmodelSFA
         else:
             assert False
         
@@ -177,6 +179,10 @@ class Worldmodel(object):
         return self.data[refs]
     
     
+    def get_data_refs_for_action(self, action):
+        return np.where(self.actions == action)
+    
+    
     def split(self, action=None, min_gain=float('-inf')):
         
         if action is None:
@@ -226,7 +232,7 @@ if __name__ == '__main__':
     #np.random.seed(0)
     data = np.random.random((N, 2))
     actions = [i%2 for i in range(N-1)]
-    model = Worldmodel(method='naive', uncertainty_prior=100, seed=None)
+    model = Worldmodel(method='sfa', uncertainty_prior=10, seed=None)
     model.add_data(data=data, actions=actions)
     model.split(action=None)
     for i in range(8):
