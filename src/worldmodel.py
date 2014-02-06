@@ -25,12 +25,12 @@ class Worldmodel(object):
         #self.gain_measure = gain_measure
         
         # root node of tree
-        assert method in ['naive', 'sfa']
+        assert method in ['naive', 'fast']
         self._method = method
         if method == 'naive':
             self._tree_class = worldmodel_methods.WorldmodelTrivial
-        elif method == 'sfa':
-            self._tree_class = worldmodel_methods.WorldmodelSFA
+        elif method == 'fast':
+            self._tree_class = worldmodel_methods.WorldmodelFast
         else:
             assert False
         
@@ -232,7 +232,7 @@ if __name__ == '__main__':
     #np.random.seed(0)
     data = np.random.random((N, 2))
     actions = [i%2 for i in range(N-1)]
-    model = Worldmodel(method='sfa', uncertainty_prior=10, seed=None)
+    model = Worldmodel(method='fast', uncertainty_prior=10, seed=None)
     model.add_data(data=data, actions=actions)
     model.split(action=None)
     for i in range(8):

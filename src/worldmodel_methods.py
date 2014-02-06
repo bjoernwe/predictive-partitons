@@ -1,6 +1,7 @@
 import collections
 import numpy as np
 import scipy.linalg
+import scipy.sparse.linalg
 
 import mdp
 
@@ -65,7 +66,7 @@ class WorldmodelTrivial(worldmodel_tree.WorldmodelTree):
 
 
 
-class WorldmodelSFA(worldmodel_tree.WorldmodelTree):
+class WorldmodelFast(worldmodel_tree.WorldmodelTree):
     """
     TODO: when there is only one action, search for the slowest feature
     """
@@ -75,7 +76,7 @@ class WorldmodelSFA(worldmodel_tree.WorldmodelTree):
     
     
     def __init__(self, partitioning):
-        super(WorldmodelSFA, self).__init__(partitioning=partitioning)
+        super(WorldmodelFast, self).__init__(partitioning=partitioning)
         
         
     def _create_covariance_matrix(self, uncertainty_prior):
@@ -124,9 +125,8 @@ class WorldmodelSFA(worldmodel_tree.WorldmodelTree):
         data_active_delta_whitened = np.dot(data_active_delta, W)
         cov_active = self._create_covariance_matrix(uncertainty_prior=self.model.uncertainty_prior/float(number_of_actions))
         cov_active.update(data_active_delta_whitened)
-        C, _, _ = cov_active.fix(center=True)
-        E, U = scipy.linalg.eigh(C)
-        final_covariance = U.dot(np.diag(E**-1).dot(U.T))
+        C_active, _, _ = cov_active.fix(center=False)
+        C_inactive = None
         
         # inactive covariances as well
         if number_of_actions >= 2:
@@ -149,15 +149,14 @@ class WorldmodelSFA(worldmodel_tree.WorldmodelTree):
                 # calculate covariance of deltas for inactive action
                 cov_inactive = self._create_covariance_matrix(uncertainty_prior=self.model.uncertainty_prior/float(number_of_actions))
                 cov_inactive.update(data_inactive_delta_whitened)
-                C, _, _ = cov_inactive.fix(center=True)
+                C, _, _ = cov_inactive.fix(center=False)
                 inactive_covariances.append(C)
                 
             # calculate mean if inactive covariances
-            inactive_covariance = np.mean(inactive_covariances)
-            final_covariance = final_covariance.dot(inactive_covariance)
+            C_inactive = reduce(lambda a, b: a + b, inactive_covariances) / len(inactive_covariances)
             
         # result (smallest eigenvector)
-        E, U = scipy.linalg.eigh(final_covariance, eigvals=(0, 0))
+        E, U = scipy.linalg.eigh(a=C_active, b=C_inactive, eigvals=(D-1, D-1))
         test_params = self.TestParams(m=data_mean, u=U[:])
         return test_params
                 
