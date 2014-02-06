@@ -101,6 +101,7 @@ class WorldmodelFast(worldmodel_tree.WorldmodelTree):
         N, D = data.shape
         
         # whitening matrix W
+        # TODO: cache! it's the same for every action
         cov = self._create_covariance_matrix(uncertainty_prior=self.model.uncertainty_prior)
         cov.update(data - data_mean)
         C, _, _ = cov.fix(center=False)
@@ -157,7 +158,7 @@ class WorldmodelFast(worldmodel_tree.WorldmodelTree):
             
         # result (smallest eigenvector)
         E, U = scipy.linalg.eigh(a=C_active, b=C_inactive, eigvals=(D-1, D-1))
-        test_params = self.TestParams(m=data_mean, u=U[:])
+        test_params = self.TestParams(m=data_mean, u=U[:,0].dot(W))
         return test_params
                 
 
