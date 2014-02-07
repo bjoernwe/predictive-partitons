@@ -16,9 +16,9 @@ class Environment(object):
         """
         Initializes the environment including an initial state.
         """
-        self.ndim = None            # initialize in sub-class
-        self.actions_dict = None    # initialize in sub-class, None if no actions
-        self.current_state = None   # initialize in sub-class
+        self.ndim = None                # initialize in sub-class
+        self.actions_dict = {0: None}   # initialize in sub-class
+        self.current_state = None       # initialize in sub-class
         self.last_action = None
         self.last_reward = None
         self.rnd = np.random.RandomState(seed)
@@ -28,9 +28,7 @@ class Environment(object):
         """
         Returns the number N for the possible actions 0, ..., N-1
         """
-        if self.actions_dict is not None:
-            return len(self.actions_dict)
-        return None
+        return len(self.actions_dict)
     
 
     def get_actions_dict(self):
