@@ -2,15 +2,17 @@ from matplotlib import pyplot
 
 import worldmodel
 
+from envs import env_circle
 from envs import env_cube
 from envs import env_noise
 
 
 if __name__ == '__main__':
     
+    env = env_circle.EnvCircle(seed=None)
     #env = env_cube.EnvCube(step_size=0.1, sigma=0.1, ndim=2, seed=None)
-    env = env_noise.EnvNoise(sigma=0.1, ndim=2, seed=None)
-    data, actions, _ = env.do_random_steps(num_steps=100000)
+    #env = env_noise.EnvNoise(sigma=0.1, ndim=2, seed=None)
+    data, actions, _ = env.do_random_steps(num_steps=10000)
     
     print data
     print map(lambda a: env.get_actions_dict()[a], actions)
