@@ -90,7 +90,7 @@ def entropy_rate(P, mu=None, normalize=False):
     return h
 
 
-def mutual_information(P, verbose=False):
+def mutual_information(P, naive_station_dist=False, verbose=False):
     """
     Calculates the mutual information between t and t+1 for a model given
     as transition matrix P.
@@ -104,18 +104,21 @@ def mutual_information(P, verbose=False):
     assert N == M
      
     # prepare stationary distribution mu
-    Q = P + 1e-6
-    d = np.sum(Q, axis=1)
-    Q = Q / d[:,np.newaxis]
-    if N <= 2:
-        E, U = scipy.linalg.eig(Q.T)
-        idx = np.argsort(E.real)
-        assert abs(E[idx[-1]].real - 1) < 1e-6
-        mu = U[:,idx[-1]].real
+    if naive_station_dist:
+        mu = np.ones(N)
     else:
-        E, U = scipy.sparse.linalg.eigs(Q.T, k=1, which='LR')
-        assert abs(E[0].real - 1) < 1e-6
-        mu = U[:,0].real
+        Q = P + 1e-6
+        d = np.sum(Q, axis=1)
+        Q = Q / d[:,np.newaxis]
+        if N <= 2:
+            E, U = scipy.linalg.eig(Q.T)
+            idx = np.argsort(E.real)
+            assert abs(E[idx[-1]].real - 1) < 1e-6
+            mu = U[:,idx[-1]].real
+        else:
+            E, U = scipy.sparse.linalg.eigs(Q.T, k=1, which='LR')
+            assert abs(E[0].real - 1) < 1e-6
+            mu = U[:,0].real
     mu /= np.sum(mu)
          
     # the actual calculation

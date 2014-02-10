@@ -192,9 +192,9 @@ class SplitParamsLocalGain(object):
             matrices[action][1,1] += np.count_nonzero((indices_1 == 1) & (indices_2 == 1) & action_mask)
              
         # mutual information
-        mi = entropy_utils.mutual_information(matrices[self._active_action])
+        mi = entropy_utils.mutual_information(matrices[self._active_action], naive_station_dist=True)
         if len(known_actions) >= 2:
-            mi_inactive = np.mean([entropy_utils.mutual_information(matrices[action]) for action in known_actions if action is not self._active_action])
+            mi_inactive = np.mean([entropy_utils.mutual_information(matrices[action], naive_station_dist=True) for action in known_actions if action is not self._active_action])
             mi = np.mean([mi, mi_inactive])
            
         self._gain = mi  

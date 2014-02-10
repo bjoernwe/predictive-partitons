@@ -72,37 +72,47 @@ class WorldmodelFast(worldmodel_tree.WorldmodelTree):
     """
     
     
-    TestParams = collections.namedtuple('TestParams', ['m', 'u'])
+    TestParams = collections.namedtuple('TestParams', ['m', 'u', 'expansion'])
     
     
     def __init__(self, partitioning):
         super(WorldmodelFast, self).__init__(partitioning=partitioning)
         
         
-    def _create_covariance_matrix(self, uncertainty_prior):
+    def _create_covariance_matrix(self, dim, uncertainty_prior):
         cov = mdp.utils.CovarianceMatrix(bias=True)
-        D = self.model.get_input_dim()
-        E = np.eye(D)
-        cov.update((uncertainty_prior/float(D)) * E)
+        E = np.eye(dim)
+        cov.update((uncertainty_prior/float(dim)) * E)
         return cov
-
+    
+    
+    def _calc_local_refs(self, refs, refs_of_data):
+        """
+        We have a local data matrix for this node calculated from refs_of_data.
+        Now we map refs to indices for this matrix.
+        """
+        return np.where(np.in1d(refs_of_data, refs, assume_unique=True))
+        
     
     def _calc_test_params(self, active_action, fast_partition=False):
 
+        # helpers
         known_actions = self.model.get_known_actions()
         number_of_actions = len(known_actions)
+        expansion = mdp.nodes.PolynomialExpansionNode(degree=1)
 
         # get transition references (inside this node)        
         trans_refs_1 = self.get_transition_refs(heading_in=False, inside=True, heading_out=False)
         trans_refs_2 = trans_refs_1 + 1
         trans_refs = np.union1d(trans_refs_1, trans_refs_2)
         data = self.model.get_data_for_refs(refs=trans_refs)
+        data = expansion.execute(data)
         data_mean = np.mean(data, axis=0)
         N, D = data.shape
-        
+
         # whitening matrix W
         # TODO: cache! it's the same for every action
-        cov = self._create_covariance_matrix(uncertainty_prior=self.model.uncertainty_prior)
+        cov = self._create_covariance_matrix(dim=D, uncertainty_prior=self.model.uncertainty_prior)
         cov.update(data - data_mean)
         C, _, _ = cov.fix(center=False)
         E, U = scipy.linalg.eigh(C)
@@ -118,13 +128,13 @@ class WorldmodelFast(worldmodel_tree.WorldmodelTree):
         # filter data references for actions
         trans_refs_active_1 = trans_refs_1[self.model.actions[trans_refs_1] == active_action]
         trans_refs_active_2 = trans_refs_active_1 + 1
-        data_active_1 = self.model.get_data_for_refs(refs=trans_refs_active_1)
-        data_active_2 = self.model.get_data_for_refs(refs=trans_refs_active_2)
+        data_active_1 = data[self._calc_local_refs(refs=trans_refs_active_1, refs_of_data=trans_refs)]
+        data_active_2 = data[self._calc_local_refs(refs=trans_refs_active_2, refs_of_data=trans_refs)]
         data_active_delta = data_active_2 - data_active_1
         
         # find fastest feature for active action
         data_active_delta_whitened = np.dot(data_active_delta, W)
-        cov_active = self._create_covariance_matrix(uncertainty_prior=self.model.uncertainty_prior/float(number_of_actions))
+        cov_active = self._create_covariance_matrix(dim=D, uncertainty_prior=self.model.uncertainty_prior/float(number_of_actions))
         cov_active.update(data_active_delta_whitened)
         C_active, _, _ = cov_active.fix(center=False)
         C_inactive = None
@@ -142,13 +152,13 @@ class WorldmodelFast(worldmodel_tree.WorldmodelTree):
                 # get references and data
                 trans_refs_inactive_1 = trans_refs_1[self.model.actions[trans_refs_1] == action]
                 trans_refs_inactive_2 = trans_refs_inactive_1 + 1
-                data_inactive_1 = self.model.get_data_for_refs(refs=trans_refs_inactive_1)
-                data_inactive_2 = self.model.get_data_for_refs(refs=trans_refs_inactive_2)
+                data_inactive_1 = data[self._calc_local_refs(refs=trans_refs_inactive_1, refs_of_data=trans_refs)]
+                data_inactive_2 = data[self._calc_local_refs(refs=trans_refs_inactive_2, refs_of_data=trans_refs)]
                 data_inactive_delta = data_inactive_2 - data_inactive_1
                 data_inactive_delta_whitened = np.dot(data_inactive_delta, W)
                 
                 # calculate covariance of deltas for inactive action
-                cov_inactive = self._create_covariance_matrix(uncertainty_prior=self.model.uncertainty_prior/float(number_of_actions))
+                cov_inactive = self._create_covariance_matrix(dim=D, uncertainty_prior=self.model.uncertainty_prior/float(number_of_actions))
                 cov_inactive.update(data_inactive_delta_whitened)
                 C, _, _ = cov_inactive.fix(center=False)
                 inactive_covariances.append(C)
@@ -158,7 +168,7 @@ class WorldmodelFast(worldmodel_tree.WorldmodelTree):
             
         # result (smallest eigenvector)
         E, U = scipy.linalg.eigh(a=C_active, b=C_inactive, eigvals=(D-1, D-1))
-        test_params = self.TestParams(m=data_mean, u=U[:,0].dot(W))
+        test_params = self.TestParams(m=data_mean, u=U[:,0].dot(W), expansion=expansion)
         return test_params
                 
 
@@ -167,7 +177,8 @@ class WorldmodelFast(worldmodel_tree.WorldmodelTree):
         """
         Tests to which child the data point x belongs.
         """
-        if (x - params.m).dot(params.u) > 0:
+        y = params.expansion.execute(np.array(x, ndmin=2))
+        if (y - params.m).dot(params.u) > 0:
             return 1
         return 0
 

@@ -232,7 +232,7 @@ if __name__ == '__main__':
     #np.random.seed(0)
     data = np.random.random((N, 2))
     actions = [i%2 for i in range(N-1)]
-    model = Worldmodel(method='fast', uncertainty_prior=10, seed=None)
+    model = Worldmodel(method='fast', uncertainty_prior=100, seed=None)
     model.add_data(data=data, actions=actions)
     model.split(action=None)
     for i in range(8):
