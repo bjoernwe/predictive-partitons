@@ -34,14 +34,10 @@ class EnvCircle(environment.Environment):
     
     
     def _render(self, phi, rad):
+        x = rad * np.cos(phi)
+        y = rad * np.sin(phi)
+        return np.array([x,y])
         
-        a = np.cos(phi)
-        b = np.sin(phi)
-        R = np.array([[a, -b], [b, a]])
-        
-        e = rad * np.array([[1], [0]])
-        return R.dot(e)[:,0]
-    
     
     def _do_action(self, action):
         """Perform the given action and return the resulting state of the
@@ -59,15 +55,22 @@ class EnvCircle(environment.Environment):
             self.phi += self.rnd.normal(loc=0.0, scale=self.sigma_phi)
         elif action == 1:
             self.rad += self.rnd.normal(loc=0.0, scale=self.sigma_rad)
+            #x = np.cos(self.phi) * self.rad
+            #x += self.rnd.normal(loc=0.0, scale=self.sigma_rad)
+            #y = np.sin(self.phi) * self.rad
+            #self.phi = np.arctan2(y, x)
+            #self.rad = np.sqrt(x**2 + y**2)
         else:
             assert False
 
         # stay in bounds            
-        self.phi = self.phi % 2 * np.pi
+        self.phi = self.phi % (2 * np.pi)
         self.rad = 0 if self.rad < 0 else self.rad
         self.rad = 1 if self.rad > 1 else self.rad
 
-        self.current_state = self._render(phi=self.phi, rad=self.rad)
+        self.current_state[0] = self.rad * np.cos(self.phi)
+        self.current_state[1] = self.rad * np.sin(self.phi)
+        
         return self.current_state, 0
 
 
