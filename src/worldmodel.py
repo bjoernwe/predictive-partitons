@@ -25,12 +25,14 @@ class Worldmodel(object):
         #self.gain_measure = gain_measure
         
         # root node of tree
-        assert method in ['naive', 'fast']
+        assert method in ['naive', 'fast', 'predictive']
         self._method = method
         if method == 'naive':
             self._tree_class = worldmodel_methods.WorldmodelTrivial
         elif method == 'fast':
             self._tree_class = worldmodel_methods.WorldmodelFast
+        elif method == 'predictive':
+            self._tree_class = worldmodel_methods.WorldmodelGPFA
         else:
             assert False
         
@@ -223,6 +225,10 @@ class Worldmodel(object):
 
     def plot_state_borders(self, active_action, show_plot=True, range_x=None, range_y=None, resolution=100):
         self.partitionings[active_action].plot_state_borders(show_plot=show_plot, range_x=range_x, range_y=range_y, resolution=resolution)
+        
+        
+    def plot_transitions(self, active_action):
+        self.partitionings[active_action].plot_transitions()
     
 
 

@@ -122,6 +122,19 @@ class Partitioning(object):
             pyplot.show()
         return
     
+    
+    def plot_transitions(self):
+        for action in self.model.get_known_actions():
+            if action == self.active_action:
+                color = 'r'
+            else:
+                color = 'b'
+            refs_1 = self.tree.get_transition_refs_for_action(action=action)
+            refs_2 = refs_1 + 1
+            data_1 = self.model.get_data_for_refs(refs=refs_1)
+            data_2 = self.model.get_data_for_refs(refs=refs_2)
+            for i in range(len(refs_1)):
+                pyplot.plot([data_1[i,0], data_2[i,0]], [data_1[i,1], data_2[i,1]], '-', color=color)
 
 
 if __name__ == '__main__':

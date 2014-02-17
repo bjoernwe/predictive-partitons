@@ -189,6 +189,13 @@ class WorldmodelTree(tree_structure.Tree):
         #refs_1 = refs_array_inside
         #refs_2 = refs_array_inside + 1
         #return [refs_1, refs_2]
+        
+        
+    def get_transition_refs_for_action(self, action, heading_in=False, inside=True, heading_out=False):
+        refs = self.get_transition_refs(heading_in=heading_in, inside=inside, heading_out=heading_out)
+        actions = self.model.actions[refs]
+        mask = (actions == action)
+        return refs[mask]
     
     
 #     def _reached_number_of_active_and_inactive_samples(self, number, active_action):

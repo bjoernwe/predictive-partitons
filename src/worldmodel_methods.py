@@ -1,6 +1,7 @@
 import collections
 import numpy as np
 import scipy.linalg
+import scipy.spatial.distance
 import scipy.sparse.linalg
 
 import mdp
@@ -68,7 +69,6 @@ class WorldmodelTrivial(worldmodel_tree.WorldmodelTree):
 
 class WorldmodelFast(worldmodel_tree.WorldmodelTree):
     """
-    TODO: when there is only one action, search for the slowest feature
     """
     
     
@@ -128,14 +128,14 @@ class WorldmodelFast(worldmodel_tree.WorldmodelTree):
         # filter data references for actions
         trans_refs_active_1 = trans_refs_1[self.model.actions[trans_refs_1] == active_action]
         trans_refs_active_2 = trans_refs_active_1 + 1
-        data_active_1 = data[self._calc_local_refs(refs=trans_refs_active_1, refs_of_data=trans_refs)]
-        data_active_2 = data[self._calc_local_refs(refs=trans_refs_active_2, refs_of_data=trans_refs)]
+        data_active_1 = data_whitened[self._calc_local_refs(refs=trans_refs_active_1, refs_of_data=trans_refs)]
+        data_active_2 = data_whitened[self._calc_local_refs(refs=trans_refs_active_2, refs_of_data=trans_refs)]
         data_active_delta = data_active_2 - data_active_1
         
         # find fastest feature for active action
-        data_active_delta_whitened = np.dot(data_active_delta, W)
+        #data_active_delta_whitened = np.dot(data_active_delta, W)
         cov_active = self._create_covariance_matrix(dim=D, uncertainty_prior=self.model.uncertainty_prior/float(number_of_actions))
-        cov_active.update(data_active_delta_whitened)
+        cov_active.update(data_active_delta)
         C_active, _, _ = cov_active.fix(center=False)
         C_inactive = None
         
@@ -152,14 +152,14 @@ class WorldmodelFast(worldmodel_tree.WorldmodelTree):
                 # get references and data
                 trans_refs_inactive_1 = trans_refs_1[self.model.actions[trans_refs_1] == action]
                 trans_refs_inactive_2 = trans_refs_inactive_1 + 1
-                data_inactive_1 = data[self._calc_local_refs(refs=trans_refs_inactive_1, refs_of_data=trans_refs)]
-                data_inactive_2 = data[self._calc_local_refs(refs=trans_refs_inactive_2, refs_of_data=trans_refs)]
+                data_inactive_1 = data_whitened[self._calc_local_refs(refs=trans_refs_inactive_1, refs_of_data=trans_refs)]
+                data_inactive_2 = data_whitened[self._calc_local_refs(refs=trans_refs_inactive_2, refs_of_data=trans_refs)]
                 data_inactive_delta = data_inactive_2 - data_inactive_1
-                data_inactive_delta_whitened = np.dot(data_inactive_delta, W)
+                #data_inactive_delta_whitened = np.dot(data_inactive_delta, W)
                 
                 # calculate covariance of deltas for inactive action
                 cov_inactive = self._create_covariance_matrix(dim=D, uncertainty_prior=self.model.uncertainty_prior/float(number_of_actions))
-                cov_inactive.update(data_inactive_delta_whitened)
+                cov_inactive.update(data_inactive_delta)
                 C, _, _ = cov_inactive.fix(center=False)
                 inactive_covariances.append(C)
                 
@@ -168,6 +168,149 @@ class WorldmodelFast(worldmodel_tree.WorldmodelTree):
             
         # result (smallest eigenvector)
         E, U = scipy.linalg.eigh(a=C_active, b=C_inactive, eigvals=(D-1, D-1))
+        test_params = self.TestParams(m=data_mean, u=U[:,0].dot(W), expansion=expansion)
+        return test_params
+                
+
+
+    def _test(self, x, params):
+        """
+        Tests to which child the data point x belongs.
+        """
+        y = params.expansion.execute(np.array(x, ndmin=2))
+        if (y - params.m).dot(params.u) > 0:
+            return 1
+        return 0
+
+
+
+class WorldmodelGPFA(worldmodel_tree.WorldmodelTree):
+    """
+    """
+    
+    
+    TestParams = collections.namedtuple('TestParams', ['m', 'u', 'expansion'])
+    
+    
+    def __init__(self, partitioning):
+        super(WorldmodelGPFA, self).__init__(partitioning=partitioning)
+        
+        
+    def _create_covariance_matrix(self, dim, uncertainty_prior):
+        cov = mdp.utils.CovarianceMatrix(bias=True)
+        E = np.eye(dim)
+        cov.update((uncertainty_prior/float(dim)) * E)
+        return cov
+    
+    
+    def _calc_local_refs(self, refs, refs_of_data):
+        """
+        We have a local data matrix for this node calculated from refs_of_data.
+        Now we map refs to indices for this matrix.
+        """
+        return np.where(np.in1d(refs_of_data, refs, assume_unique=False))
+        
+    
+    def _calc_test_params(self, active_action, fast_partition=False):
+
+        # helpers
+        known_actions = self.model.get_known_actions()
+        number_of_actions = len(known_actions)
+        expansion = mdp.nodes.PolynomialExpansionNode(degree=2)
+
+        # get transition references (inside this node)        
+        trans_refs_1 = self.get_transition_refs(heading_in=False, inside=True, heading_out=False)
+        trans_refs_2 = trans_refs_1 + 1
+        trans_refs = np.union1d(trans_refs_1, trans_refs_2)
+        data = self.model.get_data_for_refs(refs=trans_refs)
+        data = expansion.execute(data)
+        data_mean = np.mean(data, axis=0)
+        N, D = data.shape
+
+        # whitening matrix W
+        # TODO: cache! it's the same for every action
+        cov = self._create_covariance_matrix(dim=D, uncertainty_prior=self.model.uncertainty_prior)
+        cov.update(data - data_mean)
+        C, _, _ = cov.fix(center=False)
+        E, U = scipy.linalg.eigh(C)
+        W = np.dot(U, np.diag(E**(-.5))).dot(U.T)
+        assert W.shape == (D, D)
+        #W = np.eye(D)
+        
+        # whiten data
+        data_whitened = np.dot(data - data_mean, W)
+        #print np.dot(data_whitened.T, data_whitened)
+        assert data_whitened.shape == (N, D)
+        #assert np.allclose(np.dot(data_whitened.T, data_whitened), np.eye(D))
+        
+        # filter data for actions 
+        trans_refs_active_1 = trans_refs_1[self.model.actions[trans_refs_1] == active_action]
+        trans_refs_active_2 = trans_refs_active_1 + 1
+        trans_refs_active = np.union1d(trans_refs_active_1, trans_refs_active_2)
+        data_active_1 = data_whitened[self._calc_local_refs(refs=trans_refs_active_1, refs_of_data=trans_refs)]
+        data_active_2 = data_whitened[self._calc_local_refs(refs=trans_refs_active_2, refs_of_data=trans_refs)]
+
+        # pairwise distances of data points
+        distances = scipy.spatial.distance.pdist(data_active_1)
+        distances = scipy.spatial.distance.squareform(distances)
+        neighbors = [np.argsort(distances[i])[:5+1] for i in range(len(trans_refs_active_1))]
+
+        # covariance of noisy transitions
+        cov = self._create_covariance_matrix(dim=D, uncertainty_prior=self.model.uncertainty_prior/float(number_of_actions))
+        for i in range(len(trans_refs_active_1)):
+            neighbor_future_refs = trans_refs_active_2[neighbors[i]]
+            deltas = data_whitened[i] - data_whitened[self._calc_local_refs(refs=neighbor_future_refs, refs_of_data=trans_refs)]
+            cov.update(deltas)
+            
+        C_final, _, _ = cov.fix()
+            
+
+        # filter data references for actions
+        #trans_refs_active_1 = trans_refs_1[self.model.actions[trans_refs_1] == active_action]
+        #trans_refs_active_2 = trans_refs_active_1 + 1
+        #data_active_1 = data[self._calc_local_refs(refs=trans_refs_active_1, refs_of_data=trans_refs)]
+        #data_active_2 = data[self._calc_local_refs(refs=trans_refs_active_2, refs_of_data=trans_refs)]
+        #data_active_delta = data_active_2 - data_active_1
+        
+        # find fastest feature for active action
+        #data_active_delta_whitened = np.dot(data_active_delta, W)
+        #cov_active = self._create_covariance_matrix(dim=D, uncertainty_prior=self.model.uncertainty_prior/float(number_of_actions))
+        #cov_active.update(data_active_delta_whitened)
+        #C_active, _, _ = cov_active.fix(center=False)
+        #C_inactive = None
+        
+        # inactive covariances as well
+        if number_of_actions >= 2:
+            
+            inactive_covariances = []
+            
+            for action in known_actions:
+                
+                if action == active_action:
+                    continue
+                
+                # get references and data
+                trans_refs_inactive_1 = trans_refs_1[self.model.actions[trans_refs_1] == action]
+                trans_refs_inactive_2 = trans_refs_inactive_1 + 1
+                data_inactive_1 = data_whitened[self._calc_local_refs(refs=trans_refs_inactive_1, refs_of_data=trans_refs)]
+                data_inactive_2 = data_whitened[self._calc_local_refs(refs=trans_refs_inactive_2, refs_of_data=trans_refs)]
+                data_inactive_delta = data_inactive_2 - data_inactive_1
+                #data_inactive_delta_whitened = np.dot(data_inactive_delta, W)
+                
+                # calculate covariance of deltas for inactive action
+                cov_inactive = self._create_covariance_matrix(dim=D, uncertainty_prior=self.model.uncertainty_prior/float(number_of_actions))
+                cov_inactive.update(data_inactive_delta)
+                C, _, _ = cov_inactive.fix(center=False)
+                inactive_covariances.append(C)
+                
+            # calculate mean if inactive covariances
+            C_inactive = reduce(lambda a, b: a + b, inactive_covariances) / len(inactive_covariances)
+            C_final = 1000*C_inactive
+            
+        # result (smallest eigenvector)
+        #E, U = scipy.linalg.eigh(a=C_active, b=C_inactive, eigvals=(D-1, D-1))
+        #E, U = scipy.linalg.eigh(a=C_final, eigvals=(0, 0))
+        E, U = scipy.linalg.eigh(a=C_inactive, eigvals=(0, 0))
         test_params = self.TestParams(m=data_mean, u=U[:,0].dot(W), expansion=expansion)
         return test_params
                 
