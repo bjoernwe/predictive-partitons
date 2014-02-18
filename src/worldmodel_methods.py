@@ -196,14 +196,18 @@ class WorldmodelGPFA(worldmodel_tree.WorldmodelTree):
         super(WorldmodelGPFA, self).__init__(partitioning=partitioning)
         
         
-    def _create_covariance_matrix(self, dim, uncertainty_prior):
+    def _create_covariance_matrix(self, dim):
+        # prior
+        number_of_actions = len(self.model.get_known_actions())
+        uncertainty_prior = self.model.uncertainty_prior
+        weight = uncertainty_prior / (1000 * dim * number_of_actions)
+        
         cov = mdp.utils.CovarianceMatrix(bias=True)
         E = np.eye(dim)
-        cov.update((uncertainty_prior/float(dim)) * E)
+        cov.update(weight * E)
         return cov
     
     
-    @profile
     def _calc_test_params(self, active_action, fast_partition=False):
 
         # helpers
@@ -222,7 +226,7 @@ class WorldmodelGPFA(worldmodel_tree.WorldmodelTree):
         
         # whitening matrix W
         # TODO: cache! it's the same for every action
-        cov = self._create_covariance_matrix(dim=D, uncertainty_prior=self.model.uncertainty_prior)
+        cov = self._create_covariance_matrix(dim=D)
         cov.update(data - data_mean)
         C, _, _ = cov.fix(center=False)
         E, U = scipy.linalg.eigh(C)
@@ -233,6 +237,8 @@ class WorldmodelGPFA(worldmodel_tree.WorldmodelTree):
         data_2 = expansion.execute(self.model.get_data_for_refs(refs=trans_refs_2))
         data_whitened_1 = np.dot(data_1 - data_mean, W)
         data_whitened_2 = np.dot(data_2 - data_mean, W)
+        del data_1
+        del data_2
         
         # filter data for actions
         actions = self.model.actions[trans_refs_1]
@@ -246,8 +252,8 @@ class WorldmodelGPFA(worldmodel_tree.WorldmodelTree):
         neighbors = [np.argsort(distances[i])[:5+1] for i in range(len(indices_active))]
 
         # covariance of future noise
-        cov = self._create_covariance_matrix(dim=D, uncertainty_prior=self.model.uncertainty_prior/float(number_of_actions))
-        for i in range(len(indices_active)):
+        cov = self._create_covariance_matrix(dim=D)
+        for i in range(len(neighbors)):
             deltas = data_active_1[i] - data_active_2[neighbors[i]]
             cov.update(deltas)
         C_final, _, _ = cov.fix()
@@ -269,14 +275,14 @@ class WorldmodelGPFA(worldmodel_tree.WorldmodelTree):
                 data_inactive_delta = data_inactive_2 - data_inactive_1
                 
                 # calculate covariance of deltas for inactive action
-                cov_inactive = self._create_covariance_matrix(dim=D, uncertainty_prior=self.model.uncertainty_prior/float(number_of_actions))
+                cov_inactive = self._create_covariance_matrix(dim=D)
                 cov_inactive.update(data_inactive_delta)
                 C, _, _ = cov_inactive.fix(center=False)
                 inactive_covariances.append(C)
                 
             # calculate mean if inactive covariances
             C_inactive = reduce(lambda a, b: a + b, inactive_covariances) / len(inactive_covariances)
-            C_final += 100*C_inactive
+            C_final += C_inactive
             
         # result (smallest eigenvector)
         E, U = scipy.linalg.eigh(a=C_final, eigvals=(0, 0))

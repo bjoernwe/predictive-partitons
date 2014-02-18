@@ -9,8 +9,8 @@ from envs import env_noise
 
 if __name__ == '__main__':
     
-    env = env_circle.EnvCircle(seed=0)
-    #env = env_cube.EnvCube(step_size=0.1, sigma=0.1, ndim=2, seed=None)
+    #env = env_circle.EnvCircle(seed=None)
+    env = env_cube.EnvCube(step_size=0.1, sigma=0.1, ndim=2, seed=None)
     #env = env_noise.EnvNoise(sigma=0.1, ndim=2, seed=None)
     data, actions, _ = env.do_random_steps(num_steps=10000)
     
@@ -20,7 +20,7 @@ if __name__ == '__main__':
     model = worldmodel.Worldmodel(method='predictive', uncertainty_prior=10, seed=None)
     model.add_data(data=data, actions=actions)
     
-    for i in range(10):
+    for i in range(5):
         model.split(action=None, min_gain=float('-inf'))
     
     for i in range(env.get_number_of_possible_actions()):

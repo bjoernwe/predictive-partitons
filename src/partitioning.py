@@ -17,7 +17,7 @@ class Partitioning(object):
         
         N = model.get_number_of_samples()
         self.labels = np.zeros(N, dtype=int)
-        self.tree = self.model._tree_class(partitioning=self)#model=self, active_action=active_action)
+        self.tree = self.model._tree_class(partitioning=self)
         self.transitions = {}
         for action in self.model.get_known_actions():
             self.transitions[action] = np.ones((1, 1), dtype=int) * np.count_nonzero(self.model.actions == action)
