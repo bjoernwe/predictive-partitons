@@ -231,6 +231,7 @@ class WorldmodelGPFA(worldmodel_tree.WorldmodelTree):
         C, _, _ = cov.fix(center=False)
         E, U = scipy.linalg.eigh(C)
         W = np.dot(U, np.diag(E**(-.5))).dot(U.T)
+        #W = np.eye(D)
         
         # whiten data
         data_1 = expansion.execute(self.model.get_data_for_refs(refs=trans_refs_1))
@@ -281,8 +282,9 @@ class WorldmodelGPFA(worldmodel_tree.WorldmodelTree):
                 inactive_covariances.append(C)
                 
             # calculate mean if inactive covariances
+            fw = self.model.factorization_weight
             C_inactive = reduce(lambda a, b: a + b, inactive_covariances) / len(inactive_covariances)
-            C_final += C_inactive
+            C_final = (1-fw) * C_final + fw * C_inactive
             
         # result (smallest eigenvector)
         E, U = scipy.linalg.eigh(a=C_final, eigvals=(0, 0))

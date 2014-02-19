@@ -12,12 +12,13 @@ import worldmodel_methods
 class Worldmodel(object):
 
 
-    def __init__(self, method='naive', uncertainty_prior=10, seed=None):
+    def __init__(self, method='naive', uncertainty_prior=10, factorization_weight=0.9, seed=None):
         
         # data storage
         self.data = None                        # global data storage
         self.actions = np.empty(0, dtype=int)   # an array of actions
         self.uncertainty_prior = uncertainty_prior
+        self.factorization_weight = factorization_weight
         self.partitionings = {}
         self._action_set = set()
 
