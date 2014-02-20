@@ -10,14 +10,14 @@ from envs import env_noise
 if __name__ == '__main__':
     
     #env = env_circle.EnvCircle(seed=None)
-    #env = env_cube.EnvCube(step_size=0.1, sigma=0.1, ndim=2, seed=None)
-    env = env_noise.EnvNoise(sigma=0.1, ndim=2, seed=0)
+    env = env_cube.EnvCube(step_size=0.1, sigma=0.1, ndim=2, seed=None)
+    #env = env_noise.EnvNoise(sigma=0.1, ndim=2, seed=None)
     data, actions, _ = env.do_random_steps(num_steps=10000)
     
     #print data
     #print map(lambda a: env.get_actions_dict()[a], actions)
 
-    model = worldmodel.Worldmodel(method='predictive', uncertainty_prior=1, factorization_weight=0, seed=None)
+    model = worldmodel.Worldmodel(method='predictive', uncertainty_prior=1, factorization_weight=0.9, seed=None)
     model.add_data(data=data, actions=actions)
     
     for i in range(5):

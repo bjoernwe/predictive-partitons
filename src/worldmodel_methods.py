@@ -1,4 +1,5 @@
 import collections
+import itertools
 import numpy as np
 import scipy.linalg
 import scipy.spatial.distance
@@ -252,12 +253,15 @@ class WorldmodelGPFA(worldmodel_tree.WorldmodelTree):
         # pairwise distances of data points
         distances = scipy.spatial.distance.pdist(data_active_1)
         distances = scipy.spatial.distance.squareform(distances)
-        neighbors = [np.argsort(distances[i])[1:5+1] for i in range(len(indices_active))]
+        neighbors = [np.argsort(distances[i])[0:15] for i in range(len(indices_active))]
 
         # covariance of future noise
         cov = self._create_covariance_matrix(dim=D)
-        for i in range(len(indices_active)):
-            deltas = (data_active_2[neighbors[i]] - data_active_2[i]) / distances[i, neighbors[i]][:,np.newaxis]
+        for l in range(len(indices_active)):
+            combinations = np.array(list(itertools.combinations(neighbors[l], 2)), dtype=int)
+            indices_i = combinations[:,0]
+            indices_j = combinations[:,1]
+            deltas = data_active_2[indices_i] - data_active_2[indices_j]
             cov.update(deltas)
         C_final, _, _ = cov.fix()
 
