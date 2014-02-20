@@ -238,24 +238,26 @@ class WorldmodelGPFA(worldmodel_tree.WorldmodelTree):
         data_2 = expansion.execute(self.model.get_data_for_refs(refs=trans_refs_2))
         data_whitened_1 = np.dot(data_1 - data_mean, W)
         data_whitened_2 = np.dot(data_2 - data_mean, W)
-        del data_1
-        del data_2
+        #del data_1
+        #del data_2
         
         # filter data for actions
         actions = self.model.actions[trans_refs_1]
         indices_active = np.where(actions == active_action)
+        #data_active_1 = data_1[indices_active]
+        #data_active_2 = data_2[indices_active]
         data_active_1 = data_whitened_1[indices_active]
         data_active_2 = data_whitened_2[indices_active]
 
         # pairwise distances of data points
         distances = scipy.spatial.distance.pdist(data_active_1)
         distances = scipy.spatial.distance.squareform(distances)
-        neighbors = [np.argsort(distances[i])[:5+1] for i in range(len(indices_active))]
+        neighbors = [np.argsort(distances[i])[1:5+1] for i in range(len(indices_active))]
 
         # covariance of future noise
         cov = self._create_covariance_matrix(dim=D)
-        for i in range(len(neighbors)):
-            deltas = data_active_1[i] - data_active_2[neighbors[i]]
+        for i in range(len(indices_active)):
+            deltas = (data_active_2[neighbors[i]] - data_active_2[i]) / distances[i, neighbors[i]][:,np.newaxis]
             cov.update(deltas)
         C_final, _, _ = cov.fix()
 
