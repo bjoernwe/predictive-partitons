@@ -1,3 +1,4 @@
+import numpy as np
 from matplotlib import pyplot
 
 import worldmodel
@@ -10,14 +11,14 @@ from envs import env_noise
 if __name__ == '__main__':
     
     #env = env_circle.EnvCircle(seed=None)
-    env = env_cube.EnvCube(step_size=0.1, sigma=0.1, ndim=2, seed=None)
+    env = env_cube.EnvCube(step_size=0.1, sigma=0.01, ndim=2, seed=None)
     #env = env_noise.EnvNoise(sigma=0.1, ndim=2, seed=None)
     data, actions, _ = env.do_random_steps(num_steps=10000)
     
     #print data
     #print map(lambda a: env.get_actions_dict()[a], actions)
 
-    model = worldmodel.Worldmodel(method='predictive', uncertainty_prior=1, factorization_weight=0.9, seed=None)
+    model = worldmodel.Worldmodel(method='predictive', uncertainty_prior=100, factorization_weight=1, seed=None)
     model.add_data(data=data, actions=actions)
     
     for i in range(5):
@@ -29,6 +30,8 @@ if __name__ == '__main__':
         pyplot.title(env.get_actions_dict()[i])
         model.plot_data_colored_for_state(active_action=i, show_plot=False)
         #model.partitionings[i].plot_transitions()
+        #data = model.data[np.where(model.actions == i)]
+        #pyplot.plot(data[:,0], data[:,1], '.')
     
     pyplot.show()
     

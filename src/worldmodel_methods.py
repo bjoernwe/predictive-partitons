@@ -258,6 +258,8 @@ class WorldmodelGPFA(worldmodel_tree.WorldmodelTree):
         # covariance of future noise
         cov = self._create_covariance_matrix(dim=D)
         for l in range(len(indices_active)):
+            if len(neighbors[l]) < 2:
+                continue
             combinations = np.array(list(itertools.combinations(neighbors[l], 2)), dtype=int)
             indices_i = combinations[:,0]
             indices_j = combinations[:,1]
@@ -274,6 +276,18 @@ class WorldmodelGPFA(worldmodel_tree.WorldmodelTree):
                 
                 if action == active_action:
                     continue
+                
+#                 if active_action == 0 and action == 1:
+#                     continue
+#                 
+#                 if active_action == 1 and action == 0:
+#                     continue
+#                 
+#                 if active_action == 2 and action == 3:
+#                     continue
+#                 
+#                 if active_action == 3 and action == 2:
+#                     continue
                 
                 # get references and data
                 indices_inactive = np.where(actions == action)
