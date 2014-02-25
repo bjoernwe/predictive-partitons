@@ -220,18 +220,32 @@ class WorldmodelGPFA(worldmodel_tree.WorldmodelTree):
         trans_refs_1 = self.get_transition_refs(heading_in=False, inside=True, heading_out=False)
         trans_refs_2 = trans_refs_1 + 1
         trans_refs = np.union1d(trans_refs_1, trans_refs_2)
-        data = self.model.get_data_for_refs(refs=trans_refs)
-        _, D0 = data.shape
-        data = expansion.execute(data)
-        data_mean = np.mean(data, axis=0)
-        _, D = data.shape
+        data0 = self.model.get_data_for_refs(refs=trans_refs)
+        data0_mean = np.mean(data0, axis=0)
+        _, D0 = data0.shape
         
-        # whitening matrix W
-        # TODO: cache! it's the same for every action
-        cov = self._create_covariance_matrix(dim=D)
-        cov.update(data - data_mean)
+        # whitening of input data
+        cov = self._create_covariance_matrix(dim=D0)
+        cov.update(data0 - data0_mean)
         C, _, _ = cov.fix(center=False)
         E, U = scipy.linalg.eigh(C)
+        W0 = np.dot(U, np.diag(E**(-.5))).dot(U.T)
+        
+        # expansion, whitening and reduction of data
+        data = expansion.execute(np.dot(data0 - data0_mean, W0))
+        data_mean = np.mean(data, axis=0)
+        data_mean_free = data - data_mean
+        _, D = data.shape
+        # TODO: cache! it's the same for every action
+        #cov = self._create_covariance_matrix(dim=D)
+        #cov.update(data - data_mean)
+        #C, _, _ = cov.fix(center=False)
+        C = np.dot(data_mean_free.T, data_mean_free)
+        E, U = scipy.linalg.eigh(C)
+        print E
+        ev_mask = (E <= 1e-6)
+        U = U[:,ev_mask]
+        E = E[ev_mask]
         W = np.dot(U, np.diag(E**(-.5))).dot(U.T)
         #W = np.eye(D)
         
@@ -309,7 +323,7 @@ class WorldmodelGPFA(worldmodel_tree.WorldmodelTree):
             #np.set_printoptions(precision=3)
             #print scipy.linalg.eigh(a=C_inactive)
 
-        regularization_vector = 0.001 * np.ones(D)
+        regularization_vector = 0.01 * np.ones(D)
         regularization_vector[:D0] = 0
         regularization_vector = regularization_vector.dot(W)
         C_final += np.outer(regularization_vector, regularization_vector)

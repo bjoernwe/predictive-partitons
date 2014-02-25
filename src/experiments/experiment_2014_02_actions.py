@@ -18,7 +18,7 @@ if __name__ == '__main__':
     #print data
     #print map(lambda a: env.get_actions_dict()[a], actions)
 
-    model = worldmodel.Worldmodel(method='predictive', uncertainty_prior=100, factorization_weight=0.99, seed=None)
+    model = worldmodel.Worldmodel(method='predictive', uncertainty_prior=100, factorization_weight=0.9, seed=None)
     model.add_data(data=data, actions=actions)
     
     for i in range(5):
