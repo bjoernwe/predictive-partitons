@@ -163,6 +163,7 @@ class WorldmodelTree(tree_structure.Tree):
         refs_1 = self.get_data_refs()
         refs_0 = refs_1 - 1
         N = self.model.get_number_of_samples()
+        result = np.empty(0, dtype=int)
         
         if heading_in:
             # [ref-1 for ref in refs if (ref-1 not in refs) and (ref-1 >= 0)]
@@ -170,25 +171,23 @@ class WorldmodelTree(tree_structure.Tree):
             refs_array_in = np.setdiff1d(refs_0, refs_1, assume_unique=True)
             refs_array_in.difference_update([-1])
             assert set(refs_array_in) == set([ref-1 for ref in refs_1 if (ref-1 not in refs_1) and (ref-1 >= 0)])
+            result = np.union1d(result, refs_array_in)
             
         if inside:
             # [ref for ref in refs if (ref+1 in refs)]
             mask = np.in1d(refs_1, refs_0, assume_unique=True)
             refs_array_inside = refs_1[mask]
             #assert set(refs_array_inside) == set([ref for ref in refs if (ref+1 in refs)])
+            result = np.union1d(result, refs_array_inside)
 
         if heading_out:
             # [ref for ref in refs if (ref+1 not in refs) and (ref+1 < N)]
-            assert False
             refs_array_out = np.setdiff1d(refs_1, refs_0, assume_unique=True)
-            refs_array_out.difference_udate([N-1])
+            refs_array_out = np.setdiff1d(refs_array_out, np.array([N-1], dtype=int))
             assert set(refs_array_out) == set([ref for ref in refs_1 if (ref+1 not in refs_1) and (ref+1 < N)])
-         
-        # TODO: merge transitions
-        return refs_array_inside   
-        #refs_1 = refs_array_inside
-        #refs_2 = refs_array_inside + 1
-        #return [refs_1, refs_2]
+            result = np.union1d(result, refs_array_out)
+            
+        return result
         
         
     def get_transition_refs_for_action(self, action, heading_in=False, inside=True, heading_out=False):
