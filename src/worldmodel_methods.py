@@ -5,6 +5,8 @@ import scipy.linalg
 import scipy.spatial.distance
 import scipy.sparse.linalg
 
+from matplotlib import pyplot
+
 import mdp
 
 import worldmodel_tree
@@ -100,7 +102,7 @@ class WorldmodelFast(worldmodel_tree.WorldmodelTree):
         # helpers
         known_actions = self.model.get_known_actions()
         number_of_actions = len(known_actions)
-        expansion = mdp.nodes.PolynomialExpansionNode(degree=1)
+        expansion = mdp.nodes.PolynomialExpansionNode(degree=10)
 
         # get transition references (inside this node)        
         trans_refs_1 = self.get_transition_refs(heading_in=False, inside=True, heading_out=False)
@@ -182,7 +184,17 @@ class WorldmodelFast(worldmodel_tree.WorldmodelTree):
         if (y - params.m).dot(params.u) > 0:
             return 1
         return 0
-
+    
+    
+    def plot_gradient(self):
+        assert self.is_leaf()
+        params = self._parent._split_params._test_params
+        data = self.get_data()
+        gratings = []
+        for x in data:
+            y = params.expansion.execute(np.array(x, ndmin=2))
+            gratings.append((y - params.m).dot(params.u))
+        pyplot.scatter(x=data[:,0], y=data[:,1], c=gratings, edgecolors='none', vmin=-2, vmax=2)
 
 
 class WorldmodelGPFA(worldmodel_tree.WorldmodelTree):
@@ -214,7 +226,7 @@ class WorldmodelGPFA(worldmodel_tree.WorldmodelTree):
         # helpers
         known_actions = self.model.get_known_actions()
         number_of_actions = len(known_actions)
-        expansion = mdp.nodes.PolynomialExpansionNode(degree=2)
+        expansion = mdp.nodes.PolynomialExpansionNode(degree=5)
 
         # get transition references (inside this node)        
         trans_refs_1 = self.get_transition_refs(heading_in=False, inside=True, heading_out=False)
@@ -223,7 +235,7 @@ class WorldmodelGPFA(worldmodel_tree.WorldmodelTree):
         data = self.model.get_data_for_refs(refs=trans_refs)
         data = expansion.execute(data)
         data_mean = np.mean(data, axis=0)
-        N, D = data.shape
+        _, D = data.shape
         
         # whitening matrix W
         # TODO: cache! it's the same for every action
@@ -277,17 +289,17 @@ class WorldmodelGPFA(worldmodel_tree.WorldmodelTree):
                 if action == active_action:
                     continue
                 
-#                 if active_action == 0 and action == 1:
-#                     continue
-#                 
-#                 if active_action == 1 and action == 0:
-#                     continue
-#                 
-#                 if active_action == 2 and action == 3:
-#                     continue
-#                 
-#                 if active_action == 3 and action == 2:
-#                     continue
+                if active_action == 0 and action == 1:
+                    continue
+                 
+                if active_action == 1 and action == 0:
+                    continue
+                 
+                if active_action == 2 and action == 3:
+                    continue
+                 
+                if active_action == 3 and action == 2:
+                    continue
                 
                 # get references and data
                 indices_inactive = np.where(actions == action)
