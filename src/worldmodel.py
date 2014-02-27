@@ -59,6 +59,10 @@ class Worldmodel(object):
     
     def get_known_actions(self):
         return set(self._action_set)
+    
+    
+    def get_partitioning(self, action):
+        return self.partitionings[action]
 
 
     def classify(self, data, action):

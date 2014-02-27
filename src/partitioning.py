@@ -21,6 +21,10 @@ class Partitioning(object):
         self.transitions = {}
         for action in self.model.get_known_actions():
             self.transitions[action] = np.ones((1, 1), dtype=int) * np.count_nonzero(self.model.actions == action)
+            
+            
+    def get_number_of_partitions(self):
+        return self.tree.get_number_of_leaves()
 
 
     def classify(self, data):
