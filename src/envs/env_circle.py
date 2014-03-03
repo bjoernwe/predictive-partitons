@@ -26,15 +26,8 @@ class EnvCircle(environment.Environment):
         
     
     def _do_action(self, action):
-        """Perform the given action and return the resulting state of the
-        environment and the action as well.
-        --------------------------------------
-        Parameters:
-        action:     int
-        --------------------------------------
-        Return:
-        new_state:    np.ndarray - coordinates of the agent after the step
-        reward = 0
+        """Walks one step along the circle.
+        Returns new state and new angle.
         """
         
         if action == 0:
@@ -44,7 +37,7 @@ class EnvCircle(environment.Environment):
             assert False
 
         self.current_state = self._render(self.phi)
-        return self.current_state, 0
+        return self.current_state, self.phi
 
 
 if __name__ == '__main__':
