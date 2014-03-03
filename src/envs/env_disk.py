@@ -4,8 +4,8 @@ import numpy as np
 import environment
 
 
-class EnvCircle(environment.Environment):
-    """A simple environment in which the agent moves along a circle.
+class EnvDisk(environment.Environment):
+    """A simple environment in which the agent moves along a disk.
     
     There is are two actions: PHI adds noise to the angle of the current 
     position and RAD adds noise to the radius.
@@ -19,7 +19,7 @@ class EnvCircle(environment.Environment):
         sigma_rad:   float - standard deviation for radial changes
         seed:        int - 
         """
-        super(EnvCircle, self).__init__(seed=seed)
+        super(EnvDisk, self).__init__(seed=seed)
         
         self.ndim = 2
         self.sigma_phi = sigma_phi
@@ -78,7 +78,7 @@ if __name__ == '__main__':
     
     # sample data
     steps = 1000
-    circle = EnvCircle()
+    circle = EnvDisk()
     data, actions, _ = circle.do_random_steps(num_steps=steps)
     
     print 'Possible actions:'
