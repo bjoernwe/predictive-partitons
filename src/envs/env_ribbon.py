@@ -4,11 +4,11 @@ import numpy as np
 import environment
 
 
-class EnvCircle(environment.Environment):
+class EnvRibbon(environment.Environment):
     """A simple environment in which the agent moves along a circle."""
 
-    def __init__(self, step_size=2, seed=None):
-        super(EnvCircle, self).__init__(seed=seed)
+    def __init__(self, step_size=1, seed=None):
+        super(EnvRibbon, self).__init__(seed=seed)
         
         self.ndim = 2
         self.step_size = step_size
@@ -21,7 +21,7 @@ class EnvCircle(environment.Environment):
     
     def _render(self, phi):
         x = np.cos(phi)
-        y = np.sin(phi)
+        y = np.sin(2*phi)
         return np.array([x,y])
         
     
@@ -43,8 +43,8 @@ class EnvCircle(environment.Environment):
 if __name__ == '__main__':
     
     # sample data
-    steps = 100
-    circle = EnvCircle()
+    steps = 1000
+    circle = EnvRibbon(step_size=1)
     data, actions, _ = circle.do_random_steps(num_steps=steps)
     
     print 'Possible actions:'
