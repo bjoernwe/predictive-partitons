@@ -82,10 +82,15 @@ class WorldmodelFast(worldmodel_tree.WorldmodelTree):
         super(WorldmodelFast, self).__init__(partitioning=partitioning)
         
         
-    def _create_covariance_matrix(self, dim, uncertainty_prior):
+    def _create_covariance_matrix(self, dim):
+        # prior
+        number_of_actions = len(self.model.get_known_actions())
+        uncertainty_prior = self.model.uncertainty_prior
+        weight = uncertainty_prior / (1000 * dim * number_of_actions)
+        
         cov = mdp.utils.CovarianceMatrix(bias=True)
         E = np.eye(dim)
-        cov.update((uncertainty_prior/float(dim)) * E)
+        cov.update(weight * E)
         return cov
     
     
@@ -102,71 +107,72 @@ class WorldmodelFast(worldmodel_tree.WorldmodelTree):
         # helpers
         known_actions = self.model.get_known_actions()
         number_of_actions = len(known_actions)
-        expansion = mdp.nodes.PolynomialExpansionNode(degree=10)
+        expansion = mdp.nodes.PolynomialExpansionNode(degree=5)
 
         # get transition references (inside this node)        
-        trans_refs_1 = self.get_transition_refs(heading_in=False, inside=True, heading_out=False)
+        trans_refs_1 = self.get_transition_refs(heading_in=False, inside=True, heading_out=True)
         trans_refs_2 = trans_refs_1 + 1
-        trans_refs = np.union1d(trans_refs_1, trans_refs_2)
-        data = self.model.get_data_for_refs(refs=trans_refs)
-        data = expansion.execute(data)
-        data_mean = np.mean(data, axis=0)
-        N, D = data.shape
-
+        data_for_whitening = self.model.get_data_for_refs(refs=trans_refs_1)
+        data_for_whitening = expansion.execute(data_for_whitening)
+        data_mean = np.mean(data_for_whitening, axis=0)
+        _, D = data_for_whitening.shape
+        
         # whitening matrix W
         # TODO: cache! it's the same for every action
-        cov = self._create_covariance_matrix(dim=D, uncertainty_prior=self.model.uncertainty_prior)
-        cov.update(data - data_mean)
+        cov = self._create_covariance_matrix(dim=D)
+        cov.update(data_for_whitening - data_mean)
         C, _, _ = cov.fix(center=False)
         E, U = scipy.linalg.eigh(C)
         W = np.dot(U, np.diag(E**(-.5))).dot(U.T)
-        assert W.shape == (D, D)
+        #W = np.eye(D)
         
         # whiten data
-        data_whitened = np.dot(data - data_mean, W)
-        #print np.dot(data_whitened.T, data_whitened)
-        assert data_whitened.shape == (N, D)
-        #assert np.allclose(np.dot(data_whitened.T, data_whitened), np.eye(D)) 
+        data_1 = expansion.execute(self.model.get_data_for_refs(refs=trans_refs_1))
+        data_2 = expansion.execute(self.model.get_data_for_refs(refs=trans_refs_2))
+        data_whitened_1 = np.dot(data_1 - data_mean, W)
+        data_whitened_2 = np.dot(data_2 - data_mean, W)
+        #del data_1
+        #del data_2
+        
+        # filter data for actions
+        actions = self.model.actions[trans_refs_1]
+        indices_active = np.where(actions == active_action)
+        #data_active_1 = data_1[indices_active]
+        #data_active_2 = data_2[indices_active]
+        data_active_1 = data_whitened_1[indices_active]
+        data_active_2 = data_whitened_2[indices_active]
 
-        # filter data references for actions
-        trans_refs_active_1 = trans_refs_1[self.model.actions[trans_refs_1] == active_action]
-        trans_refs_active_2 = trans_refs_active_1 + 1
-        data_active_1 = data_whitened[self._calc_local_refs(refs=trans_refs_active_1, refs_of_data=trans_refs)]
-        data_active_2 = data_whitened[self._calc_local_refs(refs=trans_refs_active_2, refs_of_data=trans_refs)]
-        data_active_delta = data_active_2 - data_active_1
+        # pairwise distances of data points
+        #distances = scipy.spatial.distance.pdist(data_active_1)
+        #distances = scipy.spatial.distance.squareform(distances)
+        #neighbors = [np.argsort(distances[i])[0:15] for i in range(len(indices_active))]
         
-        # find fastest feature for active action
-        #data_active_delta_whitened = np.dot(data_active_delta, W)
-        cov_active = self._create_covariance_matrix(dim=D, uncertainty_prior=self.model.uncertainty_prior/float(number_of_actions))
-        cov_active.update(data_active_delta)
-        C_active, _, _ = cov_active.fix(center=False)
-        C_inactive = None
-        
+        deltas = data_active_2 - data_active_1
+        cov = self._create_covariance_matrix(dim=D)
+        cov.update(deltas)
+        C_active, _, _ = cov.fix()
+
         # inactive covariances as well
+        C_inactive = None
         if number_of_actions >= 2:
             
             inactive_covariances = []
             
             for action in known_actions:
                 
-                if action == active_action:
-                    continue
-                
                 # get references and data
-                trans_refs_inactive_1 = trans_refs_1[self.model.actions[trans_refs_1] == action]
-                trans_refs_inactive_2 = trans_refs_inactive_1 + 1
-                data_inactive_1 = data_whitened[self._calc_local_refs(refs=trans_refs_inactive_1, refs_of_data=trans_refs)]
-                data_inactive_2 = data_whitened[self._calc_local_refs(refs=trans_refs_inactive_2, refs_of_data=trans_refs)]
+                indices_inactive = np.where(actions == action)
+                data_inactive_1 = data_whitened_1[indices_inactive]
+                data_inactive_2 = data_whitened_2[indices_inactive]
                 data_inactive_delta = data_inactive_2 - data_inactive_1
-                #data_inactive_delta_whitened = np.dot(data_inactive_delta, W)
                 
                 # calculate covariance of deltas for inactive action
-                cov_inactive = self._create_covariance_matrix(dim=D, uncertainty_prior=self.model.uncertainty_prior/float(number_of_actions))
+                cov_inactive = self._create_covariance_matrix(dim=D)
                 cov_inactive.update(data_inactive_delta)
                 C, _, _ = cov_inactive.fix(center=False)
                 inactive_covariances.append(C)
                 
-            # calculate mean if inactive covariances
+            # calculate average of inactive covariances
             C_inactive = reduce(lambda a, b: a + b, inactive_covariances) / len(inactive_covariances)
             
         # result (smallest eigenvector)
