@@ -23,8 +23,8 @@ if __name__ == '__main__':
     results = {}
     for t in range(T):
         results[t] = {}
-        results[t]['models'] = pickle.load(open('experiment_2013_09_esann_models_%d.dump' % t, 'rb') )
-        results[t]['data'] = pickle.load(open('experiment_2013_09_esann_data_%d.dump' % t, 'rb') )
+        results[t]['models'] = pickle.load(open('experiment_2014_07_esann_models_%d.dump' % t, 'rb') )
+        results[t]['data'] = pickle.load(open('experiment_2014_07_esann_data_%d.dump' % t, 'rb') )
         print len(results[t]['models']['swiss_predictive'].stats)
         print len(results[t]['models']['noise_predictive'].stats)
         print ''

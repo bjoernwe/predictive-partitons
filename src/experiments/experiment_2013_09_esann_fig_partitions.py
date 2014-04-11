@@ -48,11 +48,12 @@ if __name__ == '__main__':
     for i in range(16-1):
         model.single_splitting_step(min_gain=float('-inf'))
         
-    pyplot.subplot(1, 3, 1)
+    #pyplot.subplot(1, 3, 1)
+    pyplot.figure()
     model.plot_data(color='none', show_plot=False)
-    #model.plot_states(show_plot=False, resolution=resolution)
-    model.plot_state_borders(show_plot=False, resolution=resolution)
-    pyplot.title('a')
+    model.plot_states(show_plot=False, resolution=resolution, range_x=[0,1], range_y=[0,1])
+    model.plot_state_borders(show_plot=False, resolution=resolution, range_x=[0,1], range_y=[0,1])
+    #pyplot.title('A')
     pyplot.xlabel('x')
     pyplot.ylabel('y')
 
@@ -68,12 +69,13 @@ if __name__ == '__main__':
         model.single_splitting_step(min_gain=float('-inf'))
         # plot data and borders
  
-    pyplot.subplot(1, 3, 2)
-    #model.plot_data(color='none', show_plot=False)
-    model.plot_state_borders(show_plot=False, resolution=resolution)
-    pyplot.title('b')
+    #pyplot.subplot(1, 3, 2)
+    pyplot.figure()
+    model.plot_states(show_plot=False, resolution=resolution, range_x=[0,1], range_y=[0,1])
+    model.plot_state_borders(show_plot=False, resolution=resolution, range_x=[0,1], range_y=[0,1])
+    #pyplot.title('B')
     pyplot.xlabel('x')
-    #pyplot.ylabel('y')
+    pyplot.ylabel('y (noise)')
                   
     #
     # noise, naive
@@ -90,15 +92,16 @@ if __name__ == '__main__':
         model.update_stats()
   
     # plot
-    pyplot.subplot(1, 3, 3)
+    #pyplot.subplot(1, 3, 3)
+    #pyplot.figure()
     #model.plot_data(color='silver', show_plot=False)
-    model.plot_state_borders(show_plot=False, resolution=resolution)
-    pyplot.title('c')
-    pyplot.xlabel('x')
+    #model.plot_states(show_plot=False, resolution=resolution)
+    #pyplot.title('A')
+    #pyplot.xlabel('x')
     #pyplot.ylabel('y')
      
  
     #pyplot.tight_layout()
     #pyplot.subplots_adjust(wspace=0.2, hspace=0.3)
-    pyplot.subplots_adjust(bottom=0.12, top=0.9, wspace=0.1)
+    #pyplot.subplots_adjust(bottom=0.12, top=0.9, wspace=0.1)
     pyplot.show()

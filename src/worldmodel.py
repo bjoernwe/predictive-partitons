@@ -1,5 +1,6 @@
 import collections
 import math
+import matplotlib
 import numpy as np
 import random
 import scipy.linalg
@@ -18,7 +19,8 @@ Stats = collections.namedtuple('Stats', ['n_states',
                                          'norm', 
                                          'entropy', 
                                          'entropy_normalized', 
-                                         'mutual_information'])
+                                         'mutual_information',
+                                         'mutual_information_test'])
 
 SplitResult = collections.namedtuple('SplitResult', ['node',
                                                      'action',
@@ -31,6 +33,7 @@ class WorldModel(object):
         
         # data storage
         self.data = None        # global data storage
+        self.test_data = None
         #self.transitions = None
         self.actions = None     # either None or a list of actions
         self.rewards = None
@@ -179,6 +182,11 @@ class WorldModel(object):
                         leaf.split_cache.pop(action)
             
         assert np.sum(self._merge_transition_matrices(transitions=self.transitions)) == N-1
+        return
+    
+    
+    def add_test_data(self, data):
+        self.test_data = data
         return
 
 
@@ -392,13 +400,25 @@ class WorldModel(object):
         # mutual information
         entropy_mu = self._entropy(dist=mu)
         mutual_information = entropy_mu - entropy
+        
+        # mutual information of test data
+        mutual_information_test = None
+        if self.test_data is not None:
+            test_labels = self.classify(self.test_data)
+            transitions_test = np.zeros((K, K), dtype=int)
+            for t in range(len(self.test_data)-1):
+                i = test_labels[t]
+                j = test_labels[t+1]
+                transitions_test[i,j] += 1
+            mutual_information_test = self._mutual_information(transitions_test)
 
         stats = Stats(n_states = K,
                       n_nodes = n_nodes, 
                       entropy = entropy, 
                       entropy_normalized = entropy_normalized, 
                       norm = norm, 
-                      mutual_information = mutual_information)
+                      mutual_information = mutual_information,
+                      mutual_information_test = mutual_information_test)
         return stats
     
     
@@ -665,7 +685,7 @@ class WorldModel(object):
             if ndim is not None and ndim < self.get_input_dim():
                 data = np.array(data)
                 data = sklearn.manifold.Isomap(n_neighbors=10, n_components=ndim).fit_transform(data)
-            pyplot.plot(data[:,0], data[:,1], '.', color='silver')
+            pyplot.plot(data[:,0], data[:,1], '.', color='#003560')
             
         if show_plot:
             pyplot.show()
@@ -694,7 +714,35 @@ class WorldModel(object):
         X, Y = np.meshgrid(x, y)
         v_classify = np.vectorize(lambda x, y: self.classify(np.array([x,y])))
         Z = v_classify(X, Y)
-        pyplot.contourf(X, Y, Z, levels = range(-1, K))
+
+#         cdict = {
+#             'red': (
+#                 (0.0, 0.55, 0.55), 
+#                 (1.0, 1.00, 1.00)),
+#             'green': (
+#                 (0.0, 0.68, 0.68),
+#                 (1.0, 1.00, 1.00)),
+#             'blue': (
+#                 (0.0, 0.06, 0.06),
+#                 (1.0, 1.00, 1.00))
+#         }
+#             
+        cdict = {
+            'red': (
+                (0.0, 0.66, 0.66), 
+                (1.0, 1.00, 1.00)),
+            'green': (
+                (0.0, 0.74, 0.74),
+                (1.0, 1.00, 1.00)),
+            'blue': (
+                (0.0, 0.35, 0.35),
+                (1.0, 1.00, 1.00))
+        }
+            
+        rub_cd_cmap = matplotlib.colors.LinearSegmentedColormap('rub_cd_colormap', cdict, 256)
+        #colormap = pyplot.cm.get_cmap('Spectral')
+        
+        pyplot.contourf(X, Y, Z, levels = range(-1, K), cmap=rub_cd_cmap)
         
         if show_plot:
             pyplot.show()
@@ -723,7 +771,7 @@ class WorldModel(object):
         X, Y = np.meshgrid(x, y)
         v_classify = np.vectorize(lambda x, y: self.classify(np.array([x,y])))
         Z = v_classify(X, Y)
-        pyplot.contour(X, Y, Z, levels = range(-1, K), colors='b', linewidths=1)
+        pyplot.contour(X, Y, Z, levels = range(-1, K), colors='#8dae10', linewidths=0.1)
         
         if show_plot:
             pyplot.show()
