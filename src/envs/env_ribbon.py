@@ -5,7 +5,7 @@ import environment
 
 
 class EnvRibbon(environment.Environment):
-    """A simple environment in which the agent moves along a circle."""
+    """A simple environment in which the agent moves along a env."""
 
     def __init__(self, step_size=1, seed=None):
         super(EnvRibbon, self).__init__(seed=seed)
@@ -26,7 +26,7 @@ class EnvRibbon(environment.Environment):
         
     
     def _do_action(self, action):
-        """Walks one step along the circle.
+        """Walks one step along the env.
         Returns new state and new angle.
         """
         
@@ -44,11 +44,11 @@ if __name__ == '__main__':
     
     # sample data
     steps = 1000
-    circle = EnvRibbon(step_size=1)
-    data, actions, _ = circle.do_random_steps(num_steps=steps)
+    env = EnvRibbon(step_size=1)
+    data, actions, _ = env.do_random_steps(num_steps=steps)
     
     print 'Possible actions:'
-    for action, describtion in circle.get_actions_dict().iteritems():
+    for action, describtion in env.get_actions_dict().iteritems():
         print '  %2d = %s' % (action, describtion)
         
     # plot data

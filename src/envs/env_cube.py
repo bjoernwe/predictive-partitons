@@ -5,8 +5,8 @@ import environment
 
 
 class EnvCube(environment.Environment):
-    """A simple environment in which the agent moves inside a (hyper-) cube between
-    zero and one.
+    """A simple environment in which the agent moves inside a (hyper-) cube 
+    between zero and one.
     
     There is one UP and one DOWN action for each dimension which performs a
     step of given length. To each step some Gaussian noise is added with 
@@ -40,7 +40,7 @@ class EnvCube(environment.Environment):
     
     def _do_action(self, action):
         """Perform the given action and return the resulting state of the
-        environment and the action as well.
+        environment and the reward as well.
         --------------------------------------
         Parameters:
         action:     str - direction of the action to be performed

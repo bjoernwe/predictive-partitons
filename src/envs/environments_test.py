@@ -1,10 +1,13 @@
 import numpy as np
 import unittest
 
-import env_circle
 import env_cube
+import env_disk
 import env_noise
-
+import env_oscillator
+import env_ribbon
+import env_swiss_roll
+import env_swiss_roll_3d
 
 
 class EnvironmentTest(unittest.TestCase):
@@ -12,9 +15,13 @@ class EnvironmentTest(unittest.TestCase):
     @classmethod
     def setUpClass(self):
         self.environments = []
-        self.environments.append(env_circle.EnvCircle)    
         self.environments.append(env_cube.EnvCube)    
+        self.environments.append(env_disk.EnvDisk)    
         self.environments.append(env_noise.EnvNoise)    
+        self.environments.append(env_oscillator.EnvOscillator)    
+        self.environments.append(env_ribbon.EnvRibbon)    
+        self.environments.append(env_swiss_roll.EnvSwissRoll)    
+        self.environments.append(env_swiss_roll_3d.EnvSwissRoll3D)    
               
 
     def testSeedGiven(self):
