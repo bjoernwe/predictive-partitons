@@ -8,7 +8,7 @@ import environment
 
 class EnvSwissRoll3D(environment.Environment):
 
-    def __init__(self, sigma_phi=0.5, sigma_z=0.05, seed=None):
+    def __init__(self, sigma_phi=1, sigma_z=0.1, seed=None):
         """
         Initializes the environment including an initial state.
         """
@@ -19,9 +19,9 @@ class EnvSwissRoll3D(environment.Environment):
         
         self.sigma_phi = sigma_phi
         self.sigma_z = sigma_z
-        self.fourpi = 4. * np.pi
+        self.threepi = 3. * np.pi
         
-        self.phi = self.fourpi / 2.
+        self.phi = self.threepi / 2.
         self.z = 0.5
         self.current_state = np.hstack([self._f(self.phi), self.z])
         return
@@ -31,8 +31,8 @@ class EnvSwissRoll3D(environment.Environment):
         """
         Maps an angle phi to x, y values of the swiss roll.
         """
-        x = np.cos(phi)*(1-.7*phi/self.fourpi)
-        y = np.sin(phi)*(1-.7*phi/self.fourpi)
+        x = np.cos(phi)*(1-.7*phi/self.threepi)
+        y = np.sin(phi)*(1-.7*phi/self.threepi)
         return np.array([x, y])
         
 
@@ -47,18 +47,25 @@ class EnvSwissRoll3D(environment.Environment):
         self.z += self.sigma_z * self.rnd.normal()
         
         # bounds
-        self.phi = np.clip(self.phi, 0, self.fourpi)
+        self.phi = np.clip(self.phi, 0, self.threepi)
         self.z = np.clip(self.z, 0, 1)
         
         # result
         self.current_state = np.hstack([self._f(self.phi), self.z])
-        return self.current_state, self.phi
+        
+        # color label
+        a = int(8 * self.phi / self.threepi - 1e-6)
+        b = int(2 * self.z - 1e-6)
+        color = (a + b) % 2
+        
+        #return self.current_state, self.phi
+        return self.current_state, color
 
 
 
 if __name__ == '__main__':
 
-    steps = 3000
+    steps = 5000
     env = EnvSwissRoll3D()
     data, _, labels = env.do_random_steps(num_steps=steps)
     
@@ -69,6 +76,6 @@ if __name__ == '__main__':
     # plot data
     fig = plt.figure()
     ax = fig.gca(projection='3d')
-    ax.scatter(data[:-1,0], data[:-1,2], data[:-1,1], c=labels)
+    ax.scatter(data[1:,0], data[1:,2], data[1:,1], c=labels, s=50, cmap=plt.cm.get_cmap('Blues'))
     plt.show()
     

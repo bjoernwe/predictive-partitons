@@ -33,7 +33,7 @@ class Environment(object):
 
     def get_actions_dict(self):
         """
-        Returns a dictionary with
+        Returns a dictionary of actions
         """
         return self.actions_dict
     

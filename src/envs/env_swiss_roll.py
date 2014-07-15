@@ -19,9 +19,9 @@ class EnvSwissRoll(environment.Environment):
         self.actions = None
         
         self.sigma = sigma
-        self.fourpi = 4. * np.pi
+        self.threepi = 4. * np.pi
         
-        self.t = self.fourpi / 2.
+        self.t = self.threepi / 2.
         self.current_state = self._f(self.t)
         
         
@@ -29,8 +29,8 @@ class EnvSwissRoll(environment.Environment):
         """
         Maps an angle phi to x, y values of the swiss roll.
         """
-        x = np.cos(phi)*(1-.7*phi/self.fourpi)
-        y = np.sin(phi)*(1-.7*phi/self.fourpi)
+        x = np.cos(phi)*(1-.7*phi/self.threepi)
+        y = np.sin(phi)*(1-.7*phi/self.threepi)
         return np.array([x, y])
         
 
@@ -41,12 +41,12 @@ class EnvSwissRoll(environment.Environment):
         """
 
         # random walk
-        #self.t += self.t * self.rnd.gauss(mu=0, sigma=1) / self.fourpi
+        #self.t += self.t * self.rnd.gauss(mu=0, sigma=1) / self.threepi
         self.t += self.sigma * self.rnd.normal()
         
         # bounds
         self.t = 0 if self.t < 0 else self.t 
-        self.t = self.fourpi if self.t > self.fourpi else self.t
+        self.t = self.threepi if self.t > self.threepi else self.t
         
         # result
         self.current_state = self._f(self.t)
