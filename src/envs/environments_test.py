@@ -6,6 +6,7 @@ import env_disk
 import env_noise
 import env_oscillator
 import env_ribbon
+import env_sine
 import env_swiss_roll
 import env_swiss_roll_3d
 
@@ -20,6 +21,7 @@ class EnvironmentTest(unittest.TestCase):
         self.environments.append(env_noise.EnvNoise)    
         self.environments.append(env_oscillator.EnvOscillator)    
         self.environments.append(env_ribbon.EnvRibbon)    
+        self.environments.append(env_sine.EnvSine)    
         self.environments.append(env_swiss_roll.EnvSwissRoll)    
         self.environments.append(env_swiss_roll_3d.EnvSwissRoll3D)    
               

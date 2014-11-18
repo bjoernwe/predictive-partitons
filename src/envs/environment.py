@@ -128,11 +128,15 @@ class Environment(object):
 
             # data
             data, actions, rewards = self.do_random_steps(num_steps=num_steps)
+            
+            # make sure data has two dimensions
+            if data.ndim == 1:
+                data = np.array(data, ndmin=2).T 
     
             # add noisy dim
             for _ in range(noisy_dims):
                 noise_complete = 1. * self.rnd.rand(num_steps)
-                data = np.insert(data, 2, axis=1, values=noise_complete)
+                data = np.insert(data, data.shape[1], axis=1, values=noise_complete)
     
             # expansion
             expansion_node = mdp.nodes.PolynomialExpansionNode(degree=expansion)
