@@ -1,5 +1,7 @@
 import numpy as np
 
+import mdp
+
 
 class Environment(object):
     '''
@@ -112,3 +114,36 @@ class Environment(object):
         some reward value.
         """
         raise RuntimeError('method not implemented yet')
+    
+    
+    def generate_training_data(self, num_steps, noisy_dims=0, whitening=True, expansion=1, chunks=1):
+        """
+        Generates a list of data chunks. Each chunks is a 3-tuple of generated
+        data, corresponding actions and reward values/labels. 
+        """
+        
+        # for every chunk ...
+        result = []
+        for _ in range(chunks):
+
+            # data
+            data, actions, rewards = self.do_random_steps(num_steps=num_steps)
+    
+            # add noisy dim
+            for _ in range(noisy_dims):
+                noise_complete = 1. * self.rnd.rand(num_steps)
+                data = np.insert(data, 2, axis=1, values=noise_complete)
+    
+            # expansion
+            expansion_node = mdp.nodes.PolynomialExpansionNode(degree=expansion)
+            data = expansion_node.execute(data)
+    
+            # whitening
+            if whitening:
+                whitening_node = mdp.nodes.WhiteningNode()
+                whitening_node.train(data)
+                data = whitening_node.execute(data)
+    
+            result.append((data, actions, rewards))
+            
+        return result

@@ -28,17 +28,23 @@ class EnvironmentTest(unittest.TestCase):
         """
         Tests whether the result depends on the seed.
         """
+
+        #print 'Testing environments with seed:'
         for Env in self.environments:
-            env = Env(seed=3)
-            A, actions_1, rewards_1 = env.do_random_steps(num_steps=100)
+            
+            #print Env.__name__
             
             env = Env(seed=3)
-            B, actions_2, rewards_2 = env.do_random_steps(num_steps=100)
+            A, actions_1, rewards_1 = env.generate_training_data(num_steps=100, noisy_dims=2)[0]
+            
+            env = Env(seed=3)
+            B, actions_2, rewards_2 = env.generate_training_data(num_steps=100, noisy_dims=2)[0]
             
             assert np.array_equal(A, B)
             assert np.array_equal(actions_1, actions_2)
             assert np.array_equal(rewards_1, rewards_2)
         
+        #print 'Done.\n'
         return
 
 
@@ -46,18 +52,23 @@ class EnvironmentTest(unittest.TestCase):
         """
         Tests whether the result is random when seed is missing.
         """
+
+        #print 'Testing environments without seed:'
         for Env in self.environments:
         
-            env = Env()
-            A, actions_1, _ = env.do_random_steps(num_steps=100)
+            #print Env.__name__
             
             env = Env()
-            B, actions_2, _ = env.do_random_steps(num_steps=100)
+            A, actions_1, _ = env.generate_training_data(num_steps=100, noisy_dims=2)[0]
+            
+            env = Env()
+            B, actions_2, _ = env.generate_training_data(num_steps=100, noisy_dims=2)[0]
         
             assert not np.array_equal(A, B)
             if env.get_number_of_possible_actions() >= 2:
                 assert not np.array_equal(actions_1, actions_2)
             
+        #print 'Done.\n'
         return 
 
 
