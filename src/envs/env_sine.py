@@ -42,11 +42,11 @@ if __name__ == '__main__':
     
     # sample data
     steps = 10
-    cube = EnvSine()
-    data = cube.do_random_steps(num_steps=steps)[0]
+    env = EnvSine()
+    data = env.do_random_steps(num_steps=steps)[0]
     
     print 'Possible actions:'
-    for action, describtion in cube.get_actions_dict().iteritems():
+    for action, describtion in env.get_actions_dict().iteritems():
         print '  %2d = %s' % (action, describtion)
     
     # plot data
