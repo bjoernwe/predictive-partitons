@@ -97,8 +97,8 @@ class Environment(object):
         """
         
         # select random action
-        if action is None and self.actions is not None:
-            action = self.rnd.choice(self.actions)
+        if action is None:
+            action = self.rnd.choice(self.actions_dict.keys())
 
         # perform action        
         self.current_state, reward = self._do_action(action=action)
@@ -135,7 +135,8 @@ class Environment(object):
     
             # add noisy dim
             for _ in range(noisy_dims):
-                noise_complete = 1. * self.rnd.rand(num_steps)
+                #noise_complete = 1. * self.rnd.rand(num_steps)
+                noise_complete = 1. * self.rnd.randn(num_steps)
                 data = np.insert(data, data.shape[1], axis=1, values=noise_complete)
     
             # expansion
