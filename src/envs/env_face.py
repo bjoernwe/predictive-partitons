@@ -18,6 +18,7 @@ class EnvFace(environment.Environment):
         seed:        int - 
         """
         super(EnvFace, self).__init__(seed=seed)
+        self.noisy_dim_dist = 'normal'
         self.video = np.load(os.path.dirname(__file__) + '/faces.npy')
         self.n_frames, self.ndim = self.video.shape
         self.counter = 0

@@ -3,7 +3,7 @@ import unittest
 
 import env_cube
 import env_disk
-import env_noise
+import env_face
 import env_oscillator
 import env_ribbon
 import env_sine
@@ -18,7 +18,7 @@ class EnvironmentTest(unittest.TestCase):
         self.environments = []
         self.environments.append(env_cube.EnvCube)    
         self.environments.append(env_disk.EnvDisk)    
-        self.environments.append(env_noise.EnvNoise)    
+        self.environments.append(env_face.EnvFace)    
         self.environments.append(env_oscillator.EnvOscillator)    
         self.environments.append(env_ribbon.EnvRibbon)    
         self.environments.append(env_sine.EnvSine)    

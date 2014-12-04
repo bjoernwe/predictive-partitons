@@ -24,6 +24,7 @@ class EnvCubeInteractive(environment.Environment):
         """
         super(EnvCubeInteractive, self).__init__(seed=seed)
         self.ndim = ndim
+        self.noisy_dim_dist = 'uniform'
         self.current_state = np.zeros(ndim)
         
         self.step_size = step_size

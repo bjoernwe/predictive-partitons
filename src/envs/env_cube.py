@@ -22,6 +22,7 @@ class EnvCube(environment.Environment):
         """
         super(EnvCube, self).__init__(seed=seed)
         self.ndim = ndim
+        self.noisy_dim_dist = 'uniform'
         self.sigma = sigma
         self.current_state = .5 * np.ones(ndim)
         return

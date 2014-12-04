@@ -1,6 +1,8 @@
+import collections
 import numpy as np
 
 import mdp
+
 
 
 class Environment(object):
@@ -21,6 +23,7 @@ class Environment(object):
         self.ndim = None                # initialize in sub-class
         self.actions_dict = {0: None}   # initialize in sub-class
         self.current_state = None       # initialize in sub-class
+        self.noisy_dim_dist = None      # initialize in sub-class
         self.last_action = None
         self.last_reward = None
         self.rnd = np.random.RandomState(seed)
@@ -119,15 +122,21 @@ class Environment(object):
     def generate_training_data(self, num_steps, noisy_dims=0, whitening=True, expansion=1, chunks=1):
         """
         Generates a list of data chunks. Each chunks is a 3-tuple of generated
-        data, corresponding actions and reward values/labels. 
+        data, corresponding actions and reward values/labels. The whitening is
+        calculated from the first chunk only.
         """
         
         # for every chunk ...
         result = []
-        for _ in range(chunks):
+        for c in range(chunks):
+            
+            # number of steps
+            N = num_steps
+            if isinstance(num_steps, collections.Iterable):
+                N = num_steps[c]
 
             # data
-            data, actions, rewards = self.do_random_steps(num_steps=num_steps)
+            data, actions, rewards = self.do_random_steps(num_steps=N)
             
             # make sure data has two dimensions
             if data.ndim == 1:
@@ -135,9 +144,19 @@ class Environment(object):
     
             # add noisy dim
             for _ in range(noisy_dims):
-                #noise_complete = 1. * self.rnd.rand(num_steps)
-                noise_complete = 1. * self.rnd.randn(num_steps)
-                data = np.insert(data, data.shape[1], axis=1, values=noise_complete)
+                if self.noisy_dim_dist is None:
+                    print 'No default distribution set for noisy dimension (noisy_dim_dist). Assuming normal.'
+                    noise = self.rnd.randn(N)
+                elif self.noisy_dim_dist == 'normal':
+                    noise = self.rnd.randn(N)
+                elif self.noisy_dim_dist == 'uniform':
+                    noise = self.rnd.rand(N)
+                elif self.noisy_dim_dist == 'binary':
+                    noise = self.rnd.randint(2, size=N)
+                else:
+                    print 'I do not understand noisy_dim_dist ==', self.noisy_dim_dist
+                    assert False
+                data = np.insert(data, data.shape[1], axis=1, values=noise)
     
             # expansion
             expansion_node = mdp.nodes.PolynomialExpansionNode(degree=expansion)
@@ -145,8 +164,9 @@ class Environment(object):
     
             # whitening
             if whitening:
-                whitening_node = mdp.nodes.WhiteningNode()
-                whitening_node.train(data)
+                if c == 0:
+                    whitening_node = mdp.nodes.WhiteningNode()
+                    whitening_node.train(data)
                 data = whitening_node.execute(data)
     
             result.append((data, actions, rewards))

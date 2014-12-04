@@ -22,6 +22,7 @@ class EnvDisk(environment.Environment):
         super(EnvDisk, self).__init__(seed=seed)
         
         self.ndim = 2
+        self.noisy_dim_dist = 'uniform'
         self.sigma_phi = sigma_phi
         self.sigma_rad = sigma_rad
         self.actions_dict = {0: 'PHI', 1: 'RAD'}

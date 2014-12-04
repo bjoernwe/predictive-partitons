@@ -18,6 +18,7 @@ class EnvOscillator(environment.Environment):
         """
         super(EnvOscillator, self).__init__(seed=seed)
         self.ndim = ndim
+        self.noisy_dim_dist = 'binary'
         self.current_state = np.zeros(ndim)
         self.counter = 0
         return

@@ -16,6 +16,7 @@ class EnvSwissRoll(environment.Environment):
         #    self.rnd.seed(seed)
             
         self.ndim = 2
+        self.noisy_dim_dist = 'uniform'
         self.actions = None
         
         self.sigma = sigma

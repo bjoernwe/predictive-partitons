@@ -16,6 +16,7 @@ class EnvSine(environment.Environment):
         """
         super(EnvSine, self).__init__(seed=seed)
         self.ndim = 1
+        self.noisy_dim_dist = 'uniform'
         self.counter = 0
         self.current_state = np.sin(self.counter)
         return

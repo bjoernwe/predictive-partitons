@@ -5,12 +5,14 @@ import environment
 
 
 class EnvRibbon(environment.Environment):
-    """A simple environment in which the agent moves along a env."""
+    """A simple environment in which the agent moves along a ribbon (like an 
+    eight)."""
 
     def __init__(self, step_size=1, seed=None):
         super(EnvRibbon, self).__init__(seed=seed)
         
         self.ndim = 2
+        self.noisy_dim_dist = 'uniform'
         self.step_size = step_size
         self.actions_dict = {0: 'NONE'}
         
@@ -26,7 +28,7 @@ class EnvRibbon(environment.Environment):
         
     
     def _do_action(self, action):
-        """Walks one step along the env.
+        """Walks one step along the ribbon.
         Returns new state and new angle.
         """
         
