@@ -165,7 +165,7 @@ class Environment(object):
             # whitening
             if whitening:
                 if c == 0:
-                    whitening_node = mdp.nodes.WhiteningNode()
+                    whitening_node = mdp.nodes.WhiteningNode(reduce=True)
                     whitening_node.train(data)
                 data = whitening_node.execute(data)
     
