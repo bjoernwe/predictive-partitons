@@ -17,11 +17,11 @@ if __name__ == '__main__':
     # parameters
     #
     resolution = 1000
-    data_all = 5000
-    data_training = 5000
+    data_size_training = 5000
+    data_size_test = 10000
     plot = False
 
-    for seed in range(10):
+    for i in range(10):
         
         #
         # data
@@ -29,12 +29,17 @@ if __name__ == '__main__':
         data_generators = [RandomSwissRollData,
                            NoisyDimData]
         data_list = []
-        for i, generator in enumerate(data_generators):
-            data = generator(n=data_all, seed=seed)
+        data_list_test = []
+        for _, generator in enumerate(data_generators):
+            data = generator(n=data_size_training, seed=i)
+            data_test = generator(n=data_size_test, seed=i+100)
             data_list.append(data)
+            data_list_test.append(data_test)
         # scale swiss role
         data_list[0].data += 1.
         data_list[0].data /= 2.
+        data_list_test[0].data += 1.
+        data_list_test[0].data /= 2.
     
         models = {}
         models['swiss_naive'] = worldmodel.WorldModel(method='naive')
@@ -46,7 +51,8 @@ if __name__ == '__main__':
         # swiss role, naive
         #
         model = models['swiss_naive']
-        model.add_data(data=data_list[0].data, actions=data.actions)
+        model.add_data(data=data_list[0].data, actions=data_list[0].actions)
+        model.add_test_data(data=data_list_test[0].data)
         model.update_stats()
      
         for _ in range(3):
@@ -79,13 +85,13 @@ if __name__ == '__main__':
         # swiss role, predictive
         #
         model = models['swiss_predictive']
-        model.add_data(data=data_list[0].data[:data_training], actions=data.actions)
+        model.add_data(data=data_list[0].data, actions=data.actions)
+        model.add_test_data(data=data_list_test[0].data)
         model.update_stats()
     
-        for i in range(24-1):
+        for _ in range(24-1):
             model.single_splitting_step(min_gain=float('-inf'))
             # plot data and borders
-            #if i == 7:
             if plot:
                 if model.get_number_of_states() == 24:
                     pyplot.subplot(2, 4, 2)
@@ -110,6 +116,7 @@ if __name__ == '__main__':
         #
         model = models['noise_naive']
         model.add_data(data=data_list[1].data, actions=data.actions)
+        model.add_test_data(data=data_list_test[1].data)
         model.update_stats()
      
         for _ in range(3):
@@ -142,7 +149,8 @@ if __name__ == '__main__':
         # noise, predictive
         #
         model = models['noise_predictive']
-        model.add_data(data=data_list[1].data[:data_training], actions=data.actions)
+        model.add_data(data=data_list[1].data, actions=data.actions)
+        model.add_test_data(data=data_list_test[1].data)
         model.update_stats()
      
         for _ in range(16-1):
@@ -170,6 +178,6 @@ if __name__ == '__main__':
             pyplot.show()
     
         # save results
-        #pickle.dump(models, open('experiment_2013_09_esann_models_%d.dump' % seed, 'wb') )
-        #pickle.dump(data_list, open('experiment_2013_09_esann_data_%d.dump' % seed, 'wb') )
+        pickle.dump(models, open('experiment_2014_04_08_esann_models_%d.dump' % i, 'wb') )
+        pickle.dump(data_list, open('experiment_2014_04_08_esann_data_%d.dump' % i, 'wb') )
         

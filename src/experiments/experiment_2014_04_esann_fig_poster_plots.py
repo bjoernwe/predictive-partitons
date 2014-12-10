@@ -23,8 +23,8 @@ if __name__ == '__main__':
     results = {}
     for t in range(T):
         results[t] = {}
-        results[t]['models'] = pickle.load(open('experiment_2014_07_esann_models_%d.dump' % t, 'rb') )
-        results[t]['data'] = pickle.load(open('experiment_2014_07_esann_data_%d.dump' % t, 'rb') )
+        results[t]['models'] = pickle.load(open('experiment_2014_04_08_esann_models_%d.dump' % t, 'rb') )
+        results[t]['data'] = pickle.load(open('experiment_2014_04_08_esann_data_%d.dump' % t, 'rb') )
         print len(results[t]['models']['swiss_predictive'].stats)
         print len(results[t]['models']['noise_predictive'].stats)
         print ''
@@ -32,68 +32,74 @@ if __name__ == '__main__':
     #
     # plot results swiss role 
     #
-    N = 24
-    pyplot.subplot(1, 2, 1)
+    N = 16#24
+    #pyplot.subplot(1, 2, 1)
+    pyplot.figure()
     pyplot.xlabel('number of states')
     pyplot.ylabel('mutual information')
-    pyplot.title('Problem A')
+    #pyplot.title('Problem A')
 
-    results_mi = np.zeros((T, 4))
-    results_nodes = np.zeros((T, 4))
+    results_mi = np.zeros((T, 3))
+    results_nodes = np.zeros((T, 3))
     for t in range(T):
         model = results[t]['models']['swiss_naive']
-        results_mi[t,:] = np.array([s.mutual_information for s in model.stats])[:4]
-        results_nodes[t,:] = np.array([s.n_states for s in model.stats])[:4]
+        results_mi[t,:] = np.array([s.mutual_information_test for s in model.stats])[:3]
+        results_nodes[t,:] = np.array([s.n_states for s in model.stats])[:3]
     n_states = np.mean(results_nodes, axis=0)
     mi_mean = np.mean(results_mi, axis=0)
     mi_std = np.std(results_mi, axis=0)
-    pyplot.errorbar(x=n_states, y=mi_mean, yerr=mi_std, fmt='o-')
+    pyplot.errorbar(x=n_states, y=mi_mean, yerr=mi_std, fmt='o-', linewidth=1.5, color='#003560')
     
     results_mi = np.zeros((T, N))
     results_nodes = np.zeros((T, N))
     for t in range(T):
         model = results[t]['models']['swiss_predictive']
-        results_mi[t,:] = np.array([s.mutual_information for s in model.stats])[:N]
+        results_mi[t,:] = np.array([s.mutual_information_test for s in model.stats])[:N]
         results_nodes[t,:] = np.array([s.n_states for s in model.stats])[:N]
     n_states = np.mean(results_nodes, axis=0)
     mi_mean = np.mean(results_mi, axis=0)
     mi_std = np.std(results_mi, axis=0)
-    pyplot.errorbar(x=n_states, y=mi_mean, yerr=mi_std, fmt='-')
+    pyplot.errorbar(x=n_states, y=mi_mean, yerr=mi_std, fmt='-', linewidth=1.5, color='#8dae10')
 
-    pyplot.legend(['naive', 'predicitve'], loc='lower right')
+    pyplot.xlim([0, N+1])
+    pyplot.ylim([0, 2.6])
+    pyplot.legend(['naive (grid)', 'predicitve'], loc='lower right')
 
 
     #
     # plot results noise 
     #
     N = 16
-    pyplot.subplot(1, 2, 2)
+    #pyplot.subplot(1, 2, 2)
+    pyplot.figure()
     pyplot.xlabel('number of states')
-    pyplot.title('Problem B')
+    pyplot.ylabel('mutual information')
+    #pyplot.title('Problem B')
     
-    results_mi = np.zeros((T, 4))
-    results_nodes = np.zeros((T, 4))
+    results_mi = np.zeros((T, 3))
+    results_nodes = np.zeros((T, 3))
     for t in range(T):
         model = results[t]['models']['noise_naive']
-        results_mi[t,:] = np.array([s.mutual_information for s in model.stats])[:4]
-        results_nodes[t,:] = np.array([s.n_states for s in model.stats])[:4]
+        results_mi[t,:] = np.array([s.mutual_information_test for s in model.stats])[:3]
+        results_nodes[t,:] = np.array([s.n_states for s in model.stats])[:3]
     n_states = np.mean(results_nodes, axis=0)
     mi_mean = np.mean(results_mi, axis=0)
     mi_std = np.std(results_mi, axis=0)
-    pyplot.errorbar(x=n_states, y=mi_mean, yerr=mi_std, fmt='o-')
+    pyplot.errorbar(x=n_states, y=mi_mean, yerr=mi_std, fmt='o-', linewidth=1.5, color='#003560')
 
     results_mi = np.zeros((T, N))
     results_nodes = np.zeros((T, N))
     for t in range(T):
         model = results[t]['models']['noise_predictive']
-        results_mi[t,:] = np.array([s.mutual_information for s in model.stats])[:N]
+        results_mi[t,:] = np.array([s.mutual_information_test for s in model.stats])[:N]
         results_nodes[t,:] = np.array([s.n_states for s in model.stats])[:N]
     n_states = np.mean(results_nodes, axis=0)
     mi_mean = np.mean(results_mi, axis=0)
     mi_std = np.std(results_mi, axis=0)
-    pyplot.errorbar(x=n_states, y=mi_mean, yerr=mi_std, fmt='-')
+    pyplot.errorbar(x=n_states, y=mi_mean, yerr=mi_std, fmt='-', linewidth=1.5, color='#8dae10')
 
-    pyplot.legend(['naive', 'predicitve'], loc='lower right')
+    pyplot.xlim([0, N+1])
+    pyplot.legend(['naive (grid)', 'predicitve'], loc='lower right')
 
     #
     # 
