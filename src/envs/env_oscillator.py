@@ -9,15 +9,15 @@ class EnvOscillator(environment.Environment):
     corners of a unit (hyper-) cube.
     """
 
-    def __init__(self, ndim=2, seed=None):
+    def __init__(self, ndim=2, transition_prob=1., seed=None):
         """Initialize the environment.
         --------------------------------------
         Parameters:
-        ndim:        int - dimensionality of the generated cube
         seed:        int - 
         """
         super(EnvOscillator, self).__init__(seed=seed)
         self.ndim = ndim
+        self.transition_prob = transition_prob
         self.noisy_dim_dist = 'binary'
         self.current_state = np.zeros(ndim)
         self.counter = 0
@@ -36,7 +36,8 @@ class EnvOscillator(environment.Environment):
         reward = 0
         """
         
-        self.counter += 1
+        if self.rnd.rand() < self.transition_prob:
+            self.counter += 1
         
         for i in range(self.ndim):
             self.current_state[i] = (self.counter >> i) % 2
