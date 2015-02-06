@@ -5,6 +5,7 @@ import env_cube
 import env_disk
 import env_face
 import env_oscillator
+import env_random
 import env_ribbon
 import env_sine
 import env_swiss_roll
@@ -20,6 +21,7 @@ class EnvironmentTest(unittest.TestCase):
         self.environments.append(env_disk.EnvDisk)    
         self.environments.append(env_face.EnvFace)    
         self.environments.append(env_oscillator.EnvOscillator)    
+        self.environments.append(env_random.EnvRandom)    
         self.environments.append(env_ribbon.EnvRibbon)    
         self.environments.append(env_sine.EnvSine)    
         self.environments.append(env_swiss_roll.EnvSwissRoll)    
