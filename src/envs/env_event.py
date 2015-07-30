@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-import numpy as np
 
 import environment
 
@@ -18,6 +17,7 @@ class EnvEvent(environment.Environment):
         """
         super(EnvEvent, self).__init__(seed=seed)
         self.ndim = 1
+        self.noisy_dim_dist = 'binary'
         self.prob = prob
         self.current_state = 0
         return
@@ -39,6 +39,7 @@ class EnvEvent(environment.Environment):
             self.current_state = 1
         else:
             self.current_state = 0
+        self.current_state += 1e-10 * self.rnd.randn()
             
         return self.current_state, 0
 
