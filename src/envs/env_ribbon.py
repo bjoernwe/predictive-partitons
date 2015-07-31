@@ -8,12 +8,13 @@ class EnvRibbon(environment.Environment):
     """A simple environment in which the agent moves along a ribbon (like an 
     eight)."""
 
-    def __init__(self, step_size=1, seed=None):
+    def __init__(self, step_size=1, sigma_noise=.05, seed=None):
         super(EnvRibbon, self).__init__(seed=seed)
         
         self.ndim = 2
         self.noisy_dim_dist = 'uniform'
         self.step_size = step_size
+        self.sigma_noise = sigma_noise
         self.actions_dict = {0: 'NONE'}
         
         self.phi = 0
@@ -22,8 +23,8 @@ class EnvRibbon(environment.Environment):
     
     
     def _render(self, phi):
-        x = np.cos(phi)
-        y = np.sin(2*phi)
+        x = np.cos(phi) + self.sigma_noise * self.rnd.randn()
+        y = np.sin(2*phi) + self.sigma_noise * self.rnd.randn()
         return np.array([x,y])
         
     
